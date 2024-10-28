@@ -12,3 +12,8 @@ docs/
 
 # Dotenv file
 .env
+
+# Circom
+/node_modules
+/circuits/build
+/circuits/contracts
