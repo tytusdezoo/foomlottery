@@ -4,6 +4,10 @@
   "main": "index.js",
   "license": "MIT",
   "dependencies": {
-    "circomlib": "^2.0.5"
+    "circomlib": "^2.0.5",
+    "circomlibjs": "^0.1.7",
+    "pedersen-fast": "^0.4.0",
+    "snarkjs": "^0.7.5",
+    "thirdweb": "^5.64.2"
   }
 }
