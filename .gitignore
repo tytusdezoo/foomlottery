@@ -15,5 +15,4 @@ docs/
 
 # Circom
 /node_modules
-/circuits/build
-/circuits/contracts
+/circuit_artifacts
