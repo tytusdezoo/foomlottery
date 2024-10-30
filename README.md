@@ -1,66 +1,57 @@
-## Foundry
+# Tornado Cash [Re-built]
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+Tornado Cash is a non-custodial Ethereum and ERC20 privacy solution based on zkSNARKs.
 
-Foundry consists of:
+This repository re-builds Tornado Cash for **educational purposes** as a [Foundry](https://book.getfoundry.sh/) project, and uses the latest versions of Circom ([circomlib](https://github.com/iden3/circomlib) and [circomlibjs](https://github.com/iden3/circomlibjs)) and [snarkJS](https://github.com/iden3/snarkjs) to generate proofs.
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+The ([original-repository](https://github.com/tornadocash/tornado-core)) is built with older versions of tools, and it is difficult to use it as educational reference material to understand the latest Solidity <-> Circom workflow for writing smart contracts with ZK-SNARK capabilities.
 
-## Documentation
+## Installation
 
-https://book.getfoundry.sh/
+Clone this repository
+
+```bash
+git clone https://github.com/nkrishang/tornado-cash-rebuilt.git
+```
+
+Install dependencies:
+
+```bash
+forge install
+```
+
+```bash
+yarn
+```
 
 ## Usage
 
-### Build
+### Compiling circom circuits
 
-```shell
-$ forge build
+The main workflow of this repo is:
+
+1. Compile circuits to generate circuit artifacts (e.g. r1cs file, ...)
+2. Perform a powers of tau ceremony
+3. Generate zkey and verifier Solidity smart contract
+
+These three steps are written as bash commands in the [makefile](https://github.com/nkrishang/tornado-cash-rebuilt/blob/main/makefile). Run the following to perform these steps:
+
+```bash
+make all
 ```
 
-### Test
+This will create a `/circuit_artifacts` folder that contains everything needed to run tests.
 
-```shell
-$ forge test
+### Running tests
+
+There is a single forge test file `/test/ETHTornado.t.sol` and scripts used in this test `/forge-ffi-scripts`. The test and script files are annotated.
+
+Run the following command to run tests (_after_ you have generated circuit artifacts):
+
+```bash
+forge test
 ```
 
-### Format
+## Credits
 
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+For a comprehensive understanding of ZK-SNARKs, see the Rareskills [ZK Book](https://www.rareskills.io/zk-book) and their [article](https://www.rareskills.io/post/how-does-tornado-cash-work) on how Tornado Cash works.
