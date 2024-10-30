@@ -1,7 +1,7 @@
 const circomlibjs = require("circomlibjs");
 const { MerkleTree } = require("fixed-merkle-tree");
 
-const { leBufferToBigint, hexToBigint } = require("./bigint");
+const { leBufferToBigint, hexToBigint } = require("./bigint.js");
 
 // Constants from MerkleTreeWithHistory.sol
 const MERKLE_TREE_HEIGHT = 20;
@@ -31,7 +31,7 @@ const ZERO_VALUES = [
 ].map(hexToBigint);
 
 // Creates a fixed height merkle-tree with MiMC hash function (just like MerkleTreeWithHistory.sol)
-async function createMerkleTree(leaves = []) {
+async function mimicMerkleTree(leaves = []) {
   const pedersen = await circomlibjs.buildPedersenHash();
   const mimcsponge = await circomlibjs.buildMimcSponge();
 
@@ -47,5 +47,5 @@ async function createMerkleTree(leaves = []) {
 }
 
 module.exports = {
-  createMerkleTree,
+  mimicMerkleTree,
 };

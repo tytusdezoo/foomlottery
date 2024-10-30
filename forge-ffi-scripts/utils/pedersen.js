@@ -1,6 +1,6 @@
 const circomlibjs = require("circomlibjs");
 
-const { leBufferToBigint } = require("./bigint");
+const { leBufferToBigint } = require("./bigint.js");
 
 // Computes the Pedersen hash of the given data, returning the result as a BigInt.
 const pedersenHash = async (data) => {

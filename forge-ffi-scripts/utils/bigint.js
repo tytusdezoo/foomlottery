@@ -1,3 +1,5 @@
+const { randomBytes } = require("crypto");
+
 // Generates a random BigInt of specified byte length
 const rbigint = (nbytes) => leBufferToBigint(randomBytes(nbytes));
 
