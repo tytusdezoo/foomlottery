@@ -25,7 +25,8 @@ ptau:
 gen_verifier:
 	cd $(ARTIFACTS_DIR) && \
 	snarkjs groth16 setup withdraw.r1cs pot16_final.ptau withdraw_final.zkey && \
-	snarkjs zkey export solidityverifier withdraw_final.zkey ../src/Verifier.sol
+	snarkjs zkey export solidityverifier withdraw_final.zkey ../src/Verifier.sol && \
+	snarkjs zkey export verificationkey withdraw_final.zkey verification_key.json
 
 # Clean circuit_artifacts
 clean:
