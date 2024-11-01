@@ -110,8 +110,6 @@ contract ETHTornadoTest is Test {
         // 2. Generate witness and proof.
         bytes32[] memory leaves = new bytes32[](1);
         leaves[0] = commitment;
-
-        console.logBytes32(mixer.getLastRoot());
         (
             uint256[2] memory pA,
             uint256[2][2] memory pB,
@@ -193,7 +191,7 @@ contract ETHTornadoTest is Test {
             bytes32 nullifierHash
         ) = _getWitnessAndProof(nullifier, secret, recipient, relayer, leaves);
 
-        // 3. Verify proof against the verifier contract.
+        // 5. Verify proof against the verifier contract.
         assertTrue(
             verifier.verifyProof(
                 pA,
@@ -209,12 +207,8 @@ contract ETHTornadoTest is Test {
                 ]
             )
         );
-        
-        // 4. Deposit funds into the contract.
-        
-        // assertEq(uint256(mixer.getLastRoot()), uint256(root));
 
-        // 5. Withdraw funds from the contract.
+        // 6. Withdraw funds from the contract.
         assertEq(recipient.balance, 0);
         assertEq(address(mixer).balance, 200 ether);
         mixer.withdraw(
