@@ -6,9 +6,8 @@ import {Groth16Verifier} from "test/utils/Verifier.sol";
 import {ETHTornado, IVerifier, IHasher} from "src/ETHTornado.sol";
 
 contract ETHTornadoTest is Test {
-
     uint256 public constant FIELD_SIZE = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
-    
+
     IVerifier public verifier;
     ETHTornado public mixer;
 
@@ -46,7 +45,7 @@ contract ETHTornadoTest is Test {
 
         /**
          * Deploy Tornado Cash mixer
-         * 
+         *
          * - verifier: Groth16 verifier
          * - hasher: MiMC hasher
          * - denomination: 1 ETH
@@ -55,7 +54,13 @@ contract ETHTornadoTest is Test {
         mixer = new ETHTornado(verifier, IHasher(mimcHasher), 1 ether, 20);
     }
 
-    function _getWitnessAndProof(bytes32 _nullifier, bytes32 _secret, address _recipient, address _relayer, bytes32[] memory leaves) internal returns (uint256[2] memory, uint256[2][2] memory, uint256[2] memory, bytes32, bytes32) {
+    function _getWitnessAndProof(
+        bytes32 _nullifier,
+        bytes32 _secret,
+        address _recipient,
+        address _relayer,
+        bytes32[] memory leaves
+    ) internal returns (uint256[2] memory, uint256[2][2] memory, uint256[2] memory, bytes32, bytes32) {
         string[] memory inputs = new string[](8 + leaves.length);
         inputs[0] = "node";
         inputs[1] = "forge-ffi-scripts/generateWitness.js";
@@ -66,18 +71,13 @@ contract ETHTornadoTest is Test {
         inputs[6] = "0";
         inputs[7] = "0";
 
-        for(uint256 i = 0; i < leaves.length; i++) {
+        for (uint256 i = 0; i < leaves.length; i++) {
             inputs[8 + i] = vm.toString(leaves[i]);
         }
 
         bytes memory result = vm.ffi(inputs);
-        (
-            uint256[2] memory pA,
-            uint256[2][2] memory pB,
-            uint256[2] memory pC,
-            bytes32 root,
-            bytes32 nullifierHash
-        ) = abi.decode(result, (uint256[2], uint256[2][2], uint256[2], bytes32, bytes32));
+        (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, bytes32 root, bytes32 nullifierHash) =
+            abi.decode(result, (uint256[2], uint256[2][2], uint256[2], bytes32, bytes32));
 
         return (pA, pB, pC, root, nullifierHash);
     }
@@ -88,35 +88,22 @@ contract ETHTornadoTest is Test {
         inputs[1] = "forge-ffi-scripts/generateCommitment.js";
 
         bytes memory result = vm.ffi(inputs);
-        (
-            commitment,
-            nullifier,
-            secret
-        ) = abi.decode(result, (bytes32, bytes32, bytes32));
+        (commitment, nullifier, secret) = abi.decode(result, (bytes32, bytes32, bytes32));
 
         return (commitment, nullifier, secret);
     }
 
     function test_mixer_single_deposit() public {
         // 1. Generate commitment and deposit
-        (
-            bytes32 commitment,
-            bytes32 nullifier,
-            bytes32 secret    
-        ) = _getCommitment();
-        
+        (bytes32 commitment, bytes32 nullifier, bytes32 secret) = _getCommitment();
+
         mixer.deposit{value: 1 ether}(commitment);
 
         // 2. Generate witness and proof.
         bytes32[] memory leaves = new bytes32[](1);
         leaves[0] = commitment;
-        (
-            uint256[2] memory pA,
-            uint256[2][2] memory pB,
-            uint256[2] memory pC,
-            bytes32 root,
-            bytes32 nullifierHash
-        ) = _getWitnessAndProof(nullifier, secret, recipient, relayer, leaves);
+        (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, bytes32 root, bytes32 nullifierHash) =
+            _getWitnessAndProof(nullifier, secret, recipient, relayer, leaves);
 
         // 3. Verify proof against the verifier contract.
         assertTrue(
@@ -138,17 +125,7 @@ contract ETHTornadoTest is Test {
         // 4. Withdraw funds from the contract.
         assertEq(recipient.balance, 0);
         assertEq(address(mixer).balance, 1 ether);
-        mixer.withdraw(
-            pA,
-            pB,
-            pC,
-            root,
-            nullifierHash,
-            recipient,
-            relayer,
-            fee,
-            refund
-        );
+        mixer.withdraw(pA, pB, pC, root, nullifierHash, recipient, relayer, fee, refund);
         assertEq(recipient.balance, 1 ether);
         assertEq(address(mixer).balance, 0);
     }
@@ -159,37 +136,28 @@ contract ETHTornadoTest is Test {
         // 1. Make many deposits with random commitments -- this will let us test with a non-empty merkle tree
         for (uint256 i = 0; i < 100; i++) {
             bytes32 leaf = bytes32(uint256(keccak256(abi.encode(i))) % FIELD_SIZE);
-            
+
             mixer.deposit{value: 1 ether}(leaf);
             leaves[i] = leaf;
         }
 
         // 2. Generate commitment and deposit.
-        (
-            bytes32 commitment,
-            bytes32 nullifier,
-            bytes32 secret    
-        ) = _getCommitment();
-        
+        (bytes32 commitment, bytes32 nullifier, bytes32 secret) = _getCommitment();
+
         mixer.deposit{value: 1 ether}(commitment);
         leaves[100] = commitment;
 
         // 3. Make more deposits.
         for (uint256 i = 101; i < 200; i++) {
             bytes32 leaf = bytes32(uint256(keccak256(abi.encode(i))) % FIELD_SIZE);
-            
+
             mixer.deposit{value: 1 ether}(leaf);
             leaves[i] = leaf;
         }
-        
+
         // 4. Generate witness and proof.
-        (
-            uint256[2] memory pA,
-            uint256[2][2] memory pB,
-            uint256[2] memory pC,
-            bytes32 root,
-            bytes32 nullifierHash
-        ) = _getWitnessAndProof(nullifier, secret, recipient, relayer, leaves);
+        (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, bytes32 root, bytes32 nullifierHash) =
+            _getWitnessAndProof(nullifier, secret, recipient, relayer, leaves);
 
         // 5. Verify proof against the verifier contract.
         assertTrue(
@@ -211,17 +179,7 @@ contract ETHTornadoTest is Test {
         // 6. Withdraw funds from the contract.
         assertEq(recipient.balance, 0);
         assertEq(address(mixer).balance, 200 ether);
-        mixer.withdraw(
-            pA,
-            pB,
-            pC,
-            root,
-            nullifierHash,
-            recipient,
-            relayer,
-            fee,
-            refund
-        );
+        mixer.withdraw(pA, pB, pC, root, nullifierHash, recipient, relayer, fee, refund);
         assertEq(recipient.balance, 1 ether);
         assertEq(address(mixer).balance, 199 ether);
     }
