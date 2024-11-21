@@ -61,8 +61,6 @@ contract MerkleTreeWithHistory {
         return bytes32(R);
     }
 
-    event Num(uint256 x);
-
     function _insert(bytes32 _leaf) internal returns (uint32 index) {
         uint32 _nextIndex = nextIndex;
         require(_nextIndex != uint32(2) ** levels, "Merkle tree is full. No more leaves can be added");
@@ -72,7 +70,6 @@ contract MerkleTreeWithHistory {
         bytes32 right;
 
         for (uint32 i = 0; i < levels; i++) {
-            emit Num(i);
             if (currentIndex % 2 == 0) {
                 left = currentLevelHash;
                 right = zeros(i);
