@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {Test, console} from "forge-std/Test.sol";
-import {Groth16Verifier} from "test/utils/Verifier.sol";
+import {Groth16Verifier} from "src/Verifier.sol";
 import {ETHTornado, IVerifier, IHasher} from "src/ETHTornado.sol";
 
 contract ETHTornadoTest is Test {
