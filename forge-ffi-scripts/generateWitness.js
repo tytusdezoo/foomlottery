@@ -11,7 +11,7 @@ const {
 const { pedersenHash } = require("./utils/pedersen.js");
 const { mimicMerkleTree } = require("./utils/mimcMerkleTree.js");
 
-// Intended output: (bytes32 commitment, uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, bytes32 root, bytes32 nullifierHash)
+// Intended output: (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, bytes32 root, bytes32 nullifierHash)
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 
