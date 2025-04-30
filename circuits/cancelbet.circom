@@ -26,12 +26,10 @@ template CancelBet() {
     signal input fee;      // not taking part in any computations
     signal input refund;   // not taking part in any computations
     
-    signal input nullifier; // TODO: could be removed
     signal input secret;
     signal input mask;
 
     component hasher = SecretHasher();
-    hasher.nullifier <== nullifier;
     hasher.secret <== secret;
 
     component S0 = MiMCFeistel(220);

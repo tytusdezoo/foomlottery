@@ -16,3 +16,5 @@ docs/
 # Circom
 /node_modules
 /circuit_artifacts
+/circuits/lib
+

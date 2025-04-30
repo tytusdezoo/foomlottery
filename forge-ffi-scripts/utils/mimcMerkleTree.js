@@ -4,7 +4,7 @@ const { MerkleTree } = require("fixed-merkle-tree");
 const { leBufferToBigint, hexToBigint } = require("./bigint.js");
 
 // Constants from MerkleTreeWithHistory.sol
-const MERKLE_TREE_HEIGHT = 20;
+const MERKLE_TREE_HEIGHT = 32;
 
 // This matches the zeros function in MerkleTreeWithHistory.sol
 const ZERO_VALUES = [
@@ -28,6 +28,18 @@ const ZERO_VALUES = [
   "0da2cb16a1ceaabf1c16b838f7a9e3f2a3a3088d9e0a6debaa748114620696ea",
   "24a3b3d822420b14b5d8cb6c28a574f01e98ea9e940551d2ebd75cee12649f9d",
   "198622acbd783d1b0d9064105b1fc8e4d8889de95c4c519b3f635809fe6afc05",
+  "29d7ed391256ccc3ea596c86e933b89ff339d25ea8ddced975ae2fe30b5296d4",
+  "19be59f2f0413ce78c0c3703a3a5451b1d7f39629fa33abd11548a76065b2967",
+  "1ff3f61797e538b70e619310d33f2a063e7eb59104e112e95738da1254dc3453",
+  "10c16ae9959cf8358980d9dd9616e48228737310a10e2b6b731c1a548f036c48",
+  "0ba433a63174a90ac20992e75e3095496812b652685b5e1a2eae0b1bf4e8fcd1",
+  "019ddb9df2bc98d987d0dfeca9d2b643deafab8f7036562e627c3667266a044c",
+  "2d3c88b23175c5a5565db928414c66d1912b11acf974b2e644caaac04739ce99",
+  "2eab55f6ae4e66e32c5189eed5c470840863445760f5ed7e7b69b2a62600f354",
+  "002df37a2642621802383cf952bf4dd1f32e05433beeb1fd41031fb7eace979d",
+  "104aeb41435db66c3e62feccc1d6f5d98d0a0ed75d1374db457cf462e3a1f427",
+  "1f3c6fd858e9a7d4b0d1f38e256a09d81d5a5e3c963987e2d4b814cfab7c6ebb",
+  "2c7a07d20dff79d01fecedc1134284a8d08436606c93693b67e333f671bf69cc",
 ].map(hexToBigint);
 
 // Creates a fixed height merkle-tree with MiMC hash function (just like MerkleTreeWithHistory.sol)

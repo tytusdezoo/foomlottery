@@ -71,16 +71,16 @@ template Withdraw(levels,power1,power2,power3) {
     lottoBits.in <== lotto;
     maskBits.in <== mask;
     var j = 0;
-    for (; j < power1; j++) {
-        test[j] <== lotoBits.out[j]*maskBits.out[j];
+    for ( j=j ; j < power1; j++) {
+        test[j] <== lottoBits.out[j] * maskBits.out[j];
         test[j] * reward1 === 0;
     }
-    for (; j < power1+power2; j++) {
-        test[j] <== lotoBits.out[j]*maskBits.out[j];
+    for ( j=j ; j < power1+power2; j++) {
+        test[j] <== lottoBits.out[j] * maskBits.out[j];
         test[j] * reward2 === 0;
     }
-    for (; j < power1+power2+power3; j++) { // no more mask
-        lotoBits.out[j]*reward3 === 0;
+    for ( j=j ; j < power1+power2+power3; j++) { // no more mask
+        lottoBits.out[j]*reward3 === 0;
     }
 
     // NEW calculate new leaf hash
