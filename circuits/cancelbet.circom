@@ -4,22 +4,17 @@ include "./lib/bitify.circom";
 include "./lib/pedersen.circom";
 include "./lib/mimcsponge.circom";
 
-// computes Pedersen(nullifier + secret)
-template PreCommitmentHasher() {
-    signal input nullifier;
+template SecretHasher() {
     signal input secret;
     signal output commitment;
 
-    component commitmentHasher = Pedersen(496);
-    component nullifierBits = Num2Bits(248);
+    component secretHasher = Pedersen(248);
     component secretBits = Num2Bits(248);
-    nullifierBits.in <== nullifier;
     secretBits.in <== secret;
     for (var i = 0; i < 248; i++) {
-        commitmentHasher.in[i] <== nullifierBits.out[i];
-        commitmentHasher.in[i + 248] <== secretBits.out[i];
+        secretHasher.in[i] <== secretBits.out[i];
     }
-    commitment <== commitmentHasher.out[0];
+    commitment <== secretHasher.out[0];
 }
 
 // Verifies that commitment that corresponds to given secret and nullifier is included in the merkle tree of deposits
@@ -35,7 +30,7 @@ template CancelBet() {
     signal input secret;
     signal input mask;
 
-    component hasher = PreCommitmentHasher();
+    component hasher = SecretHasher();
     hasher.nullifier <== nullifier;
     hasher.secret <== secret;
 

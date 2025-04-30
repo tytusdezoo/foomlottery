@@ -5,31 +5,24 @@ include "./lib/pedersen.circom";
 include "./lib/mimcsponge.circom"; // NEW
 include "./merkletree.circom";
 
-// computes Pedersen(nullifier + secret)
 template CommitmentHasher() {
-    signal input nullifier;
     signal input secret;
     signal input rand; // NEW
     signal output commitment;
     signal output nullifierHash;
 
-    component commitmentHasher = Pedersen(496);
-    // component nullifierHasher = Pedersen(248);
-    component nullifierHasher = Pedersen(496); // NEW
-    component nullifierBits = Num2Bits(248);
+    component secretHasher = Pedersen(248);
     component secretBits = Num2Bits(248);
-    component randBits = Num2Bits(248);
-    nullifierBits.in <== nullifier;
+    component nullifierHasher = Pedersen(248);
+    component nullifierBits = Num2Bits(248);
     secretBits.in <== secret;
-    randBits.in <== rand; // NEW
+    nullifierBits.in <== secret + rand;
     for (var i = 0; i < 248; i++) {
-        nullifierHasher.in[i] <== nullifierBits.out[i];
-        nullifierHasher.in[i + 248] <== randBits.out[i]; // NEW
-        commitmentHasher.in[i] <== nullifierBits.out[i];
-        commitmentHasher.in[i + 248] <== secretBits.out[i];
+        secretHasher.in[i] <== secretBits.out[i];
+        nullifierHasher.in[i] <== nullifierBits.out[248 -1 -i];
     }
 
-    commitment <== commitmentHasher.out[0];
+    commitment <== secretHasher.out[0];
     nullifierHash <== nullifierHasher.out[0];
 }
 
@@ -45,7 +38,6 @@ template Withdraw(levels,power1,power2,power3) {
     signal input fee;      // not taking part in any computations
     signal input refund;   // not taking part in any computations
     
-    signal input nullifier; // TODO: could be removed
     signal input secret;
     signal input mask; // NEW
     signal input rand; // NEW
@@ -53,7 +45,6 @@ template Withdraw(levels,power1,power2,power3) {
     signal input pathIndices[levels];
 
     component hasher = CommitmentHasher();
-    hasher.nullifier <== nullifier;
     hasher.secret <== secret;
     hasher.rand <== rand; // NEW
     hasher.nullifierHash === nullifierHash;
@@ -123,4 +114,4 @@ template Withdraw(levels,power1,power2,power3) {
     refundSquare <== refund * refund;
 }
 
-component main {public [root, nullifierHash, reward1, reward2, reward3, recipient, relayer, fee, refund]} = Withdraw(20,10,16,22);
+component main {public [root, nullifierHash, reward1, reward2, reward3, recipient, relayer, fee, refund]} = Withdraw(32,10,16,22);
