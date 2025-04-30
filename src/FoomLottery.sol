@@ -1,41 +1,30 @@
-pragma solidity ^0.7.0;
+pragma solidity ^0.8.0;
 
-import "./MerkleTreeWithHistory.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 interface IVerifier {
-    function verifyProof(
-        uint256[2] calldata _pA,
-        uint256[2][2] calldata _pB,
-        uint256[2] calldata _pC,
-        uint256[9] calldata _pubSignals
-    ) external view returns (bool);
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool);
 }
 interface ICancel {
-    function verifyProof(
-        uint256[2] calldata _pA,
-        uint256[2][2] calldata _pB,
-        uint256[2] calldata _pC,
-        uint256[6] calldata _pubSignals
-    ) external view returns (bool);
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[6] calldata _pubSignals) external view returns (bool);
 }
 interface IHasher {
-  function MiMCSponge(uint256 in_xL, uint256 in_xR) external pure returns (uint256 xL, uint256 xR);
+  function MiMCSponge(uint256 in_xL, uint256 in_xR, uint256 k) external pure returns (uint256 xL, uint256 xR);
 }
 
 /**
  * @title FOOM Lottery
  */
-contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
+contract FoomLottery {
     using SafeERC20 for IERC20;
     IERC20 public token; // FOOM token
 
     // metadata
     string public constant name = "Foom Lottery";
 
-    uint public constant merkleTreeLevels = 31 ; // number of Merkle Tree levels
+    uint public constant FIELD_SIZE = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
+    uint public constant merkleTreeLevels = 32 ; // number of Merkle Tree levels
     uint public constant merkleTreeReportLevel = 8 ; // report completed Merkle Tree level
     uint public constant periodBlocks = 16384 ; // number of blocks in a period
     uint public constant betMin = 0.001 ether; // minimum bet size per block, 
@@ -46,6 +35,8 @@ contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
     uint public constant dividendFeePerCent = 4; // 4% of dividends go to the shareholders (wall)
     uint public constant generatorFeePerCent = 1; // 1% of dividends go to the generator
     uint public constant maxBalance = 2**108; // maximum balance of a user and maximum size of bets in period
+    uint private constant _NOT_ENTERED = 1;
+    uint private constant _ENTERED = 2;
     //TODO: define minimum play amount
 
     // contract state
@@ -67,7 +58,7 @@ contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
     }
     //Period[] public periods;
     // it removes index range check on every interaction
-    mapping(uint256 => Period) public periods;
+    mapping(uint => Period) public periods;
     uint public currentBalance = 1; // sum of funds in wallets
     uint public currentBets = 1; // total bet volume in current period
     uint public currentShares = 1; // sum of funds eligible for dividend in current period
@@ -75,44 +66,83 @@ contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
 
     // betting parameters
     struct BetsRC {
-        uint256 R; // total bet volume in period
-        uint256 C; // total eligible funds in period
+        uint R; // total bet volume in period
+        uint C; // total eligible funds in period
     }
     //BetsRC public bets[betsMax]; // bets in queue
     // it removes index range check on every interaction
-    mapping(uint256 => BetsRC) public bets;
+    mapping(uint => BetsRC) public bets;
     uint public betsSum = 0; // sum of bets in queue
     uint public betsWaiting = 0; // sum of bets waiting for new generator commit
     uint public betsIndex = 0; // index of the next slot in queue
     mapping (uint => uint) public nullifier; // nullifier hash for each bet
-
-    //mapping (uint => uint) public betsMap; // TODO: all previous bets , for testing only !
 
     // generator data
     uint public commitHash = 0;
     uint public commitBlock = 0;
     uint public commitIndex = 0;
 
+    // mertkeltree
+    mapping(uint => bytes32) public filledSubtrees;
+    mapping(uint => bytes32) public roots;
+    mapping(uint => bytes32) public zeros;
+    uint public constant ROOT_HISTORY_SIZE = 64;
+    uint public currentRootIndex = 0;
+    uint public nextIndex = 0;
+
     // constructor
     IVerifier public immutable verifier;
     ICancel public immutable cancel;
     IHasher public immutable hasher;
-    constructor(
-        IVerifier _verifier,
-        ICancel _cancel,
-        IHasher _hasher,
-        IERC20 _token
-          ) MerkleTreeWithHistory(merkleTreeLevels, _hasher) {
-            verifier = _verifier;
-            cancel = _cancel;
-            hasher = _hasher;
-            token = _token;
-            owner = msg.sender;
-            generator = msg.sender;
-            periodStartBlock = block.number;
-            wallets[owner] = Wallet(uint112(1),uint112(1),uint16(dividendPeriod),uint16(0));
-            periods.push(Period(0,0)); // not used
-            periods.push(Period(1,1)); // not used
+    constructor(IVerifier _verifier,ICancel _cancel,IHasher _hasher,IERC20 _token) {
+        require(merkleTreeLevels<=32,"Tree too large");
+        verifier = _verifier;
+        cancel = _cancel;
+        hasher = _hasher;
+        token = _token;
+        owner = msg.sender;
+        generator = msg.sender;
+        periodStartBlock = block.number;
+        wallets[owner] = Wallet(uint112(1),uint112(1),uint16(dividendPeriod),uint16(0));
+        periods.push(Period(0,0)); // not used
+        periods.push(Period(1,1)); // not used
+        zeros[ 0]= bytes32(0x2fe54c60d3acabf3343a35b6eba15db4821b340f76e741e2249685ed4899af6c);
+        zeros[ 1]= bytes32(0x256a6135777eee2fd26f54b8b7037a25439d5235caee224154186d2b8a52e31d);
+        zeros[ 2]= bytes32(0x1151949895e82ab19924de92c40a3d6f7bcb60d92b00504b8199613683f0c200);
+        zeros[ 3]= bytes32(0x20121ee811489ff8d61f09fb89e313f14959a0f28bb428a20dba6b0b068b3bdb);
+        zeros[ 4]= bytes32(0x0a89ca6ffa14cc462cfedb842c30ed221a50a3d6bf022a6a57dc82ab24c157c9);
+        zeros[ 5]= bytes32(0x24ca05c2b5cd42e890d6be94c68d0689f4f21c9cec9c0f13fe41d566dfb54959);
+        zeros[ 6]= bytes32(0x1ccb97c932565a92c60156bdba2d08f3bf1377464e025cee765679e604a7315c);
+        zeros[ 7]= bytes32(0x19156fbd7d1a8bf5cba8909367de1b624534ebab4f0f79e003bccdd1b182bdb4);
+        zeros[ 8]= bytes32(0x261af8c1f0912e465744641409f622d466c3920ac6e5ff37e36604cb11dfff80);
+        zeros[ 9]= bytes32(0x0058459724ff6ca5a1652fcbc3e82b93895cf08e975b19beab3f54c217d1c007);
+        zeros[10]= bytes32(0x1f04ef20dee48d39984d8eabe768a70eafa6310ad20849d4573c3c40c2ad1e30);
+        zeros[11]= bytes32(0x1bea3dec5dab51567ce7e200a30f7ba6d4276aeaa53e2686f962a46c66d511e5);
+        zeros[12]= bytes32(0x0ee0f941e2da4b9e31c3ca97a40d8fa9ce68d97c084177071b3cb46cd3372f0f);
+        zeros[13]= bytes32(0x1ca9503e8935884501bbaf20be14eb4c46b89772c97b96e3b2ebf3a36a948bbd);
+        zeros[14]= bytes32(0x133a80e30697cd55d8f7d4b0965b7be24057ba5dc3da898ee2187232446cb108);
+        zeros[15]= bytes32(0x13e6d8fc88839ed76e182c2a779af5b2c0da9dd18c90427a644f7e148a6253b6);
+        zeros[16]= bytes32(0x1eb16b057a477f4bc8f572ea6bee39561098f78f15bfb3699dcbb7bd8db61854);
+        zeros[17]= bytes32(0x0da2cb16a1ceaabf1c16b838f7a9e3f2a3a3088d9e0a6debaa748114620696ea);
+        zeros[18]= bytes32(0x24a3b3d822420b14b5d8cb6c28a574f01e98ea9e940551d2ebd75cee12649f9d);
+        zeros[19]= bytes32(0x198622acbd783d1b0d9064105b1fc8e4d8889de95c4c519b3f635809fe6afc05);
+        zeros[20]= bytes32(0x29d7ed391256ccc3ea596c86e933b89ff339d25ea8ddced975ae2fe30b5296d4);
+        zeros[21]= bytes32(0x19be59f2f0413ce78c0c3703a3a5451b1d7f39629fa33abd11548a76065b2967);
+        zeros[22]= bytes32(0x1ff3f61797e538b70e619310d33f2a063e7eb59104e112e95738da1254dc3453);
+        zeros[23]= bytes32(0x10c16ae9959cf8358980d9dd9616e48228737310a10e2b6b731c1a548f036c48);
+        zeros[24]= bytes32(0x0ba433a63174a90ac20992e75e3095496812b652685b5e1a2eae0b1bf4e8fcd1);
+        zeros[25]= bytes32(0x019ddb9df2bc98d987d0dfeca9d2b643deafab8f7036562e627c3667266a044c);
+        zeros[26]= bytes32(0x2d3c88b23175c5a5565db928414c66d1912b11acf974b2e644caaac04739ce99);
+        zeros[27]= bytes32(0x2eab55f6ae4e66e32c5189eed5c470840863445760f5ed7e7b69b2a62600f354);
+        zeros[28]= bytes32(0x002df37a2642621802383cf952bf4dd1f32e05433beeb1fd41031fb7eace979d);
+        zeros[29]= bytes32(0x104aeb41435db66c3e62feccc1d6f5d98d0a0ed75d1374db457cf462e3a1f427);
+        zeros[30]= bytes32(0x1f3c6fd858e9a7d4b0d1f38e256a09d81d5a5e3c963987e2d4b814cfab7c6ebb);
+        zeros[31]= bytes32(0x2c7a07d20dff79d01fecedc1134284a8d08436606c93693b67e333f671bf69cc);
+        for (uint i = 0; i < merkleTreeLevels; i++) {
+            filledSubtrees[i] = zeros[i];
+        }
+        roots[0] = zeros[merkleTreeLevels - 1];
+        _status = _NOT_ENTERED;
     }
 
 /* lottery functions */
@@ -142,10 +172,10 @@ contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
     /**
      * @dev Play in lottery
      */
-    function play(uint _secrethash,uint _amount) external {
-        require(uint256(_secrethash) < FIELD_SIZE, "_left should be inside the field");
+    function play(uint _secrethash,uint _amount) external nonReentrant {
+        require(uint(_secrethash) < FIELD_SIZE, "_left should be inside the field");
         require(msg.value == 0, "ETH value is supposed to be 0 for ERC20 instance");
-        require(betsIndex + nextIndex < 2**32, "No more bets allowed"); // TODO: move to commit() ; nextIndex is from MerkleTreeWithHistory
+        require(betsIndex + nextIndex < 2 ** merkleTreeLevels, "No more bets allowed"); // TODO: move to commit() ; nextIndex is from MerkleTreeWithHistory
         token.safeTransferFrom(msg.sender, address(this), _amount);
         require(_secrethash != 0, "Invalid secret hash");
         require(betsIndex >= betsMax, "No more bets allowed");
@@ -158,15 +188,11 @@ contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
         uint mask = _getMask(_amount);
         uint R = _secrethash;
         uint C = 0;
-        (R, C) = _hasher.MiMCSponge(R, C, 0);
+        (R, C) = hasher.MiMCSponge(R, C, 0);
         R = addmod(R, mask, FIELD_SIZE);
-        (R, C) = _hasher.MiMCSponge(R, C, 0);
+        (R, C) = hasher.MiMCSponge(R, C, 0);
         bets[betsIndex].R = R;
         bets[betsIndex].C = C;
-        //uint power = _getPower(_amount);
-        //// store the bets in the contract
-        //uint bethash = power+(_secrethash<<8); // TODO: convert to zksnark freindly update, add minBet if allowed to change
-        //bets[betsIndex] = bethash;
         LogBetIn(_secrethash,nextIndex+betsIndex,mask,R,C); // mask,R,C not needed
         betsIndex++;
     }
@@ -187,7 +213,7 @@ contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
         uint _fee,
         uint _refund,
         uint _luck, // 0x1,0x2,0x4 for each lottery reward
-        uint _invest) payable external {
+        uint _invest) payable external nonReentrant {
         require(msg.value == _refund, "Incorrect refund amount received by the contract");
         require(nullifier[_nullifierHash] == 0, "Incorrect nullifier");
         require(isKnownRoot(_root), "Cannot find your merkle root"); // Make sure to use a recent one
@@ -197,13 +223,13 @@ contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
                 _pB,
                 _pC,
                 [
-                    uint256(_root),
-                    uint256(_nullifierHash),
-                    uint256(_luck&1?1:0),
-                    uint256(_luck&2?1:0),
-                    uint256(_luck&4?1:0),
-                    uint256(uint160(_recipient)),
-                    uint256(uint160(_relayer)),
+                    uint(_root),
+                    uint(_nullifierHash),
+                    uint(_luck&1?1:0),
+                    uint(_luck&2?1:0),
+                    uint(_luck&4?1:0),
+                    uint(uint160(_recipient)),
+                    uint(uint160(_relayer)),
                     _fee,
                     _refund
                 ]
@@ -211,9 +237,9 @@ contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
             "Invalid withdraw proof"
         );
         nullifier[_nullifierHash] = 1;
-        uint _reward == betMin * uint256(_luck&1?1:0) * 2**betPower1 +
-                        betMin * uint256(_luck&2?1:0) * 2**betPower2 +
-                        betMin * uint256(_luck&4?1:0) * 2**betPower3 ;
+        uint _reward == betMin * uint(_luck&1?1:0) * 2**betPower1 +
+                        betMin * uint(_luck&2?1:0) * 2**betPower2 +
+                        betMin * uint(_luck&4?1:0) * 2**betPower3 ;
         LogWin(uint _nullifierHash, uint _reward);
         currentBets += _reward;
         collectDividend(generator);
@@ -259,7 +285,7 @@ contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
         address payable _recipient,
         address payable _relayer,
         uint _fee,
-        uint _refund) payable external {
+        uint _refund) payable external nonReentrant {
         require(msg.value == _refund, "Incorrect refund amount received by the contract");
         require(nextIndex<=betIndex && betIndex<nextIndex+betsIndex, "Bet probably processed");
         uint betId=betIndex-nextIndex;
@@ -342,7 +368,7 @@ contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
             uint R = bets[i].R;
             uint C = bets[i].C;
             R = addmod(R, newhash, FIELD_SIZE);
-            (R, C) = _hasher.MiMCSponge(R, C, 0);
+            (R, C) = hasher.MiMCSponge(R, C, 0);
             uint currentLevelHash = R;
             if(i<commitIndex-1) {
                 insertedIndex = _insertleft(currentLevelHash);
@@ -367,37 +393,6 @@ contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
         // commitIndex = 0; // not needed
     }
 
-    /**
-     * @dev insert a leaf into the merkletree without updating the root
-     */
-    function _insertleft(bytes32 _leaf) internal returns (uint index) { // from MerkleTreeWithHistory
-        uint _nextIndex = nextIndex;
-        uint currentIndex = _nextIndex;
-        bytes32 currentLevelHash = _leaf;
-        bytes32 left;
-        bytes32 right;
-
-        //TODO: log hiher levels
-
-        for (uint i = 0; i < merkleTreeLevels; i++) {
-            if (currentIndex % 2 == 0) {
-                filledSubtrees[i] = currentLevelHash;
-                nextIndex = _nextIndex + 1;
-                if(i=>merkleTreeReportLevel){
-                    LogTreeHash(i,nextIndex,currentLevelHash);
-                }
-                return _nextIndex;
-            } else {
-                left = filledSubtrees[i];
-                right = currentLevelHash;
-            }
-            currentLevelHash = hashLeftRight(hasher, left, right);
-            currentIndex /= 2;
-        }
-        nextIndex = _nextIndex + 1;
-        return _nextIndex;
-    }
-
 /* investment functions */
 
     /**
@@ -416,7 +411,7 @@ contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
     /**
      * @dev Commit remaining dividends before balance changes
      */
-    function collectDividend(address _who) public {
+    function collectDividend(address _who) public nonReentrant {
         updateDividendPeriod();
         uint last = wallets[_who].lastDividendPeriod;
         if(last==0){
@@ -426,9 +421,9 @@ contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
         if(last==dividendPeriod) {
             return;
         }
-        uint shares = uint256(wallets[_who].shares) * 0xffffffff;
+        uint shares = uint(wallets[_who].shares) * 0xffffffff;
         uint betshares = shares * periods[last].bets / periods[last].shares;
-        shares = uint256(wallets[_who].balance) * 0xffffffff;
+        shares = uint(wallets[_who].balance) * 0xffffffff;
         for(last++;last<dividendPeriod;last++) {
             betshares += shares * periods[last].bets / periods[last].shares;
         }
@@ -444,7 +439,7 @@ contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
      * @dev Pay out balance from wallet
      * @param _amount The amount to pay out.
      */
-    function payOut(uint _amount) public {
+    function payOut(uint _amount) public nonReentrant {
         collectDividend(msg.sender);
         require(_amount <= wallets[msg.sender].balance, "Invalid amount");
         require(dividendPeriod <= wallets[msg.sender].nextWithdrawPeriod, "Wait till the next dividend period");
@@ -530,6 +525,18 @@ contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
         _;
     }
 
+    modifier nonReentrant() {
+        // On the first call to nonReentrant, _notEntered will be true
+        require(_status != _ENTERED, "ReentrancyGuard: reentrant call");
+        // Any calls to nonReentrant after this point will fail
+        _status = _ENTERED;
+        _;
+        // By storing the original value once again, a refund is triggered (see
+        // https://eips.ethereum.org/EIPS/eip-2200)
+        _status = _NOT_ENTERED;
+    }
+
+
     /**
      * @dev Change owner.
      * @param _who The address of new owner.
@@ -576,7 +583,7 @@ contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
      * @dev Show last dividend period processed.
      * @param _owner The address of the account.
      */
-    function walletPeriodOf(address _owner) constant external returns (uint) {
+    function walletDividendPeriodOf(address _owner) constant external returns (uint) {
         return uint(wallets[_owner].lastDividendPeriod);
     }
     
@@ -584,8 +591,15 @@ contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
      * @dev Show block number when withdraw can continue.
      * @param _owner The address of the account.
      */
-    function walletBlockOf(address _owner) constant external returns (uint) {
-        return uint(wallets[_owner].nextWithdrawBlock);
+    function walletWithdrawPeriodOf(address _owner) constant external returns (uint) {
+        return uint(wallets[_owner].nextWithdrawPeriod);
+    }
+
+    /**
+     * @dev Returns the last root
+     */
+    function getLastRoot() public view returns (bytes32) {
+        return roots[currentRootIndex];
     }
 
     // events
@@ -601,4 +615,93 @@ contract FoomLottery is MerkleTreeWithHistory, ReentrancyGuard {
     event LogChangeOwner(address indexed owner, address indexed newOwner);
     event LogChangeGenerator(address indexed owner, address indexed newGenerator);
     
+    /**
+     * @dev Hash 2 tree leaves, returns MiMC(_left, _right)
+     */
+    function hashLeftRight(bytes32 _left, bytes32 _right) public pure returns (bytes32) {
+        //require(uint(_left) < FIELD_SIZE, "_left should be inside the field");
+        //require(uint(_right) < FIELD_SIZE, "_right should be inside the field");
+        uint R = uint(_left);
+        uint C = 0;
+        (R, C) = hasher.MiMCSponge(R, C, 0);
+        R = addmod(R, uint(_right), FIELD_SIZE);
+        (R, C) = hasher.MiMCSponge(R, C, 0);
+        return bytes32(R);
+    }
+
+    function _insert(bytes32 _leaf) internal returns (uint index) {
+        uint _nextIndex = nextIndex;
+        uint currentIndex = _nextIndex;
+        bytes32 currentLevelHash = _leaf;
+        bytes32 left;
+        bytes32 right;
+
+        for (uint i = 0; i < merkleTreeLevels; i++) {
+            if (currentIndex % 2 == 0) {
+                left = currentLevelHash;
+                right = zeros[i];
+                filledSubtrees[i] = currentLevelHash;
+            } else {
+                left = filledSubtrees[i];
+                right = currentLevelHash;
+            }
+            currentLevelHash = hashLeftRight(left, right);
+            currentIndex /= 2;
+        }
+
+        uint newRootIndex = (currentRootIndex + 1) % ROOT_HISTORY_SIZE;
+        currentRootIndex = newRootIndex;
+        roots[newRootIndex] = currentLevelHash;
+        nextIndex = _nextIndex + 1;
+        return _nextIndex;
+    }
+
+    /**
+     * @dev insert a leaf into the merkletree without updating the root
+     */
+    function _insertleft(bytes32 _leaf) internal returns (uint index) { // from MerkleTreeWithHistory
+        uint _nextIndex = nextIndex;
+        uint currentIndex = _nextIndex;
+        bytes32 currentLevelHash = _leaf;
+        bytes32 left;
+        bytes32 right;
+        for (uint i = 0; i < merkleTreeLevels; i++) {
+            if (currentIndex % 2 == 0) {
+                filledSubtrees[i] = currentLevelHash;
+                nextIndex = _nextIndex + 1;
+                if(i=>merkleTreeReportLevel){
+                    LogTreeHash(i,nextIndex,currentLevelHash);
+                }
+                return _nextIndex;
+            } else {
+                left = filledSubtrees[i];
+                right = currentLevelHash;
+            }
+            currentLevelHash = hashLeftRight(left, right);
+            currentIndex /= 2;
+        }
+        nextIndex = _nextIndex + 1;
+        return _nextIndex;
+    }
+
+    /**
+     * @dev Whether the root is present in the root history
+     */
+    function isKnownRoot(bytes32 _root) public view returns (bool) {
+        if (_root == 0) {
+            return false;
+        }
+        uint _currentRootIndex = currentRootIndex;
+        uint i = _currentRootIndex;
+        do {
+            if (_root == roots[i]) {
+                return true;
+            }
+            if (i == 0) {
+                i = ROOT_HISTORY_SIZE;
+            }
+            i--;
+        } while (i != _currentRootIndex);
+        return false;
+    }
 }
