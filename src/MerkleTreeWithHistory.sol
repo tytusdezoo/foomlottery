@@ -21,7 +21,7 @@ contract MerkleTreeWithHistory {
     uint256 public constant ZERO_VALUE = 21663839004416932945382355908790599225266501822907911457504978515578255421292; // = keccak256("tornado") % FIELD_SIZE
     IHasher public immutable hasher;
 
-    uint32 public levels;
+    uint public levels;
 
     // the following variables are made public for easier testing and debugging and
     // are not supposed to be accessed in regular code
@@ -30,17 +30,17 @@ contract MerkleTreeWithHistory {
     // it removes index range check on every interaction
     mapping(uint256 => bytes32) public filledSubtrees;
     mapping(uint256 => bytes32) public roots;
-    uint32 public constant ROOT_HISTORY_SIZE = 30;
-    uint32 public currentRootIndex = 0;
-    uint32 public nextIndex = 0;
+    uint public constant ROOT_HISTORY_SIZE = 64;
+    uint public currentRootIndex = 0;
+    uint public nextIndex = 0;
 
-    constructor(uint32 _levels, IHasher _hasher) {
+    constructor(uint _levels, IHasher _hasher) {
         require(_levels > 0, "_levels should be greater than zero");
         require(_levels < 32, "_levels should be less than 32");
         levels = _levels;
         hasher = _hasher;
 
-        for (uint32 i = 0; i < _levels; i++) {
+        for (uint i = 0; i < _levels; i++) {
             filledSubtrees[i] = zeros(i);
         }
 
@@ -61,15 +61,15 @@ contract MerkleTreeWithHistory {
         return bytes32(R);
     }
 
-    function _insert(bytes32 _leaf) internal returns (uint32 index) {
-        uint32 _nextIndex = nextIndex;
-        require(_nextIndex != uint32(2) ** levels, "Merkle tree is full. No more leaves can be added");
-        uint32 currentIndex = _nextIndex;
+    function _insert(bytes32 _leaf) internal returns (uint index) {
+        uint _nextIndex = nextIndex;
+        require(_nextIndex != 2 ** levels, "Merkle tree is full. No more leaves can be added");
+        uint currentIndex = _nextIndex;
         bytes32 currentLevelHash = _leaf;
         bytes32 left;
         bytes32 right;
 
-        for (uint32 i = 0; i < levels; i++) {
+        for (uint i = 0; i < levels; i++) {
             if (currentIndex % 2 == 0) {
                 left = currentLevelHash;
                 right = zeros(i);
@@ -82,7 +82,7 @@ contract MerkleTreeWithHistory {
             currentIndex /= 2;
         }
 
-        uint32 newRootIndex = (currentRootIndex + 1) % ROOT_HISTORY_SIZE;
+        uint newRootIndex = (currentRootIndex + 1) % ROOT_HISTORY_SIZE;
         currentRootIndex = newRootIndex;
         roots[newRootIndex] = currentLevelHash;
         nextIndex = _nextIndex + 1;
@@ -96,8 +96,8 @@ contract MerkleTreeWithHistory {
         if (_root == 0) {
             return false;
         }
-        uint32 _currentRootIndex = currentRootIndex;
-        uint32 i = _currentRootIndex;
+        uint _currentRootIndex = currentRootIndex;
+        uint i = _currentRootIndex;
         do {
             if (_root == roots[i]) {
                 return true;
