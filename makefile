@@ -11,9 +11,9 @@ setup:
 # Compile withdraw.circom
 compile:
 	@echo "Compiling withdraw.circom..."
-	circom circuits/withdraw.circom --r1cs --wasm --sym -o $(ARTIFACTS_DIR)
+	circom circuits/withdraw.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
 	@echo "Compiling cancelbet.circom..."
-	circom circuits/cancelbet.circom --r1cs --wasm --sym -o $(ARTIFACTS_DIR)
+	circom circuits/cancelbet.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
 
 # Powers of tau ceremony
 ptau:

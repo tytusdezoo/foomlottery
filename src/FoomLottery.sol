@@ -20,6 +20,8 @@ contract FoomLottery {
     using SafeERC20 for IERC20;
     IERC20 public token; // FOOM token
 
+//TODO: add procedure to store last hash if late
+
     // metadata
     string public constant name = "Foom Lottery";
 

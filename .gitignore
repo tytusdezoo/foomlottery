@@ -18,3 +18,5 @@ docs/
 /circuit_artifacts
 /circuits/lib
 
+# Test
+forge-ffi-scripts/testMimc.js
