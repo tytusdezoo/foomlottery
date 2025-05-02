@@ -18,9 +18,22 @@ interface IHasher {
  */
 contract FoomLottery {
     using SafeERC20 for IERC20;
-    IERC20 public token; // FOOM token
+    IERC20 public immutable token; // FOOM token
+    IVerifier public immutable verifier;
+    ICancel public immutable cancel;
+    IHasher public immutable hasher;
 
-//TODO: add procedure to store last hash if late
+    // keep together
+    struct Data {
+        uint64 public periodStartBlock;
+        uint64 public commitBlock;
+        uint32 public nextIndex;
+        uint32 public dividendPeriod; // current dividend period
+        uint8 public betsIndex; // index of the next slot in queue
+        uint8 public commitIndex;
+        uint8 public currentRootIndex;
+    }
+    Data D;
 
     // metadata
     string public constant name = "Foom Lottery";
@@ -29,22 +42,22 @@ contract FoomLottery {
     uint public constant merkleTreeLevels = 32 ; // number of Merkle Tree levels
     uint public constant merkleTreeReportLevel = 8 ; // report completed Merkle Tree level
     uint public constant periodBlocks = 16384 ; // number of blocks in a period
-    uint public constant betMin = 0.001 ether; // minimum bet size per block, 
-    uint public constant betPower1 = 10; // power of the first bet = 1024 ... TODO: consider increasing to 20
+    uint public constant betMin = 0.001 ether; // minimum bet size per block, TODO: compute correct value
+    uint public constant betPower1 = 10; // power of the first bet = 1024
     uint public constant betPower2 = 16; // power of the second bet = 65536
-    uint public constant betPower3 = 22; // power of the third bet = 4194304 (not enough FOOM now)
-    uint public constant betsMax = 128; // maximum number of bets in queue
+    uint public constant betPower3 = 22; // power of the third bet = 4194304
+    uint public constant betsMax = 128; // maximum number of bets in queue, max 8bit
     uint public constant dividendFeePerCent = 4; // 4% of dividends go to the shareholders (wall)
     uint public constant generatorFeePerCent = 1; // 1% of dividends go to the generator
     uint public constant maxBalance = 2**108; // maximum balance of a user and maximum size of bets in period
+    uint public constant ROOT_HISTORY_SIZE = 64;
     uint private constant _NOT_ENTERED = 1;
     uint private constant _ENTERED = 2;
-    //TODO: define minimum play amount
 
     // contract state
     address public owner;
     address public generator;
-    uint public periodStartBlock;
+    //uint64 public periodStartBlock;
 
     // investment parameters
     struct Wallet {
@@ -61,10 +74,10 @@ contract FoomLottery {
     //Period[] public periods;
     // it removes index range check on every interaction
     mapping(uint => Period) public periods;
-    uint public currentBalance = 1; // sum of funds in wallets
-    uint public currentBets = 1; // total bet volume in current period
-    uint public currentShares = 1; // sum of funds eligible for dividend in current period
-    uint public dividendPeriod = 1; // current dividend period
+    uint128 public currentBalance = 1; // sum of funds in wallets
+    uint128 public currentBets = 1; // total bet volume in current period
+    uint128 public currentShares = 1; // sum of funds eligible for dividend in current period
+    //uint32 public dividendPeriod = 1; // current dividend period
 
     // betting parameters
     struct BetsRC {
@@ -74,28 +87,25 @@ contract FoomLottery {
     //BetsRC public bets[betsMax]; // bets in queue
     // it removes index range check on every interaction
     mapping(uint => BetsRC) public bets;
-    uint public betsSum = 0; // sum of bets in queue
-    uint public betsWaiting = 0; // sum of bets waiting for new generator commit
-    uint public betsIndex = 0; // index of the next slot in queue
+    uint128 public betsSum = 0; // sum of bets in queue
+    uint128 public betsWaiting = 0; // sum of bets waiting for new generator commit
+    //uint8 public betsIndex = 0; // index of the next slot in queue
     mapping (uint => uint) public nullifier; // nullifier hash for each bet
 
     // generator data
+    //uint64 public commitBlock = 0;
+    //uint8 public commitIndex = 0;
     uint public commitHash = 0;
-    uint public commitBlock = 0;
-    uint public commitIndex = 0;
+    uint public commitBlockHash = 0;
 
     // mertkeltree
+    mapping(uint => bytes32) public constant zeros;
     mapping(uint => bytes32) public filledSubtrees;
     mapping(uint => bytes32) public roots;
-    mapping(uint => bytes32) public zeros;
-    uint public constant ROOT_HISTORY_SIZE = 64;
-    uint public currentRootIndex = 0;
-    uint public nextIndex = 0;
+    //uint8 public currentRootIndex = 0;
+    //uint32 public nextIndex = 0;
 
     // constructor
-    IVerifier public immutable verifier;
-    ICancel public immutable cancel;
-    IHasher public immutable hasher;
     constructor(IVerifier _verifier,ICancel _cancel,IHasher _hasher,IERC20 _token) {
         require(merkleTreeLevels<=32,"Tree too large");
         verifier = _verifier;
@@ -104,8 +114,9 @@ contract FoomLottery {
         token = _token;
         owner = msg.sender;
         generator = msg.sender;
-        periodStartBlock = block.number;
-        wallets[owner] = Wallet(uint112(1),uint112(1),uint16(dividendPeriod),uint16(0));
+        D.periodStartBlock = block.number;
+        D.dividendPeriod = 1;
+        wallets[owner] = Wallet(uint112(1),uint112(1),uint16(D.dividendPeriod),uint16(0));
         periods.push(Period(0,0)); // not used
         periods.push(Period(1,1)); // not used
         zeros[ 0]= bytes32(0x2fe54c60d3acabf3343a35b6eba15db4821b340f76e741e2249685ed4899af6c);
@@ -175,16 +186,15 @@ contract FoomLottery {
      * @dev Play in lottery
      */
     function play(uint _secrethash,uint _amount) external nonReentrant {
-        require(uint(_secrethash) < FIELD_SIZE, "_left should be inside the field");
         require(msg.value == 0, "ETH value is supposed to be 0 for ERC20 instance");
-        require(betsIndex + nextIndex < 2 ** merkleTreeLevels, "No more bets allowed"); // TODO: move to commit() ; nextIndex is from MerkleTreeWithHistory
+        require(0<_secrethash &&_secrethash < FIELD_SIZE, "_left should be inside the field");
+        require(D.betsIndex < betsMax && D.betsIndex + D.nextIndex < 2 ** merkleTreeLevels - 1, "No more bets allowed");
         token.safeTransferFrom(msg.sender, address(this), _amount);
-        require(_secrethash != 0, "Invalid secret hash");
-        require(betsIndex >= betsMax, "No more bets allowed");
-        if(commitBlock == 0) {
+        if(D.commitBlock == 0) {
             betsSum += _amount;
         }
         else {
+            rememberHash();
             betsWaiting += _amount;
         }
         uint mask = _getMask(_amount);
@@ -193,10 +203,10 @@ contract FoomLottery {
         (R, C) = hasher.MiMCSponge(R, C, 0);
         R = addmod(R, mask, FIELD_SIZE);
         (R, C) = hasher.MiMCSponge(R, C, 0);
-        bets[betsIndex].R = R;
-        bets[betsIndex].C = C;
-        LogBetIn(_secrethash,nextIndex+betsIndex,mask,R,C); // mask,R,C not needed
-        betsIndex++;
+        bets[D.betsIndex].R = R;
+        bets[D.betsIndex].C = C;
+        LogBetIn(_secrethash,D.nextIndex+D.betsIndex,mask,R,C); // mask,R,C not needed
+        D.betsIndex++;
     }
 
 
@@ -219,25 +229,7 @@ contract FoomLottery {
         require(msg.value == _refund, "Incorrect refund amount received by the contract");
         require(nullifier[_nullifierHash] == 0, "Incorrect nullifier");
         require(isKnownRoot(_root), "Cannot find your merkle root"); // Make sure to use a recent one
-        require(
-            verifier.verifyProof(
-                _pA,
-                _pB,
-                _pC,
-                [
-                    uint(_root),
-                    uint(_nullifierHash),
-                    uint(_luck&1?1:0),
-                    uint(_luck&2?1:0),
-                    uint(_luck&4?1:0),
-                    uint(uint160(_recipient)),
-                    uint(uint160(_relayer)),
-                    _fee,
-                    _refund
-                ]
-            ),
-            "Invalid withdraw proof"
-        );
+        require( verifier.verifyProof( _pA, _pB, _pC, [ uint(_root), uint(_nullifierHash), uint(_luck&1?1:0), uint(_luck&2?1:0), uint(_luck&4?1:0), uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
         nullifier[_nullifierHash] = 1;
         uint _reward == betMin * uint(_luck&1?1:0) * 2**betPower1 +
                         betMin * uint(_luck&2?1:0) * 2**betPower2 +
@@ -259,6 +251,13 @@ contract FoomLottery {
             _reward -= _invest;
         }
         /* process withdrawal */
+        if(betMin * 2**betPower2 < _reward) { // limit max withdrawal
+            _invest = _reward - (betMin * 2**betPower2);
+            currentBalance += _invest;
+            wallets[_recipient].balance += uint112(_invest);
+            wallets[_recipient].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // wait 1 period for more funds
+            _reward -= _invest;
+        }
         uint balance = token.balanceOf(address(this));
         if(balance < _reward) {
             _invest = _reward - balance;
@@ -274,40 +273,26 @@ contract FoomLottery {
         if (_refund > 0) {
           _recipient.call{ value: _refund }("");
         }
+        rememberHash();
     }
 
    /**
      * @dev cancel bet, no privacy !
      */
     function cancelbet(
+        uint _betIndex,
         uint[2] calldata _pA,
         uint[2][2] calldata _pB,
         uint[2] calldata _pC,
-        uint _betIndex,
         address payable _recipient,
         address payable _relayer,
         uint _fee,
         uint _refund) payable external nonReentrant {
         require(msg.value == _refund, "Incorrect refund amount received by the contract");
-        require(nextIndex<=betIndex && betIndex<nextIndex+betsIndex, "Bet probably processed");
-        uint betId=betIndex-nextIndex;
+        require(D.nextIndex<=betIndex && betIndex<D.nextIndex+D.betsIndex, "Bet probably processed");
+        uint betId=betIndex-D.nextIndex;
         require(bidId<betsMax, "Cannot find your bet"); // probably, bet already processed
-        require(
-            cancel.verifyProof(
-                _pA,
-                _pB,
-                _pC,
-                [
-                    uint(bets[betId].R),
-                    uint(bets[betId].C),
-                    uint(uint160(_recipient)),
-                    uint(uint160(_relayer)),
-                    _fee,
-                    _refund
-                ]
-            ),
-            "Invalid withdraw proof"
-        );
+        require(cancel.verifyProof( _pA, _pB, _pC, [ uint(bets[betId].R), uint(bets[betId].C), uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
         bets[betId]=BetsRC(0,0);
         uint _reward == 2 * betMin; // fee: betMin
         uint i=0;
@@ -322,10 +307,10 @@ contract FoomLottery {
             }
         }
         LogCancel(betIndex);
+        collectDividend(_recipient);
         /* process withdrawal */
         uint balance = token.balanceOf(address(this));
         if(balance < _reward) {
-            collectDividend(_recipient);
             uint _invest = _reward - balance;
             currentBalance += _invest;
             wallets[_recipient].balance += uint112(_invest);
@@ -339,6 +324,7 @@ contract FoomLottery {
         if (_refund > 0) {
           _recipient.call{ value: _refund }("");
         }
+        rememberHash();
     }
 
 
@@ -350,10 +336,19 @@ contract FoomLottery {
     function commit(uint _commitHash) external onlyGenerator {
         require(_commitHash != 0, "Invalid commit hash");
         require(commitHash == 0, "Commit hash already set");
-        require(commitBlock == 0, "Commit block already set");
+        require(D.commitBlock == 0, "Commit block already set");
         commitHash = _commitHash;
-        commitBlock = block.number;
-        commitIndex = betsIndex;
+        D.commitBlock = block.number;
+        D.commitIndex = D.betsIndex;
+        commitBlockHash = 0;
+    }
+
+    /**
+     * @dev remember commitBlockHash
+     */
+    function rememberHash() public {
+        if(D.commitBlock != 0 && commitBlockHash == 0){
+          commitBlockHash = block.blockhash(D.commitBlock);}
     }
 
     /**
@@ -361,18 +356,18 @@ contract FoomLottery {
      */
     function reveal(uint _revealSecret) external onlyGenerator {
         require(uint(keccak256(_revealSecret)) == commitHash, "Invalid reveal secret");
-        require(commitBlock != 0, "Commit not set");
-        uint commitBlockHash = block.blockhash(commitBlock);
+        require(D.commitBlock != 0, "Commit not set");
+        rememberHash();
         require(commitBlockHash != 0, "Commit block hash not found");
         uint newhash = uint240(keccak256(_revealSecret,commitBlockHash));
         uint insertedIndex;
-        for(uint i = 0; i < commitIndex; i++) {
+        for(uint i = 0; i < D.commitIndex; i++) {
             uint R = bets[i].R;
             uint C = bets[i].C;
             R = addmod(R, newhash, FIELD_SIZE);
             (R, C) = hasher.MiMCSponge(R, C, 0);
             uint currentLevelHash = R;
-            if(i<commitIndex-1) {
+            if(i<D.commitIndex-1) {
                 insertedIndex = _insertleft(currentLevelHash);
             }
             else {
@@ -380,19 +375,16 @@ contract FoomLottery {
             }
             LogBetHash(insertedIndex,newhash,currentLevelHash); // currentLevelHash for speedup
             newhash++;
-            //betsMap[bets[i]] = newhash; // TODO: for testing only
         }
         for(uint j = 0; i < bestIndex; i++, j++) { // queue unprocessed bets
             bets[j].R=bets[i].R;
             bets[j].C=bets[i].C;
         }
-        // TODO: pay fee to generator
         betsSum = betsWaiting;
         betsWaiting = 0;
-        betsIndex = j;
+        D.betsIndex = j;
         commitHash = 0;
-        commitBlock = 0;
-        // commitIndex = 0; // not needed
+        D.commitBlock = 0;
     }
 
 /* investment functions */
@@ -401,12 +393,12 @@ contract FoomLottery {
      * @dev Update dividend period
      */
     function updateDividendPeriod() public {
-        if(block.number >= periodStartBlock + periodBlocks || currentBets > maxBalance) {
+        if(block.number >= D.periodStartBlock + periodBlocks || currentBets > maxBalance) {
             periods.push(Period(currentBets,currentShares));
             currentShares = currentBalance;
             currentBets = 0;
-            periodStartBlock = block.number;
-            dividendPeriod++;
+            D.periodStartBlock = block.number;
+            D.dividendPeriod++;
         }
     }
 
@@ -417,16 +409,16 @@ contract FoomLottery {
         updateDividendPeriod();
         uint last = wallets[_who].lastDividendPeriod;
         if(last==0){
-            wallets[_who].lastDividendPeriod=uint16(dividendPeriod);
+            wallets[_who].lastDividendPeriod=uint16(D.dividendPeriod);
             return;
         }
-        if(last==dividendPeriod) {
+        if(last==D.dividendPeriod) {
             return;
         }
         uint shares = uint(wallets[_who].shares) * 0xffffffff;
         uint betshares = shares * periods[last].bets / periods[last].shares;
         shares = uint(wallets[_who].balance) * 0xffffffff;
-        for(last++;last<dividendPeriod;last++) {
+        for(last++;last<D.dividendPeriod;last++) {
             betshares += shares * periods[last].bets / periods[last].shares;
         }
         uint108 dividend = betshares * dividendFeePerCent / 100 / 0xffffffff; // uint108 to prevent theoretical balance overflow
@@ -434,24 +426,26 @@ contract FoomLottery {
         currentShares += dividend;
         wallets[_who].balance += dividend;
         wallets[_who].shares = wallets[_who].balance;
-        wallets[_who].lastDividendPeriod = uint16(dividendPeriod);
+        wallets[_who].lastDividendPeriod = uint16(D.dividendPeriod);
     }
 
     /**
      * @dev Pay out balance from wallet
      * @param _amount The amount to pay out.
      */
-    function payOut(uint _amount) public nonReentrant {
+
+    function payOut() public nonReentrant {
         collectDividend(msg.sender);
-        require(_amount <= wallets[msg.sender].balance, "Invalid amount");
-        require(dividendPeriod <= wallets[msg.sender].nextWithdrawPeriod, "Wait till the next dividend period");
-        if(_amount==0) {
-            _amount = wallets[msg.sender].balance;
+        require(D.dividendPeriod <= wallets[msg.sender].nextWithdrawPeriod, "Wait till the next dividend period");
+        uint _amount = wallets[msg.sender].balance;
+        if(betMin * 2**betPower2 < _amount) { // limit max withdrawal
+            _amount = betMin * 2**betPower2;
+            wallets[msg.sender].nextWithdrawPeriod = uint16(D.dividendPeriod + 1);
         }
         uint balance = token.balanceOf(address(this));
         if(_amount > balance) {
             _amount = balance;
-            wallets[msg.sender].nextWithdrawPeriod = uint16(dividendPeriod + 1); // wait 1 period for more funds
+            wallets[msg.sender].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // wait 1 period for more funds
         }
         wallets[msg.sender].balance -= uint112(_amount);
         currentBalance -= _amount;
@@ -468,10 +462,10 @@ contract FoomLottery {
      * @dev deposit security deposit to reset commit
      */
     function resetcommit() payable external onlyOwner {
-        require(commitHash!=0 && block.blockhash(commitBlock)==0, "No failed commit");
+        require(commitHash!=0 && block.blockhash(D.commitBlock)==0, "No failed commit");
         token.safeTransferFrom(msg.sender, address(this), betsSum);
         commitHash = 0;
-        commitBlock = 0;
+        D.commitBlock = 0;
         betsSum += betsWaiting;
         betsWaiting = 0;
         LogResetCommit(msg.sender);
@@ -481,10 +475,10 @@ contract FoomLottery {
      * @dev close the lottery
      */
     function close() external onlyOwner {
-        require(betsIndex==0, "Open bets");
+        require(D.betsIndex==0, "Open bets");
         commitHash = 1;
-        commitBlock = block.number;
-        betsIndex = betsMax;
+        D.commitBlock = block.number;
+        D.betsIndex = betsMax;
         LogClose(msg.sender);
     }
 
@@ -494,8 +488,8 @@ contract FoomLottery {
     function reopen() external onlyOwner {
         require(commitHash==1, "Lottery open");
         commitHash = 0;
-        commitBlock = 0;
-        betsIndex = 0;
+        D.commitBlock = 0;
+        D.betsIndex = 0;
         LogReopen(msg.sender);
     }
 
@@ -504,7 +498,7 @@ contract FoomLottery {
      */
     function adminwithdraw() external onlyOwner {
         require(commitHash==1, "Lottery open");
-        require(block.number > commitBlock + 4*60*24*365*2, "Not enough blocks passed"); // wait 2 years (in Ethereum)
+        require(block.number > D.commitBlock + 4*60*24*365*2, "Not enough blocks passed"); // wait 2 years (in Ethereum)
         msg.sender.transfer(this.balance);
         token.safeTransfer(msg.sender, token.balanceOf(address(this)));
         LogWithdraw(msg.sender);
@@ -601,7 +595,7 @@ contract FoomLottery {
      * @dev Returns the last root
      */
     function getLastRoot() public view returns (bytes32) {
-        return roots[currentRootIndex];
+        return roots[D.currentRootIndex];
     }
 
     // events
@@ -632,8 +626,7 @@ contract FoomLottery {
     }
 
     function _insert(bytes32 _leaf) internal returns (uint index) {
-        uint _nextIndex = nextIndex;
-        uint currentIndex = _nextIndex;
+        uint currentIndex = D.nextIndex++;
         bytes32 currentLevelHash = _leaf;
         bytes32 left;
         bytes32 right;
@@ -643,6 +636,9 @@ contract FoomLottery {
                 left = currentLevelHash;
                 right = zeros[i];
                 filledSubtrees[i] = currentLevelHash;
+                if(i=>merkleTreeReportLevel){
+                    LogTreeHash(i,D.nextIndex-1,currentLevelHash);
+                }
             } else {
                 left = filledSubtrees[i];
                 right = currentLevelHash;
@@ -651,30 +647,27 @@ contract FoomLottery {
             currentIndex /= 2;
         }
 
-        uint newRootIndex = (currentRootIndex + 1) % ROOT_HISTORY_SIZE;
-        currentRootIndex = newRootIndex;
+        uint newRootIndex = (D.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
+        D.currentRootIndex = newRootIndex;
         roots[newRootIndex] = currentLevelHash;
-        nextIndex = _nextIndex + 1;
-        return _nextIndex;
+        return D.nextIndex-1;
     }
 
     /**
      * @dev insert a leaf into the merkletree without updating the root
      */
     function _insertleft(bytes32 _leaf) internal returns (uint index) { // from MerkleTreeWithHistory
-        uint _nextIndex = nextIndex;
-        uint currentIndex = _nextIndex;
+        uint currentIndex = D.nextIndex++;
         bytes32 currentLevelHash = _leaf;
         bytes32 left;
         bytes32 right;
         for (uint i = 0; i < merkleTreeLevels; i++) {
             if (currentIndex % 2 == 0) {
                 filledSubtrees[i] = currentLevelHash;
-                nextIndex = _nextIndex + 1;
                 if(i=>merkleTreeReportLevel){
-                    LogTreeHash(i,nextIndex,currentLevelHash);
+                    LogTreeHash(i,D.nextIndex-1,currentLevelHash);
                 }
-                return _nextIndex;
+                return D.nextIndex-1;
             } else {
                 left = filledSubtrees[i];
                 right = currentLevelHash;
@@ -682,8 +675,7 @@ contract FoomLottery {
             currentLevelHash = hashLeftRight(left, right);
             currentIndex /= 2;
         }
-        nextIndex = _nextIndex + 1;
-        return _nextIndex;
+        return D.nextIndex-1;
     }
 
     /**
@@ -693,7 +685,7 @@ contract FoomLottery {
         if (_root == 0) {
             return false;
         }
-        uint _currentRootIndex = currentRootIndex;
+        uint _currentRootIndex = D.currentRootIndex;
         uint i = _currentRootIndex;
         do {
             if (_root == roots[i]) {

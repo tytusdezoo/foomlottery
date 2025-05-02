@@ -2,7 +2,7 @@
 ARTIFACTS_DIR = circuit_artifacts
 
 # Default target
-all: setup compile ptau gen_verifier
+all: setup compile ptau gen_withdraw get_cancelbet
 
 # Create necessary directories
 setup:
@@ -23,12 +23,19 @@ ptau:
 	snarkjs powersoftau contribute pot16_0000.ptau pot16_0001.ptau --name="First contribution" -v && \
 	snarkjs powersoftau prepare phase2 pot16_0001.ptau pot16_final.ptau -v
 
-# Generate zkey and verifier contract
-gen_verifier:
+# Generate zkey and withdraw contract
+gen_withdraw:
 	cd $(ARTIFACTS_DIR) && \
 	snarkjs groth16 setup withdraw.r1cs pot16_final.ptau withdraw_final.zkey && \
-	snarkjs zkey export solidityverifier withdraw_final.zkey ../src/Verifier.sol && \
-	snarkjs zkey export verificationkey withdraw_final.zkey verification_key.json
+	snarkjs zkey export solidityverifier withdraw_final.zkey ../src/Withdraw.sol && \
+	snarkjs zkey export verificationkey withdraw_final.zkey withdraw_verification_key.json
+
+# Generate zkey and cancelbet contract
+gen_cancelbet:
+	cd $(ARTIFACTS_DIR) && \
+	snarkjs groth16 setup cancelbet.r1cs pot16_final.ptau cancelbet_final.zkey && \
+	snarkjs zkey export solidityverifier cancelbet_final.zkey ../src/CancelBet.sol && \
+	snarkjs zkey export verificationkey cancelbet_final.zkey cancelbet_verification_key.json
 
 # Clean circuit_artifacts
 clean:
