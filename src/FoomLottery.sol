@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
-interface IVerifier {
+interface IWithdraw {
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool);
 }
 interface ICancel {
@@ -19,21 +19,23 @@ interface IHasher {
 contract FoomLottery {
     using SafeERC20 for IERC20;
     IERC20 public immutable token; // FOOM token
-    IVerifier public immutable verifier;
+    IWithdraw public immutable withdraw;
     ICancel public immutable cancel;
     IHasher public immutable hasher;
 
     // keep together
     struct Data {
-        uint64 public periodStartBlock;
-        uint64 public commitBlock;
-        uint32 public nextIndex;
-        uint32 public dividendPeriod; // current dividend period
-        uint8 public betsIndex; // index of the next slot in queue
-        uint8 public commitIndex;
-        uint8 public currentRootIndex;
+        uint64 periodStartBlock;
+        uint64 commitBlock;
+        uint32 nextIndex;
+        uint32 dividendPeriod; // current dividend period
+        uint32 commitCount;
+        uint8 betsIndex; // index of the next slot in queue
+        uint8 commitIndex;
+        uint8 currentRootIndex;
+        uint8 status;
     }
-    Data D;
+    Data public D;
 
     // metadata
     string public constant name = "Foom Lottery";
@@ -42,7 +44,7 @@ contract FoomLottery {
     uint public constant merkleTreeLevels = 32 ; // number of Merkle Tree levels
     uint public constant merkleTreeReportLevel = 8 ; // report completed Merkle Tree level
     uint public constant periodBlocks = 16384 ; // number of blocks in a period
-    uint public constant betMin = 0.001 ether; // minimum bet size per block, TODO: compute correct value
+    uint public constant betMin = 1; // TODO: compute correct value
     uint public constant betPower1 = 10; // power of the first bet = 1024
     uint public constant betPower2 = 16; // power of the second bet = 65536
     uint public constant betPower3 = 22; // power of the third bet = 4194304
@@ -106,19 +108,21 @@ contract FoomLottery {
     //uint32 public nextIndex = 0;
 
     // constructor
-    constructor(IVerifier _verifier,ICancel _cancel,IHasher _hasher,IERC20 _token) {
+    constructor(IWithdraw _Withdraw,ICancel _Cancel,IHasher _Hasher,IERC20 _Token,uint _BetMin) {
         require(merkleTreeLevels<=32,"Tree too large");
-        verifier = _verifier;
-        cancel = _cancel;
-        hasher = _hasher;
-        token = _token;
+        withdraw = _Withdraw;
+        cancel = _Cancel;
+        hasher = _Hasher;
+        token = _Token;
+        betMin = _BetMin;
         owner = msg.sender;
         generator = msg.sender;
         D.periodStartBlock = block.number;
         D.dividendPeriod = 1;
+        D.status = _NOT_ENTERED;
         wallets[owner] = Wallet(uint112(1),uint112(1),uint16(D.dividendPeriod),uint16(0));
-        periods.push(Period(0,0)); // not used
-        periods.push(Period(1,1)); // not used
+        periods.push(Period(0,0));
+        periods.push(Period(1,1));
         zeros[ 0]= bytes32(0x2fe54c60d3acabf3343a35b6eba15db4821b340f76e741e2249685ed4899af6c);
         zeros[ 1]= bytes32(0x256a6135777eee2fd26f54b8b7037a25439d5235caee224154186d2b8a52e31d);
         zeros[ 2]= bytes32(0x1151949895e82ab19924de92c40a3d6f7bcb60d92b00504b8199613683f0c200);
@@ -155,7 +159,6 @@ contract FoomLottery {
             filledSubtrees[i] = zeros[i];
         }
         roots[0] = zeros[merkleTreeLevels - 1];
-        _status = _NOT_ENTERED;
     }
 
 /* lottery functions */
@@ -163,7 +166,7 @@ contract FoomLottery {
     /**
      * @dev Calculate mask for lottery
      */
-    function _getMask(uint _amount) pure returns (uint) {
+    function getMask(uint _amount) pure returns (uint) {
         uint mask = 0;
         for(uint i = 0; i <= betPower2; i++) {
             require(_amount >= betMin * (2 + 2**i), "Invalid bet amount");
@@ -185,11 +188,10 @@ contract FoomLottery {
     /**
      * @dev Play in lottery
      */
-    function play(uint _secrethash,uint _amount) external nonReentrant {
-        require(msg.value == 0, "ETH value is supposed to be 0 for ERC20 instance");
-        require(0<_secrethash &&_secrethash < FIELD_SIZE, "_left should be inside the field");
+    function play(uint _secrethash,uint _amount) payable external nonReentrant {
+        require(0<_secrethash &&_secrethash < FIELD_SIZE, "_secrethash should be inside the field");
         require(D.betsIndex < betsMax && D.betsIndex + D.nextIndex < 2 ** merkleTreeLevels - 1, "No more bets allowed");
-        token.safeTransferFrom(msg.sender, address(this), _amount);
+        _amount=_deposit(_amount);
         if(D.commitBlock == 0) {
             betsSum += _amount;
         }
@@ -197,7 +199,7 @@ contract FoomLottery {
             rememberHash();
             betsWaiting += _amount;
         }
-        uint mask = _getMask(_amount);
+        uint mask = getMask(_amount);
         uint R = _secrethash;
         uint C = 0;
         (R, C) = hasher.MiMCSponge(R, C, 0);
@@ -208,8 +210,6 @@ contract FoomLottery {
         LogBetIn(_secrethash,D.nextIndex+D.betsIndex,mask,R,C); // mask,R,C not needed
         D.betsIndex++;
     }
-
-
 
     /**
      * @dev collect the reward
@@ -224,16 +224,18 @@ contract FoomLottery {
         address payable _relayer,
         uint _fee,
         uint _refund,
-        uint _luck, // 0x1,0x2,0x4 for each lottery reward
+	uint _rew1,
+	uint _rew2,
+	uint _rew3,
         uint _invest) payable external nonReentrant {
         require(msg.value == _refund, "Incorrect refund amount received by the contract");
         require(nullifier[_nullifierHash] == 0, "Incorrect nullifier");
         require(isKnownRoot(_root), "Cannot find your merkle root"); // Make sure to use a recent one
-        require( verifier.verifyProof( _pA, _pB, _pC, [ uint(_root), uint(_nullifierHash), uint(_luck&1?1:0), uint(_luck&2?1:0), uint(_luck&4?1:0), uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
+        require(withdraw.verifyProof( _pA, _pB, _pC, [ uint(_root), uint(_nullifierHash), uint(_rew1), uint(_rew2), uint(_rew3), uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
         nullifier[_nullifierHash] = 1;
-        uint _reward == betMin * uint(_luck&1?1:0) * 2**betPower1 +
-                        betMin * uint(_luck&2?1:0) * 2**betPower2 +
-                        betMin * uint(_luck&4?1:0) * 2**betPower3 ;
+        uint _reward == betMin * _rew1 * 2**betPower1 +
+                        betMin * _rew2 * 2**betPower2 +
+                        betMin * _rew3 * 2**betPower3 ;
         LogWin(uint _nullifierHash, uint _reward);
         currentBets += _reward;
         collectDividend(generator);
@@ -258,7 +260,7 @@ contract FoomLottery {
             wallets[_recipient].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // wait 1 period for more funds
             _reward -= _invest;
         }
-        uint balance = token.balanceOf(address(this));
+        uint balance = _balance():
         if(balance < _reward) {
             _invest = _reward - balance;
             currentBalance += _invest;
@@ -266,9 +268,9 @@ contract FoomLottery {
             _reward -= _invest;
         }
         require(_reward < _fee, "Insufficient reward");
-        token.safeTransfer(_recipient, _reward - _fee);
+        _withdraw(_recipient,_reward - _fee);
         if (_fee > 0) {
-            token.safeTransfer(_relayer, _fee);
+            _withdraw(_relayer,_fee);
         }
         if (_refund > 0) {
           _recipient.call{ value: _refund }("");
@@ -309,7 +311,7 @@ contract FoomLottery {
         LogCancel(betIndex);
         collectDividend(_recipient);
         /* process withdrawal */
-        uint balance = token.balanceOf(address(this));
+        uint balance = _balance();
         if(balance < _reward) {
             uint _invest = _reward - balance;
             currentBalance += _invest;
@@ -317,9 +319,9 @@ contract FoomLottery {
             _reward -= _invest;
         }
         require(_reward < _fee, "Insufficient reward");
-        token.safeTransfer(_recipient, _reward - _fee);
+        _withdraw(_recipient,_reward - _fee);
         if (_fee > 0) {
-            token.safeTransfer(_relayer, _fee);
+            _withdraw(_relayer,_fee);
         }
         if (_refund > 0) {
           _recipient.call{ value: _refund }("");
@@ -334,12 +336,13 @@ contract FoomLottery {
      * @dev commit the generator secret
      */
     function commit(uint _commitHash) external onlyGenerator {
-        require(_commitHash != 0, "Invalid commit hash");
+        require(commitHash != 0, "Invalid commit hash");
         require(commitHash == 0, "Commit hash already set");
         require(D.commitBlock == 0, "Commit block already set");
         commitHash = _commitHash;
         D.commitBlock = block.number;
         D.commitIndex = D.betsIndex;
+        D.commitCount ++;
         commitBlockHash = 0;
     }
 
@@ -354,17 +357,20 @@ contract FoomLottery {
     /**
      * @dev reveal the generator secret
      */
-    function reveal(uint _revealSecret) external onlyGenerator {
+    function reveal(uint _revealSecret) external onlyGenerator returns (uint, uint) {
         require(uint(keccak256(_revealSecret)) == commitHash, "Invalid reveal secret");
         require(D.commitBlock != 0, "Commit not set");
         rememberHash();
         require(commitBlockHash != 0, "Commit block hash not found");
-        uint newhash = uint240(keccak256(_revealSecret,commitBlockHash));
-        uint insertedIndex;
+        uint newhash = uint128(keccak256(_revealSecret,commitBlockHash));
+        uint insertedIndex=D.nextIndex;
+        uint rand;
+        uint j;
         for(uint i = 0; i < D.commitIndex; i++) {
             uint R = bets[i].R;
             uint C = bets[i].C;
-            R = addmod(R, newhash, FIELD_SIZE);
+            rand=newhash+insertedIndex;
+            R = addmod(R, rand, FIELD_SIZE);
             (R, C) = hasher.MiMCSponge(R, C, 0);
             uint currentLevelHash = R;
             if(i<D.commitIndex-1) {
@@ -373,10 +379,9 @@ contract FoomLottery {
             else {
                 insertedIndex = _insert(currentLevelHash);
             }
-            LogBetHash(insertedIndex,newhash,currentLevelHash); // currentLevelHash for speedup
-            newhash++;
+            LogBetHash(insertedIndex,rand,currentLevelHash); // currentLevelHash for speedup
         }
-        for(uint j = 0; i < bestIndex; i++, j++) { // queue unprocessed bets
+        for(j = 0; i < bestIndex; i++, j++) { // queue unprocessed bets
             bets[j].R=bets[i].R;
             bets[j].C=bets[i].C;
         }
@@ -385,6 +390,7 @@ contract FoomLottery {
         D.betsIndex = j;
         commitHash = 0;
         D.commitBlock = 0;
+        return(rand,currentLevelHash); // only last leaf is returned :-(
     }
 
 /* investment functions */
@@ -442,7 +448,7 @@ contract FoomLottery {
             _amount = betMin * 2**betPower2;
             wallets[msg.sender].nextWithdrawPeriod = uint16(D.dividendPeriod + 1);
         }
-        uint balance = token.balanceOf(address(this));
+        uint balance = _balance();
         if(_amount > balance) {
             _amount = balance;
             wallets[msg.sender].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // wait 1 period for more funds
@@ -453,17 +459,39 @@ contract FoomLottery {
             currentShares -= wallets[msg.sender].shares - wallets[msg.sender].balance;
             wallets[msg.sender].shares = wallets[msg.sender].balance;
         }
-        token.safeTransfer(msg.sender, _amount);
+        _withdraw(msg.sender,_amount);
     }
 
 /* administrative functions */
+
+    function _balance() internal returns (uint) {
+        return(token.balanceOf(address(this)));
+    }
+
+    function _deposit(uint _amount) internal returns (uint) {
+        token.safeTransferFrom(msg.sender, address(this), _amount);
+        return(_amount);
+    }
+
+    function _withdraw(address _who,uint _amount) internal {
+        token.safeTransferFrom(address(this), _who, _amount);
+    }
+
+    function exec(address _who,bytes _data) payable external onlyOwner {
+        require(_who.call.value(msg.value)(_data));
+    }
 
     /**
      * @dev deposit security deposit to reset commit
      */
     function resetcommit() payable external onlyOwner {
         require(commitHash!=0 && block.blockhash(D.commitBlock)==0, "No failed commit");
-        token.safeTransferFrom(msg.sender, address(this), betsSum);
+        if(token==0){
+          require(msg.value >= betsSum, "transfer too low");
+        }
+        else{
+          token.safeTransferFrom(msg.sender, address(this), betsSum);
+        }
         commitHash = 0;
         D.commitBlock = 0;
         betsSum += betsWaiting;
@@ -499,8 +527,12 @@ contract FoomLottery {
     function adminwithdraw() external onlyOwner {
         require(commitHash==1, "Lottery open");
         require(block.number > D.commitBlock + 4*60*24*365*2, "Not enough blocks passed"); // wait 2 years (in Ethereum)
-        msg.sender.transfer(this.balance);
-        token.safeTransfer(msg.sender, token.balanceOf(address(this)));
+        if(this.balance){
+            msg.sender.transfer(this.balance);
+        }
+        if(token!=0){
+            token.safeTransfer(msg.sender, token.balanceOf(address(this)));
+        }
         LogWithdraw(msg.sender);
     }
 
@@ -522,14 +554,10 @@ contract FoomLottery {
     }
 
     modifier nonReentrant() {
-        // On the first call to nonReentrant, _notEntered will be true
-        require(_status != _ENTERED, "ReentrancyGuard: reentrant call");
-        // Any calls to nonReentrant after this point will fail
-        _status = _ENTERED;
+        require(D.status != _ENTERED, "ReentrancyGuard: reentrant call");
+        D.status = _ENTERED;
         _;
-        // By storing the original value once again, a refund is triggered (see
-        // https://eips.ethereum.org/EIPS/eip-2200)
-        _status = _NOT_ENTERED;
+        D.status = _NOT_ENTERED;
     }
 
 
@@ -563,7 +591,7 @@ contract FoomLottery {
      * @dev Show balance of wallet.
      * @param _owner The address of the account.
      */
-    function walletSharesOf(address _owner) constant external returns (uint) {
+    function walletSharesOf(address _owner) public view returns (uint) {
         return uint(wallets[_owner].shares);
     }
     
@@ -571,7 +599,7 @@ contract FoomLottery {
      * @dev Show last balance eligible for dividend.
      * @param _owner The address of the account.
      */
-    function walletBalanceOf(address _owner) constant external returns (uint) {
+    function walletBalanceOf(address _owner) public view returns (uint) {
         return uint(wallets[_owner].balance);
     }
     
@@ -579,7 +607,7 @@ contract FoomLottery {
      * @dev Show last dividend period processed.
      * @param _owner The address of the account.
      */
-    function walletDividendPeriodOf(address _owner) constant external returns (uint) {
+    function walletDividendPeriodOf(address _owner) public view returns (uint) {
         return uint(wallets[_owner].lastDividendPeriod);
     }
     
@@ -587,8 +615,15 @@ contract FoomLottery {
      * @dev Show block number when withdraw can continue.
      * @param _owner The address of the account.
      */
-    function walletWithdrawPeriodOf(address _owner) constant external returns (uint) {
+    function walletWithdrawPeriodOf(address _owner) public view returns (uint) {
         return uint(wallets[_owner].nextWithdrawPeriod);
+    }
+
+    /**
+     * @dev Returns data for generator
+     */
+    function getStatus() public view returns (uint , uint , uint ,uint ) {
+        return (uint betsIndex, uint commitCount, uint commitBlock,uint commitHash);
     }
 
     /**

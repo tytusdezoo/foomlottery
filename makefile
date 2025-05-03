@@ -27,14 +27,14 @@ ptau:
 gen_withdraw:
 	cd $(ARTIFACTS_DIR) && \
 	snarkjs groth16 setup withdraw.r1cs pot16_final.ptau withdraw_final.zkey && \
-	snarkjs zkey export solidityverifier withdraw_final.zkey ../src/Withdraw.sol && \
+	snarkjs zkey export solidityverifier withdraw_final.zkey ../src/Withdraw.sol && sed -i 's/Groth16Verifier/WithdrawG16Verifier/' ../src/Withdraw.sol && \
 	snarkjs zkey export verificationkey withdraw_final.zkey withdraw_verification_key.json
 
 # Generate zkey and cancelbet contract
 gen_cancelbet:
 	cd $(ARTIFACTS_DIR) && \
 	snarkjs groth16 setup cancelbet.r1cs pot16_final.ptau cancelbet_final.zkey && \
-	snarkjs zkey export solidityverifier cancelbet_final.zkey ../src/CancelBet.sol && \
+	snarkjs zkey export solidityverifier cancelbet_final.zkey ../src/CancelBet.sol && sed -i 's/Groth16Verifier/CancelBetG16Verifier/' ../src/CancelBet.sol && \
 	snarkjs zkey export verificationkey cancelbet_final.zkey cancelbet_verification_key.json
 
 # Clean circuit_artifacts

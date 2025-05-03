@@ -7,22 +7,16 @@ const { rbigint, bigintToHex, leBigintToBuffer } = require("./utils/bigint.js");
 ////////////////////////////// MAIN ///////////////////////////////////////////
 
 async function main() {
-  // 1. Generate random nullifier and secret
-  const nullifier = rbigint(31);
+  // 1. Generate random secret
   const secret = rbigint(31);
 
   // 2. Get commitment
-  const commitment = await pedersenHash(
-    Buffer.concat([
-      leBigintToBuffer(nullifier, 31),
-      leBigintToBuffer(secret, 31),
-    ])
-  );
+  const commitment = await pedersenHash(leBigintToBuffer(secret, 31));
 
   // 3. Return abi encoded nullifier, secret, commitment
   const res = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["bytes32", "bytes32", "bytes32"],
-    [bigintToHex(commitment), bigintToHex(nullifier), bigintToHex(secret)]
+    ["bytes32", "bytes32"],
+    [bigintToHex(commitment), bigintToHex(secret)]
   );
 
   return res;
