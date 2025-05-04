@@ -16,7 +16,8 @@ contract mimcTest {
         hasher = _Hasher;
     }
 
-    function MiMCSponge(uint256 in_xL, uint256 in_xR, uint256 k) public view returns (uint256 xL, uint256 xR) {
-        return hasher.MiMCSponge(in_xL, in_xR, k);
+    //function MiMCSponge(bytes32 in_xL, bytes32 in_xR, bytes32 k) public view returns (uint256 xL, uint256 xR) {
+    function MiMCSponge(uint in_xL, uint in_xR, uint k) public view returns (uint256 xL, uint256 xR) {
+        return hasher.MiMCSponge(uint(in_xL),uint(in_xR),uint(k));
     }
 }

@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {Test, console} from "forge-std/Test.sol";
 import {mimcTest, IHasher } from "src/mimcTest.sol";
 
-contract EthLotteryTest is Test {
+contract MIMCTest is Test {
 
     mimcTest public mimctest;
 
@@ -21,14 +21,15 @@ contract EthLotteryTest is Test {
         mimctest = new mimcTest(IHasher(mimcHasher));
     }
 
-    function test_mimc() public {
+    function test_mimc() view public {
         uint inL=1;
         uint inR=0;
         uint k=0;
         console.log("%x inL",inL);
         console.log("%x inR",inR);
         console.log("%x k",k);
-        (uint oL,uint oR)=mimctest.MiMCSponge(inL,inR,k);
+        (uint oL,uint oR)=mimctest.MiMCSponge(uint(inL),uint(inR),uint(k));
+        //(uint oL,uint oR)=mimctest.MiMCSponge(bytes32(inL),bytes32(inR),bytes32(k));
         console.log("%x oL",oL);
         console.log("%x oR",oR);
     }
