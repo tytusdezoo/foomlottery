@@ -19,6 +19,8 @@ async function main() {
 
   const res2 = mimcsponge.multiHash([1,2]);
   console.log(mimcsponge.F.toString(res2,16));
+  console.log(mimcsponge.F.toString(mimcsponge.F.e("0x2bcea035a1251603f1ceaf73cd4ae89427c47075bb8e3a944039ff1e3d6d2a6f"),16));
+  //assert(mimcSponge.F.eq(mimcSponge.F.e("0x2bcea035a1251603f1ceaf73cd4ae89427c47075bb8e3a944039ff1e3d6d2a6f"), res2));
 }
 
 main()
