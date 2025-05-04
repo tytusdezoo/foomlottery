@@ -173,10 +173,13 @@ contract EthLotteryTest is Test {
     function test_mimc() public {
         uint inL=1;
         uint inR=2;
-        uint k=3;
+        uint k=0;
+        console.log("%x inL",inL);
+        console.log("%x inR",inR);
+        console.log("%x k",k);
         (uint oL,uint oR)=lottery.MiMCSponge(inL,inR,k);
-        console.log("%x R",oL);
-        console.log("%x C",oR);
+        console.log("%x oL",oL);
+        console.log("%x oR",oR);
     }
 
     function _notest_lottery_single_deposit() public {
