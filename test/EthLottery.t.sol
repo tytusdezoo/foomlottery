@@ -172,7 +172,7 @@ contract EthLotteryTest is Test {
 
     function test_mimc() public {
         uint inL=1;
-        uint inR=2;
+        uint inR=0;
         uint k=0;
         console.log("%x inL",inL);
         console.log("%x inR",inR);

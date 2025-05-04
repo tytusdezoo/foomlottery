@@ -11,6 +11,7 @@ interface ICancel {
 }
 interface IHasher {
   function MiMCSponge(uint256 in_xL, uint256 in_xR, uint256 k) external pure returns (uint256 xL, uint256 xR);
+  //function MiMCSponge(uint in_xL, uint in_xR, uint k) external pure returns (uint256 xL, uint256 xR);
 }
 
 /**

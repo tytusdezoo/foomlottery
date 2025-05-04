@@ -5,7 +5,7 @@ const { bigintToHex, leBufferToBigint, } = require("./utils/bigint.js");
 
 async function main() {
   const L = 1n;
-  const R = 2n;
+  const R = 0n;
   const k = 0n;
   const mimcsponge = await circomlibjs.buildMimcSponge();
   console.log("L",L);
@@ -14,6 +14,11 @@ async function main() {
   const m1 = await mimcsponge.hash(L,R,k);
   console.log(bigintToHex(leBufferToBigint(m1.xL)));
   console.log(bigintToHex(leBufferToBigint(m1.xR)));
+  //const ar = mimcsponge.getConstants();
+  //console.log(":",ar[219]);
+
+  const res2 = mimcsponge.multiHash([1,2]);
+  console.log(mimcsponge.F.toString(res2,16));
 }
 
 main()
