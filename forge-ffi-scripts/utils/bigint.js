@@ -53,10 +53,21 @@ function leBigintToBuffer(num, byteLength) {
   return buffer;
 }
 
+// reverese bits
+const reverseBits = (num, bitLength) => {
+  let res = 0n;
+  for (let i = 0; i < bitLength; i++) {
+    res = (res << 1n) | (num & 1n);
+    num >>= 1n;
+  }
+  return res;
+};
+
 module.exports = {
   rbigint,
   hexToBigint,
   bigintToHex,
   leBufferToBigint,
   leBigintToBuffer,
+  reverseBits,
 };

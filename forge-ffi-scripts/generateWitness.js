@@ -1,7 +1,7 @@
 const path = require("path");
 const snarkjs = require("snarkjs");
 const { ethers } = require("ethers");
-const { hexToBigint, bigintToHex, leBigintToBuffer, } = require("./utils/bigint.js");
+const { hexToBigint, bigintToHex, leBigintToBuffer, reverseBits, } = require("./utils/bigint.js");
 const { pedersenHash } = require("./utils/pedersen.js");
 const { mimcsponge2,mimcsponge3, } = require("./utils/mimcsponge.js");
 const { mimicMerkleTree } = require("./utils/mimcMerkleTree.js");
@@ -13,24 +13,29 @@ async function main() {
 
   // 1. Get nullifier and secret
   const secret = hexToBigint(inputs[0]);
-  const terces = reverse(secret,31);
+  console.log("start  %x", secret);
+  const terces = reverseBits(secret,31*8);
   const mask = hexToBigint(inputs[1]);
   const rand = hexToBigint(inputs[2]);
 
   // 1.5. calculate reward
-  const dice = mimcsponge2(secret,rand);
+  const dice = await mimcsponge2(secret,rand);
   const maskdice= mask & dice;
-  const rew1 = if(maskdice &                                       0b1111111111?0:1)
-  const rew2 = if(maskdice &                       0b11111111111111110000000000?0:1)
-  const rew3 = if(dice     & 0b111111111111111111111100000000000000000000000000?0:1)
+  const rew1 = (maskdice &                                       0b1111111111n)?0:1
+  const rew2 = (maskdice &                       0b11111111111111110000000000n)?0:1
+  const rew3 = (dice     & 0b111111111111111111111100000000000000000000000000n)?0:1
 
   // 2. Get nullifier hash and commitment
-  const nullifierHash = await pedersenHash(leBigintToBuffer((terces+rand)%Bigint(21888242871839275222246405745257275088548364400416034343698204186575808495617), 31));
-  const SecretHashIn = await pedersenHash(leBigintToBuffer(secret, 31));
-  const commitment = mimcsponge3(SecretHashIn,mask,rand);
+  const nullifierHash = await pedersenHash(leBigintToBuffer((terces+rand)%21888242871839275222246405745257275088548364400416034343698204186575808495617n, 32));
+  const SecretHashIn = await pedersenHash(leBigintToBuffer(secret, 32));
+  console.log("mimcin  %x", SecretHashIn,mask,rand);
+  const commitment = await mimcsponge3(SecretHashIn,mask,rand);
+  console.log("mimcout %x", commitment);
 
   // 3. Create merkle tree, insert leaves and get merkle proof for commitment
   const leaves = inputs.slice(7, inputs.length).map((l) => hexToBigint(l));
+  // fix leaves
+  //  leaves[0] = commitment;
   const tree = await mimicMerkleTree(leaves);
   const merkleProof = tree.proof(commitment);
 

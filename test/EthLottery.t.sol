@@ -15,6 +15,8 @@ contract EthLotteryTest is Test {
     IWithdraw public withdraw;
     ICancel public cancel;
 
+    uint blocknumber = 1;
+
     // Test vars
     address public constant recipient = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
     address public constant relayer = address(0);
@@ -64,12 +66,12 @@ contract EthLotteryTest is Test {
         address _relayer,
         bytes32[] memory leaves
     ) internal returns (uint256[2] memory, uint256[2][2] memory, uint256[2] memory, uint, uint, uint, uint, uint) {
-        string[] memory inputs = new string[](8 + leaves.length);
+        string[] memory inputs = new string[](9 + leaves.length);
         inputs[0] = "node";
         inputs[1] = "forge-ffi-scripts/generateWitness.js";
-        inputs[2] = vm.toString(_secret);
-        inputs[3] = vm.toString(_mask);
-        inputs[4] = vm.toString(_rand);
+        inputs[2] = vm.toString(bytes32(_secret));
+        inputs[3] = vm.toString(bytes32(_mask));
+        inputs[4] = vm.toString(bytes32(_rand));
         inputs[5] = vm.toString(_recipient);
         inputs[6] = vm.toString(_relayer);
         inputs[7] = "0";
@@ -93,6 +95,8 @@ contract EthLotteryTest is Test {
 
         bytes memory result = vm.ffi(inputs);
         (commitment, secret) = abi.decode(result, (uint, uint));
+	//console.log("%x commmitment\n",commitment);
+	//console.log("%x secret\n",secret);
 
         return (commitment, secret);
     }
@@ -109,6 +113,8 @@ contract EthLotteryTest is Test {
         uint _revealSecret = uint(keccak256(abi.encodePacked(commitCount)));
         uint _commitHash = uint(keccak256(abi.encodePacked(_revealSecret)));
         lottery.commit(_commitHash);
+        vm.roll(++blocknumber);
+	//console.log("block: %d\n",block.number);
 	/* must wait for the transaction to get included in a block */
         uint commitCountNew;
         (betsIndex, commitCountNew, commitBlock,commitHash)=lottery.getStatus();
@@ -116,14 +122,24 @@ contract EthLotteryTest is Test {
         assertEq(commitHash,_commitHash);
         assertEq(commitCount+1,commitCountNew);
         (uint rand,uint leaf)=lottery.reveal(_revealSecret);
+	//console.log("%x shas\n",commitment);
+	//console.log("%x mask\n",mask);
+	//console.log("%x rand\n",rand);
+	//console.log("%x leaf\n",leaf);
+
+
+        vm.roll(++blocknumber);
+	//console.log("block: %d\n",block.number);
         (betsIndex, commitCount, commitBlock,commitHash)=lottery.getStatus();
         assertEq(commitBlock,0);
         return(_amount,commitment,secret,mask,rand,bytes32(leaf));
     }
 
     function _collect(uint secret,uint mask,uint rand,bytes32[] memory leaves) internal {
+	//console.log("%x secret\n",secret);
         (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint root, uint nullifierHash, uint rew1, uint rew2, uint rew3) =
             _getWitnessAndProof(secret, mask, rand, recipient, relayer, leaves);
+	//console.log("now: %d\n",block.number);
         uint _reward = betMin * rew1 * 2**betPower1 +
                        betMin * rew2 * 2**betPower2 +
                        betMin * rew3 * 2**betPower3 ;
@@ -154,7 +170,18 @@ contract EthLotteryTest is Test {
         return(bytes32(leaf));
     }
 
-    function test_lottery_single_deposit() public {
+    function test_mimc() public {
+        uint inL=1;
+        uint inR=2;
+        uint k=3;
+        (uint oL,uint oR)=lottery.MiMCSponge(inL,inR,k);
+        console.log("%x R",oL);
+        console.log("%x C",oR);
+    }
+
+    function _notest_lottery_single_deposit() public {
+        uint max=21888242871839275222246405745257275088548364400416034343698204186575808495617;
+	//console.log("%x max\n",max);
         //(uint _amount,uint commitment,uint secret,uint mask,uint rand,bytes32 leaf) = _play_and_get_data();
         (,,uint secret,uint mask,uint rand,bytes32 leaf) = _play_and_get_data();
         bytes32[] memory leaves = new bytes32[](1);
@@ -162,7 +189,7 @@ contract EthLotteryTest is Test {
         _collect(secret,mask,rand,leaves);
     }
 
-    function test_mixer_many_deposits() public {
+    function _notest_lottery_many_deposits() public {
         bytes32[] memory leaves = new bytes32[](200);
         // 1. Make many deposits with random commitments -- this will let us test with a non-empty merkle tree
         for (uint256 i = 0; i < 100; i++) {

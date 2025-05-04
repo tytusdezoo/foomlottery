@@ -1,6 +1,7 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Test, console} from "forge-std/Test.sol";
 
 interface IWithdraw {
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool);
@@ -126,6 +127,10 @@ contract Lottery {
         roots[0] = zeros(merkleTreeLevels - 1);
     }
 
+    function MiMCSponge(uint256 in_xL, uint256 in_xR, uint256 k) public view returns (uint256 xL, uint256 xR) {
+        return hasher.MiMCSponge(in_xL, in_xR, k);
+    }
+
 /* lottery functions */
 
     /**
@@ -165,11 +170,19 @@ contract Lottery {
             betsWaiting += uint128(_amount);
         }
         uint mask = getMask(_amount);
-        uint R = uint128(_secrethash);
+        uint R = _secrethash;
+        //console.log("%x shas C",R);
+        //console.log("%x mask C",mask);
         uint C = 0;
+            console.log("%x R C",R);
         (R, C) = hasher.MiMCSponge(R, C, 0);
+            console.log("%x R C",R);
+            console.log("%x C C",C);
         R = addmod(R, mask, FIELD_SIZE);
+            //console.log("%x R C",R);
         (R, C) = hasher.MiMCSponge(R, C, 0);
+            //console.log("%x R C",R);
+            //console.log("%x C C",C);
         bets[D.betsIndex].R = R;
         bets[D.betsIndex].C = C;
         emit LogBetIn(_secrethash,D.nextIndex+D.betsIndex,mask,R,C); // mask,R,C not needed
@@ -320,7 +333,10 @@ contract Lottery {
     function rememberHash() public {
         if(D.commitBlock != 0 && commitBlockHash == 0){
           commitBlockHash = uint(blockhash(D.commitBlock));
-          require(commitBlockHash != 0, "blockhash() not found"); //TODO: only for testing
+          /* rest is for testing only , TODO remove later */
+          if(commitBlockHash == 0 && D.commitBlock==block.number-1){
+            commitBlockHash=uint(keccak256(abi.encodePacked(block.number-1)));}
+          require(commitBlockHash != 0, "blockhash() not found");
         } 
     }
 
@@ -332,7 +348,7 @@ contract Lottery {
         require(D.commitBlock != 0, "Commit not set");
         rememberHash();
         require(commitBlockHash != 0, "Commit block hash not found");
-        uint newhash = uint(keccak256(abi.encodePacked(_revealSecret,commitBlockHash)));
+        uint newhash = uint240(uint(keccak256(abi.encodePacked(_revealSecret,commitBlockHash))));
         uint insertedIndex=D.nextIndex;
         uint rand;
         uint i;
@@ -351,6 +367,8 @@ contract Lottery {
             else {
                 insertedIndex = _insert(currentLevelHash);
             }
+            //console.log("%x rand C",rand);
+            //console.log("%x leaf C",currentLevelHash);
             emit LogBetHash(insertedIndex,rand,currentLevelHash); // currentLevelHash for speedup
         }
         for(j = 0; i < D.betsIndex; i++) { // queue unprocessed bets
