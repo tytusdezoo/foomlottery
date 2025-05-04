@@ -1,7 +1,7 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+//import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 interface IWithdraw {
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool);
@@ -17,7 +17,7 @@ interface IHasher {
  * @title FOOM Lottery
  */
 contract FoomLottery {
-    using SafeERC20 for IERC20;
+    //using SafeERC20 for IERC20;
     IERC20 public immutable token; // FOOM token
     IWithdraw public immutable withdraw;
     ICancel public immutable cancel;
@@ -166,7 +166,7 @@ contract FoomLottery {
     /**
      * @dev Calculate mask for lottery
      */
-    function getMask(uint _amount) pure returns (uint) {
+    function getMask(uint _amount) pure public returns (uint) {
         uint mask = 0;
         for(uint i = 0; i <= betPower2; i++) {
             require(_amount >= betMin * (2 + 2**i), "Invalid bet amount");
@@ -233,10 +233,10 @@ contract FoomLottery {
         require(isKnownRoot(_root), "Cannot find your merkle root"); // Make sure to use a recent one
         require(withdraw.verifyProof( _pA, _pB, _pC, [ uint(_root), uint(_nullifierHash), uint(_rew1), uint(_rew2), uint(_rew3), uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
         nullifier[_nullifierHash] = 1;
-        uint _reward == betMin * _rew1 * 2**betPower1 +
-                        betMin * _rew2 * 2**betPower2 +
-                        betMin * _rew3 * 2**betPower3 ;
-        LogWin(uint _nullifierHash, uint _reward);
+        uint _reward = betMin * _rew1 * 2**betPower1 +
+                       betMin * _rew2 * 2**betPower2 +
+                       betMin * _rew3 * 2**betPower3 ;
+        LogWin(_nullifierHash,_reward);
         currentBets += _reward;
         collectDividend(generator);
         uint generatorReward = _reward * generatorFeePerCent / 100;
@@ -260,7 +260,7 @@ contract FoomLottery {
             wallets[_recipient].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // wait 1 period for more funds
             _reward -= _invest;
         }
-        uint balance = _balance():
+        uint balance = _balance();
         if(balance < _reward) {
             _invest = _reward - balance;
             currentBalance += _invest;
@@ -296,7 +296,8 @@ contract FoomLottery {
         require(bidId<betsMax, "Cannot find your bet"); // probably, bet already processed
         require(cancel.verifyProof( _pA, _pB, _pC, [ uint(bets[betId].R), uint(bets[betId].C), uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
         bets[betId]=BetsRC(0,0);
-        uint _reward == 2 * betMin; // fee: betMin
+        /* should be a function */
+        uint _reward = 2 * betMin; // fee: betMin
         uint i=0;
         for( ; i<=betPower1 ; i++){
             if(!(_mask & (2**i))){
@@ -365,7 +366,7 @@ contract FoomLottery {
         uint newhash = uint128(keccak256(_revealSecret,commitBlockHash));
         uint insertedIndex=D.nextIndex;
         uint rand;
-        uint j;
+        uint j=0;
         for(uint i = 0; i < D.commitIndex; i++) {
             uint R = bets[i].R;
             uint C = bets[i].C;
@@ -381,9 +382,10 @@ contract FoomLottery {
             }
             LogBetHash(insertedIndex,rand,currentLevelHash); // currentLevelHash for speedup
         }
-        for(j = 0; i < bestIndex; i++, j++) { // queue unprocessed bets
+        for(; i < bestIndex; i++) { // queue unprocessed bets
             bets[j].R=bets[i].R;
             bets[j].C=bets[i].C;
+            j++;
         }
         betsSum = betsWaiting;
         betsWaiting = 0;
@@ -437,7 +439,6 @@ contract FoomLottery {
 
     /**
      * @dev Pay out balance from wallet
-     * @param _amount The amount to pay out.
      */
 
     function payOut() public nonReentrant {
@@ -469,12 +470,13 @@ contract FoomLottery {
     }
 
     function _deposit(uint _amount) internal returns (uint) {
-        token.safeTransferFrom(msg.sender, address(this), _amount);
+        token.transferFrom(msg.sender, address(this), _amount); /* success tests inside token contract */
         return(_amount);
     }
 
     function _withdraw(address _who,uint _amount) internal {
-        token.safeTransferFrom(address(this), _who, _amount);
+        token.transferFrom(address(this), _who, _amount); /* success tests inside token contract */
+        return(_amount);
     }
 
     function exec(address _who,bytes _data) payable external onlyOwner {
@@ -486,12 +488,8 @@ contract FoomLottery {
      */
     function resetcommit() payable external onlyOwner {
         require(commitHash!=0 && block.blockhash(D.commitBlock)==0, "No failed commit");
-        if(token==0){
-          require(msg.value >= betsSum, "transfer too low");
-        }
-        else{
-          token.safeTransferFrom(msg.sender, address(this), betsSum);
-        }
+        uint amount=_deposit(betsSum);
+        require(amount >= betsSum, "transfer too low");
         commitHash = 0;
         D.commitBlock = 0;
         betsSum += betsWaiting;
@@ -531,7 +529,7 @@ contract FoomLottery {
             msg.sender.transfer(this.balance);
         }
         if(token!=0){
-            token.safeTransfer(msg.sender, token.balanceOf(address(this)));
+            _withdraw(msg.sender,oken.balanceOf(address(this)));
         }
         LogWithdraw(msg.sender);
     }
@@ -539,7 +537,7 @@ contract FoomLottery {
     /**
      * @dev do not allow to send ether to the contract
      */
-    function () payable external {
+    fallback () payable external {
         revert("Invalid call");
     }
 
@@ -623,7 +621,7 @@ contract FoomLottery {
      * @dev Returns data for generator
      */
     function getStatus() public view returns (uint , uint , uint ,uint ) {
-        return (uint betsIndex, uint commitCount, uint commitBlock,uint commitHash);
+        return (betsIndex,commitCount,commitBlock,commitHash);
     }
 
     /**
@@ -671,7 +669,7 @@ contract FoomLottery {
                 left = currentLevelHash;
                 right = zeros[i];
                 filledSubtrees[i] = currentLevelHash;
-                if(i=>merkleTreeReportLevel){
+                if(i>=merkleTreeReportLevel){
                     LogTreeHash(i,D.nextIndex-1,currentLevelHash);
                 }
             } else {
@@ -699,7 +697,7 @@ contract FoomLottery {
         for (uint i = 0; i < merkleTreeLevels; i++) {
             if (currentIndex % 2 == 0) {
                 filledSubtrees[i] = currentLevelHash;
-                if(i=>merkleTreeReportLevel){
+                if(i>=merkleTreeReportLevel){
                     LogTreeHash(i,D.nextIndex-1,currentLevelHash);
                 }
                 return D.nextIndex-1;
