@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test, console} from "forge-std/Test.sol";
 import {WithdrawG16Verifier} from "src/Withdraw.sol";
 import {CancelBetG16Verifier} from "src/CancelBet.sol";
-import {IWithdraw, ICancel, IHasher} from "src/FoomLottery.sol";
+import {IWithdraw, ICancel, IHasher} from "src/Lottery.sol";
 import {EthLottery} from "src/EthLottery.sol";
 
 contract EthLotteryTest is Test {
@@ -52,17 +53,17 @@ contract EthLotteryTest is Test {
         cancel = ICancel(address(new CancelBetG16Verifier()));
 
         // Deploy lottery contract.
-        lottery = new EthLottery(withdraw, cancel, IHasher(mimcHasher), 0, betMin);
+        lottery = new EthLottery(withdraw, cancel, IHasher(mimcHasher), IERC20(address(0)), betMin);
     }
 
     function _getWitnessAndProof(
-        bytes32 _secret,
-        bytes32 _mask,
-        bytes32 _rand,
+        uint _secret,
+        uint _mask,
+        uint _rand,
         address _recipient,
         address _relayer,
         bytes32[] memory leaves
-    ) internal returns (uint256[2] memory, uint256[2][2] memory, uint256[2] memory, bytes32, bytes32, uint, uint, uint) {
+    ) internal returns (uint256[2] memory, uint256[2][2] memory, uint256[2] memory, uint, uint, uint, uint, uint) {
         string[] memory inputs = new string[](8 + leaves.length);
         inputs[0] = "node";
         inputs[1] = "forge-ffi-scripts/generateWitness.js";
@@ -79,48 +80,49 @@ contract EthLotteryTest is Test {
         }
 
         bytes memory result = vm.ffi(inputs);
-        (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, bytes32 root, bytes32 nullifierHash, uint rew1, uint rew2, uint rew3) =
-            abi.decode(result, (uint256[2], uint256[2][2], uint256[2], bytes32, bytes32, uint, uint, uint));
+        (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint root, uint nullifierHash, uint rew1, uint rew2, uint rew3) =
+            abi.decode(result, (uint256[2], uint256[2][2], uint256[2], uint, uint, uint, uint, uint));
 
         return (pA, pB, pC, root, nullifierHash, rew1, rew2, rew3);
     }
 
-    function _getCommitment() internal returns (bytes32 commitment, bytes32 secret) {
+    function _getCommitment() internal returns (uint commitment, uint secret) {
         string[] memory inputs = new string[](2);
         inputs[0] = "node";
         inputs[1] = "forge-ffi-scripts/generateCommitment.js";
 
         bytes memory result = vm.ffi(inputs);
-        (commitment, secret) = abi.decode(result, (bytes32, bytes32));
+        (commitment, secret) = abi.decode(result, (uint, uint));
 
         return (commitment, secret);
     }
 
-    function _play_and_get_data() internal returns (uint,bytes32,bytes32,uint,uint,uint) {
+    function _play_and_get_data() internal returns (uint,uint,uint,uint,uint,bytes32) {
         uint _amount=3;
         // 1. Generate commitment and deposit
-        (bytes32 commitment, bytes32 secret) = _getCommitment();
+        (uint commitment, uint secret) = _getCommitment();
         (uint mask) = lottery.getMask(_amount*betMin);
         lottery.play{value: _amount*betMin}(commitment,0);
 	// 1.5. Process bets by admin
         (uint betsIndex, uint commitCount, uint commitBlock,uint commitHash)=lottery.getStatus();
         assertEq(commitBlock,0);
-        uint _revealSecret = uint(keccak256(commitCount));
-        uint _commitHash = uint(keccak256(_revealSecret));
+        uint _revealSecret = uint(keccak256(abi.encodePacked(commitCount)));
+        uint _commitHash = uint(keccak256(abi.encodePacked(_revealSecret)));
         lottery.commit(_commitHash);
 	/* must wait for the transaction to get included in a block */
         uint commitCountNew;
         (betsIndex, commitCountNew, commitBlock,commitHash)=lottery.getStatus();
-        assertEq(commitHash,genhash);
+        assertGt(commitBlock,0);
+        assertEq(commitHash,_commitHash);
         assertEq(commitCount+1,commitCountNew);
         (uint rand,uint leaf)=lottery.reveal(_revealSecret);
         (betsIndex, commitCount, commitBlock,commitHash)=lottery.getStatus();
         assertEq(commitBlock,0);
-        return(_amount,commitment,secret,mask,rand,leaf);
+        return(_amount,commitment,secret,mask,rand,bytes32(leaf));
     }
 
-    function _collect(uint _amount,bytes32 commitment,bytes32 secret,uint mask,uint rand,bytes32[] memory leaves) internal {
-        (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, bytes32 root, bytes32 nullifierHash, uint rew1, uint rew2, uint rew3) =
+    function _collect(uint secret,uint mask,uint rand,bytes32[] memory leaves) internal {
+        (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint root, uint nullifierHash, uint rew1, uint rew2, uint rew3) =
             _getWitnessAndProof(secret, mask, rand, recipient, relayer, leaves);
         uint _reward = betMin * rew1 * 2**betPower1 +
                        betMin * rew2 * 2**betPower2 +
@@ -137,39 +139,43 @@ contract EthLotteryTest is Test {
         }
     }
 
-    function _fake_play_and_get_leaf() internal returns (uint) {
+    function _fake_play_and_get_leaf(uint i) internal returns (bytes32) {
         uint _amount=3;
-        bytes32 commitment = bytes32(uint256(keccak256(abi.encode(i))) % FIELD_SIZE);
+        uint commitment = uint(uint256(keccak256(abi.encode(i))) % FIELD_SIZE);
         lottery.play{value: _amount*betMin}(commitment,0);
         // 1.5. Process bets by admin
-        (uint betsIndex, uint commitCount, uint commitBlock,uint commitHash)=lottery.getStatus();
-        uint _revealSecret = uint(keccak256(commitCount));
-        uint _commitHash = uint(keccak256(_revealSecret));
+        //(uint betsIndex, uint commitCount, uint commitBlock,uint commitHash)=lottery.getStatus();
+        (,uint commitCount,,)=lottery.getStatus();
+        uint _revealSecret = uint(keccak256(abi.encodePacked(commitCount)));
+        uint _commitHash = uint(keccak256(abi.encodePacked(_revealSecret)));
         lottery.commit(_commitHash);
-        (uint rand,uint leaf)=lottery.reveal(_revealSecret);
-        return(leaf);
+        //(uint rand,uint leaf)=lottery.reveal(_revealSecret);
+        (,uint leaf)=lottery.reveal(_revealSecret);
+        return(bytes32(leaf));
     }
 
     function test_lottery_single_deposit() public {
-        (uint _amount,bytes32 commitment,bytes32 secret,uint mask,uint rand,uint leaf) = _play_and_get_data();
+        //(uint _amount,uint commitment,uint secret,uint mask,uint rand,bytes32 leaf) = _play_and_get_data();
+        (,,uint secret,uint mask,uint rand,bytes32 leaf) = _play_and_get_data();
         bytes32[] memory leaves = new bytes32[](1);
         leaves[0] = leaf;
-        _collect(_amount,commitment,secret,mask,rand,leaves);
+        _collect(secret,mask,rand,leaves);
     }
 
     function test_mixer_many_deposits() public {
         bytes32[] memory leaves = new bytes32[](200);
         // 1. Make many deposits with random commitments -- this will let us test with a non-empty merkle tree
         for (uint256 i = 0; i < 100; i++) {
-            leaves[i] = _fake_play_and_get_leaf();
+            leaves[i] = _fake_play_and_get_leaf(i);
         }
         // 2. Generate commitment and deposit.
-        (uint _amount,bytes32 commitment,bytes32 secret,uint mask,uint rand,uint leaf) = _play_and_get_data();
+        //(uint _amount,uint commitment,uint secret,uint mask,uint rand,bytes32 leaf) = _play_and_get_data();
+        (,,uint secret,uint mask,uint rand,bytes32 leaf) = _play_and_get_data();
         leaves[100] = leaf;
         // 3. Make more deposits.
         for (uint256 i = 101; i < 200; i++) {
-            leaves[i] = _fake_play_and_get_leaf();
+            leaves[i] = _fake_play_and_get_leaf(i);
         }
-        _collect(_amount,commitment,secret,mask,rand,leaves);
+        _collect(secret,mask,rand,leaves);
     }
 }

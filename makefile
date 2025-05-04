@@ -2,7 +2,7 @@
 ARTIFACTS_DIR = circuit_artifacts
 
 # Default target
-all: setup compile ptau gen_withdraw get_cancelbet
+all: setup compile ptau gen_withdraw gen_cancelbet
 
 # Create necessary directories
 setup:
