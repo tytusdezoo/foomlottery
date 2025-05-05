@@ -128,6 +128,7 @@ contract Lottery {
         roots[0] = zeros(merkleTreeLevels - 1);
     }
 
+    /* TODO: just a test ... remove later */
     function MiMCSponge(uint256 in_xL, uint256 in_xR, uint256 k) public view returns (uint256 xL, uint256 xR) {
         return hasher.MiMCSponge(in_xL, in_xR, k);
     }
