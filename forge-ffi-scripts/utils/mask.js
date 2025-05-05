@@ -1,10 +1,17 @@
-// calculate mask 
-function getMask(amount) {
+// calculate mask and secret from amount and ticket
+function getData(amount,ticket,rint) {
   const betPower1 = 10n;
   const betPower2 = 16n;
 
+  let secret = 0n;
+  if(amount == 0n){
+    amount=2n + 2n**(ticket & 0xFFn);
+    secret = ticket>>8n;
+  }
+
   let mask = 0n;
-  for(let i = 0n; i <= betPower2; i++) {
+  let i = 0n;
+  for(; i <= betPower2; i++) {
     if(amount < (2n + 2n**i)) throw new Error("Invalid bet amount");
     if(amount == (2n + 2n**i)){ 
       if(i<=betPower1){
@@ -18,9 +25,19 @@ function getMask(amount) {
     }
   }
   if (mask ==0n ) throw new Error("Invalid bet amount");
-  return mask;
+
+  if(ticket == 0n){
+    secret = rint;
+    ticket = secret<<8n | i;
+  }
+
+  return {
+    secret: secret,
+    ticket: ticket,
+    mask: mask,
+  };
 }
 
 module.exports = {
-  getMask,
+  getData,
 };

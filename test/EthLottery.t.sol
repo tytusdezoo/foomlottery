@@ -31,10 +31,12 @@ contract EthLotteryTest is Test {
     uint public constant betPower3 = 22; // power of the third bet = 4194304
 
     struct PlayData {
-        uint secret;
-        uint mask;
-        uint mimcR;
-        uint mimcC;
+        uint256 hash;
+        uint256 secret; // this is the secret (240bit)
+        uint256 mask;	 // is encoded in lower 8 bits of ticket
+        uint256 mimcR;	 // this can be computed from secret+mask
+        uint256 mimcC;	 // -''-
+        uint256 ticket; // only this ticket is needed to recover the rest of the data
     }
 
     struct CollectData {
@@ -107,31 +109,34 @@ contract EthLotteryTest is Test {
         return (pA, pB, pC, root, nullifierHash, rew1, rew2, rew3);
     }
 
-    function _getCommitment(uint _amount) internal returns (uint commitment, uint secret, uint mask, uint mimcR, uint mimcC) {
-        string[] memory inputs = new string[](3);
+    function _getTicket(uint _amount, uint _ticket) internal returns (PlayData memory) {
+        string[] memory inputs = new string[](4);
         inputs[0] = "node";
         inputs[1] = "forge-ffi-scripts/generateCommitment.js";
         inputs[2] = vm.toString(bytes32(_amount));
+        inputs[3] = vm.toString(bytes32(_ticket));
 
         bytes memory result = vm.ffi(inputs);
-        (commitment, secret, mask, mimcR, mimcC) = abi.decode(result, (uint, uint, uint, uint, uint));
-        return (commitment, secret, mask, mimcR, mimcC);
+        (uint256 hash, uint256 secret, uint256 mask, uint256 mimcR, uint256 mimcC, uint256 ticket) = abi.decode(result, (uint256, uint256, uint256, uint256, uint256, uint256));
+        return PlayData({
+            hash: hash,
+            secret: secret,
+            mask: mask,
+            mimcR: mimcR,
+            mimcC: mimcC,
+            ticket: ticket
+        });
     }
 
     function _play(uint _amount) internal returns (PlayData memory) {
         // 1. Generate commitment and deposit
-        (uint commitment, uint secret, uint mask, uint mimcR, uint mimcC) = _getCommitment(_amount);
+        PlayData memory playData = _getTicket(_amount, 0);
         uint256 gasStart = gasleft();
-        lottery.play{value: _amount*betMin}(commitment,0);
+        lottery.play{value: _amount*betMin}(playData.hash,0);
         uint256 gasUsed = gasStart - gasleft();
         console.log("Gas used in _play: %d", gasUsed);
         
-        return PlayData({
-            secret: secret,
-            mask: mask,
-            mimcR: mimcR,
-            mimcC: mimcC
-        });
+        return playData;
     }
 
     function _get_collect_data(uint secret, uint mask, uint rand, bytes32[] memory leaves) internal returns (CollectData memory) {
@@ -252,8 +257,12 @@ contract EthLotteryTest is Test {
     }
 
     function test_lottery_single_deposit() public {
-        PlayData memory playData = _play(1024+2);
+        PlayData memory playDataForget = _play(1024+2);
+        uint256 ticket = playDataForget.ticket; // only this ticket is needed to recover the rest of the data
+        console.log("%x ticket", ticket);
         _commit_reveal();
+
+        PlayData memory playData = _getTicket(0, ticket);
         (/*uint index*/,uint rand,/*uint currentLevelHash*/,bytes32[] memory leaves) = _get_leaves(playData.mimcR,playData.mimcC);
         _collect(playData.secret, playData.mask, rand, leaves);
     }

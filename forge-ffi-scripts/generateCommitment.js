@@ -1,33 +1,30 @@
+#!/usr/bin/node
+
 const { ethers } = require("ethers");
 const { pedersenHash } = require("./utils/pedersen.js");
 const { rbigint, bigintToHex, leBigintToBuffer, hexToBigint } = require("./utils/bigint.js");
-const { getMask } = require("./utils/mask.js");
+const { getData } = require("./utils/mask.js");
 const { mimcRC } = require("./utils/mimcsponge.js");
-// Intended output: (bytes32 commitment, bytes32 nullifier, bytes32 secret)
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 
 async function main() {
   const inputs = process.argv.slice(2, process.argv.length);
 
-  // 1. Get nullifier and secret
-  const amount = hexToBigint(inputs[0]);
-  const secret = rbigint(31);
+  // 1. Get secret and ticket and mask
+  const data = getData(hexToBigint(inputs[0]), hexToBigint(inputs[1]), rbigint(31));
+  const ticket = data.ticket;
+  const secret = data.secret;
+  const mask = data.mask;
 
-  // 2. Get commitment
-  const commitment = await pedersenHash(leBigintToBuffer(secret, 31));
+  // 2. Get hash
+  const hash = await pedersenHash(leBigintToBuffer(secret, 31));
+  const mimc = await mimcRC(hash, mask);
 
-  // 3. Get mask
-  //console.log(bigintToHex(amount));
-  const mask = await getMask(amount);
-  //console.log(bigintToHex(mask));
-  // 4. Get mimc hash
-  const mimc = await mimcRC(commitment, mask);
-
-  // 3. Return abi encoded nullifier, secret, commitment
+  // 3. Return abi encoded hash, secret, mask, mimcR, mimcC, ticket
   const res = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["uint", "uint", "uint", "uint", "uint"],
-    [bigintToHex(commitment), bigintToHex(secret), bigintToHex(mask), bigintToHex(mimc.R), bigintToHex(mimc.C)]
+    ["uint", "uint", "uint", "uint", "uint", "uint"],
+    [bigintToHex(hash), bigintToHex(secret), bigintToHex(mask), bigintToHex(mimc.R), bigintToHex(mimc.C), bigintToHex(ticket)]
   );
 
   return res;
