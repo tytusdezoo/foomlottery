@@ -188,7 +188,7 @@ contract Lottery {
         //console.log("%x C2 C",C);
         bets[D.betsIndex].R = R;
         bets[D.betsIndex].C = C;
-        emit LogBetIn(_secrethash,D.nextIndex+D.betsIndex,mask,R,C); // mask,R,C not needed
+        emit LogBetIn(D.nextIndex+D.betsIndex,R,C);
         D.betsIndex++;
     }
 
@@ -629,11 +629,11 @@ contract Lottery {
     }
 
     // events
-    event LogBetIn(uint indexed secrethash,uint indexed index,uint R,uint C,uint mask);
-    event LogBetHash(uint indexed index,uint newhash,uint currentLevelHash);
+    event LogBetIn(uint indexed index,uint indexed R,uint indexed C);
+    event LogBetHash(uint indexed index,uint indexed newhash,uint indexed currentLevelHash);
     event LogCancel(uint indexed index);
-    event LogWin(uint indexed nullifierHash, uint reward);
-    event LogTreeHash(uint indexed level,uint indexed index,uint levelHash);
+    event LogWin(uint indexed nullifierHash, uint indexed reward);
+    event LogTreeHash(uint indexed level,uint indexed index,uint indexed levelHash);
     event LogClose(address indexed owner);
     event LogResetCommit(address indexed owner);
     event LogWithdraw(address indexed owner);

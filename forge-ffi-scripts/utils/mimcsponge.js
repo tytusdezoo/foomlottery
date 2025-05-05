@@ -23,8 +23,21 @@ const mimcspongehash = async (inL,inR,k) => {
   };
 };
 
+const mimcRC = async (in1,in2) => {
+  const mimcsponge = await circomlibjs.buildMimcSponge();
+  const out1 = mimcsponge.hash(in1,0n,0n);
+  const in2L = leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.F.add(out1.xL,mimcsponge.F.e(in2))));
+  const in2R = leBufferToBigint(mimcsponge.F.fromMontgomery(out1.xR));
+  const out2 = mimcsponge.hash(in2L,in2R,0n);
+  return {
+    R: leBufferToBigint(mimcsponge.F.fromMontgomery(out2.xL)),
+    C: leBufferToBigint(mimcsponge.F.fromMontgomery(out2.xR)),
+  };
+};
+
 module.exports = {
   mimcsponge2,
   mimcsponge3,
   mimcspongehash,
+  mimcRC,
 };
