@@ -128,11 +128,6 @@ contract Lottery {
         roots[0] = zeros(merkleTreeLevels - 1);
     }
 
-    /* TODO: just a test ... remove later */
-    function MiMCSponge(uint256 in_xL, uint256 in_xR, uint256 k) public view returns (uint256 xL, uint256 xR) {
-        return hasher.MiMCSponge(in_xL, in_xR, k);
-    }
-
 /* lottery functions */
 
     /**
@@ -348,7 +343,7 @@ contract Lottery {
     /**
      * @dev reveal the generator secret
      */
-    function reveal(uint _revealSecret) external onlyGenerator returns (uint, uint) {
+    function reveal(uint _revealSecret) external onlyGenerator /* returns (uint, uint) */ {
         require(uint(keccak256(abi.encodePacked(_revealSecret))) == commitHash, "Invalid reveal secret");
         require(D.commitBlock != 0, "Commit not set");
         rememberHash();
@@ -392,7 +387,7 @@ contract Lottery {
         D.betsIndex = uint8(j);
         commitHash = 0;
         D.commitBlock = 0;
-        return(rand,currentLevelHash); // only last leaf is returned :-(
+        //return(rand,currentLevelHash); // only last leaf is returned :-(
     }
 
 /* investment functions */

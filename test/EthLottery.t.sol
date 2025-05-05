@@ -35,8 +35,6 @@ contract EthLotteryTest is Test {
         uint mask;
         uint mimcR;
         uint mimcC;
-        uint rand;
-        bytes32 leaf;
     }
 
     struct CollectData {
@@ -117,49 +115,22 @@ contract EthLotteryTest is Test {
 
         bytes memory result = vm.ffi(inputs);
         (commitment, secret, mask, mimcR, mimcC) = abi.decode(result, (uint, uint, uint, uint, uint));
-	    //console.log("%x commmitment",commitment);
-	    //console.log("%x secret",secret);
-	    //console.log("%x mask",mask);
-	    //console.log("%x mimcR",mimcR);
-	    //console.log("%x mimcC",mimcC);
         return (commitment, secret, mask, mimcR, mimcC);
     }
 
-    function _play_and_get_data(uint _amount) internal returns (PlayData memory) {
-        uint256 gasStart = gasleft();
+    function _play(uint _amount) internal returns (PlayData memory) {
         // 1. Generate commitment and deposit
         (uint commitment, uint secret, uint mask, uint mimcR, uint mimcC) = _getCommitment(_amount);
+        uint256 gasStart = gasleft();
         lottery.play{value: _amount*betMin}(commitment,0);
-        
-        // 1.5. Process bets by admin
-        (uint betsIndex, uint commitCount, uint commitBlock,uint commitHash)=lottery.getStatus();
-        assertEq(commitBlock,0);
-        uint _revealSecret = uint(keccak256(abi.encodePacked(commitCount)));
-        uint _commitHash = uint(keccak256(abi.encodePacked(_revealSecret)));
-        lottery.commit(_commitHash);
-        vm.roll(++blocknumber);
-
-        uint commitCountNew;
-        (betsIndex, commitCountNew, commitBlock,commitHash)=lottery.getStatus();
-        assertGt(commitBlock,0);
-        assertEq(commitHash,_commitHash);
-        assertEq(commitCount+1,commitCountNew);
-        (uint rand,uint leaf)=lottery.reveal(_revealSecret);
-        vm.roll(++blocknumber);
-        
-        (betsIndex, commitCount, commitBlock,commitHash)=lottery.getStatus();
-        assertEq(commitBlock,0);
-        
         uint256 gasUsed = gasStart - gasleft();
-        console.log("Gas used in _play_and_get_data: %d", gasUsed);
+        console.log("Gas used in _play: %d", gasUsed);
         
         return PlayData({
             secret: secret,
             mask: mask,
             mimcR: mimcR,
-            mimcC: mimcC,
-            rand: rand,
-            leaf: bytes32(leaf)
+            mimcC: mimcC
         });
     }
 
@@ -180,15 +151,11 @@ contract EthLotteryTest is Test {
     }
 
     function _collect(uint secret, uint mask, uint rand, bytes32[] memory leaves) internal {
-        uint256 gasStart = gasleft();
-        
-        CollectData memory data = _get_collect_data(secret, mask, rand, leaves);
-        
+        CollectData memory data = _get_collect_data(secret, mask, rand, leaves);        
         uint _reward = betMin * data.rew1 * 2**betPower1 +
                        betMin * data.rew2 * 2**betPower2 +
                        betMin * data.rew3 * 2**betPower3;
-        console.log("%d reward",_reward);
-        
+        console.log("%d reward",_reward);        
         assertTrue(withdraw.verifyProof(
             data.pA,
             data.pB,
@@ -196,6 +163,7 @@ contract EthLotteryTest is Test {
             [uint256(data.root),uint256(data.nullifierHash),data.rew1,data.rew2,data.rew3,uint256(uint160(recipient)),uint256(uint160(relayer)),fee,refund]
         ));
         
+        uint256 gasStart = gasleft();
         lottery.collect(
             data.pA,
             data.pB,
@@ -211,60 +179,39 @@ contract EthLotteryTest is Test {
             data.rew3,
             0
         );
+        uint256 gasUsed = gasStart - gasleft();
         
         if(_reward>0){
             assertGt(recipient.balance,(_reward*94)/100);
         }
         
-        uint256 gasUsed = gasStart - gasleft();
         console.log("Gas used in _collect: %d", gasUsed);
     }
 
-    function _fake_play_and_get_leaf(uint i) internal /*returns (bytes32)*/ {
+    function _fake_play(uint i) internal /*returns (bytes32)*/ {
         uint _amount=3;
         uint commitment = uint(uint256(keccak256(abi.encode(i))) % FIELD_SIZE);
         lottery.play{value: _amount*betMin}(commitment,0);
-        /*
-        (,uint commitCount,,)=lottery.getStatus();
-        uint _revealSecret = uint(keccak256(abi.encodePacked(commitCount)));
-        uint _commitHash = uint(keccak256(abi.encodePacked(_revealSecret)));
-        vm.roll(++blocknumber);
-        lottery.commit(_commitHash);
-        vm.roll(++blocknumber);
-        //(uint rand,uint leaf)=lottery.reveal(_revealSecret);
-        (,uint leaf)=lottery.reveal(_revealSecret);
-        vm.roll(++blocknumber);
-        return(bytes32(leaf));
-        */
     }
 
     function _commit_reveal() internal {
-        uint256 gasStart = gasleft();
         (,uint commitCount,,)=lottery.getStatus();
         uint _revealSecret = uint(keccak256(abi.encodePacked(commitCount)));
         uint _commitHash = uint(keccak256(abi.encodePacked(_revealSecret)));
         vm.roll(++blocknumber);
+        uint256 commitGasStart = gasleft();
         lottery.commit(_commitHash);
+        uint256 commitGasUsed = commitGasStart - gasleft();
+        console.log("Gas used in _commit: %d", commitGasUsed);
         vm.roll(++blocknumber);
+        uint256 revealGasStart = gasleft();
         lottery.reveal(_revealSecret);
+        uint256 revealGasUsed = revealGasStart - gasleft();
+        console.log("Gas used in _reveal: %d", revealGasUsed);
         vm.roll(++blocknumber);
-        uint256 gasUsed = gasStart - gasleft();
-        console.log("Gas used in _commit_reveal: %d", gasUsed);
     }
 
-    function _notest_mimc() public view {
-        uint inL=1;
-        uint inR=0;
-        uint k=0;
-        console.log("%x inL",inL);
-        console.log("%x inR",inR);
-        console.log("%x k",k);
-        (uint oL,uint oR)=lottery.MiMCSponge(inL,inR,k);
-        console.log("%x oL",oL);
-        console.log("%x oR",oR);
-    }
-
-    function _get_leaves(uint inR, uint inC) internal returns (uint,uint,uint,uint,bytes32[] memory) {
+    function _get_leaves(uint inR, uint inC) internal returns (uint,uint,uint,bytes32[] memory) {
         Vm.Log[] memory entries = vm.getRecordedLogs();
         // push all new entries to allEntries
         for (uint256 i = 0; i < entries.length; i++) {
@@ -272,30 +219,20 @@ contract EthLotteryTest is Test {
         }
         uint maxLeaves = allEntries.length/2;
         bytes32[] memory leaves = new bytes32[](maxLeaves);
-        //console.log("%d allEntries.length",allEntries.length);
         uint leavesCount = 0;
         uint index = 2**32;
         uint mimcR;
         uint mimcC;
         uint rand; // newhash
         uint currentLevelHash; // leaf
-        // LogBetIn(uint indexed index,uint R,uint C)
-        // LogBetHash(uint indexed index,uint newhash,uint currentLevelHash)
         uint logBetIn = uint(keccak256(abi.encodePacked("LogBetIn(uint256,uint256,uint256)")));
-        //console.log("%x logBetIn",logBetIn);
         uint logBetHash = uint(keccak256(abi.encodePacked("LogBetHash(uint256,uint256,uint256)")));
-        //console.log("%x logBetHash",logBetHash);
         for (uint256 i = 0; i < allEntries.length; i++) {
-            //console.log("%x topic",uint(allEntries[i].topics[0]));
             if (uint(allEntries[i].topics[0]) == logBetIn){
-                //console.log("%x topic1",uint(allEntries[i].topics[1]));
-                //console.log("%x topic2",uint(allEntries[i].topics[2]));
-                //console.log("%x topic3",uint(allEntries[i].topics[3]));
                 if (uint(allEntries[i].topics[2]) == inR && uint(allEntries[i].topics[3]) == inC) {
                     index = uint(allEntries[i].topics[1]);
                     mimcR = uint(allEntries[i].topics[2]); // not used
                     mimcC = uint(allEntries[i].topics[3]); // not used
-                    //console.log("%x index",index);
                 }
             }
             if (uint(allEntries[i].topics[0]) == logBetHash){
@@ -303,51 +240,39 @@ contract EthLotteryTest is Test {
                 if (uint(allEntries[i].topics[1]) == index) {
                     rand = uint(allEntries[i].topics[2]);
                     currentLevelHash = uint(allEntries[i].topics[3]);
-                    //console.log("%x rand",rand);
                 }
             }
-
         }
-        return (index,rand,currentLevelHash,leavesCount,leaves);
+        assertGt(leavesCount,0);        
+        bytes32[] memory selectedLeaves = new bytes32[](leavesCount);
+        for(uint i = 0; i < leavesCount; i++) {
+            selectedLeaves[i] = leaves[i];
+        }
+        return (index,rand,currentLevelHash,selectedLeaves);
     }
 
     function test_lottery_single_deposit() public {
-        PlayData memory playData = _play_and_get_data(1024+2);
-        (/*uint index*/,uint rand,/*uint currentLevelHash*/,uint leavesCount,bytes32[] memory leaves) = _get_leaves(playData.mimcR,playData.mimcC);
-        assertGt(leavesCount,0);
-        
-        bytes32[] memory selectedLeaves = new bytes32[](leavesCount);
-        for(uint i = 0; i < leavesCount; i++) {
-            selectedLeaves[i] = leaves[i];
-        }
-        _collect(playData.secret, playData.mask, rand, selectedLeaves);
+        PlayData memory playData = _play(1024+2);
+        _commit_reveal();
+        (/*uint index*/,uint rand,/*uint currentLevelHash*/,bytes32[] memory leaves) = _get_leaves(playData.mimcR,playData.mimcC);
+        _collect(playData.secret, playData.mask, rand, leaves);
     }
 
     function test_lottery_many_deposits() public {
-        //bytes32[] memory leaves = new bytes32[](200);
         // 1. Make many deposits with random commitments -- this will let us test with a non-empty merkle tree
         for (uint256 i = 0; i < 100; i++) {
-            //leaves[i] = 
-            _fake_play_and_get_leaf(i);
+            _fake_play(i);
         }
         _commit_reveal();
-
         // 2. Generate commitment and deposit.
-        PlayData memory playData = _play_and_get_data(3);
-        //leaves[100] = leaf;
+        PlayData memory playData = _play(3);
         // 3. Make more deposits.
         for (uint256 i = 101; i < 200; i++) {
-            //leaves[i] = 
-            _fake_play_and_get_leaf(i);
+            _fake_play(i);
         }
         _commit_reveal();
 
-        (/*uint index*/,uint rand,/*uint currentLevelHash*/,uint leavesCount,bytes32[] memory leaves) = _get_leaves(playData.mimcR,playData.mimcC);
-        assertGt(leavesCount,0);
-        bytes32[] memory selectedLeaves = new bytes32[](leavesCount);
-        for(uint i = 0; i < leavesCount; i++) {
-            selectedLeaves[i] = leaves[i];
-        }
-        _collect(playData.secret,playData.mask,playData.rand,selectedLeaves);
+        (/*uint index*/,uint rand,/*uint currentLevelHash*/,bytes32[] memory leaves) = _get_leaves(playData.mimcR,playData.mimcC);
+        _collect(playData.secret,playData.mask,rand,leaves);
     }
 }
