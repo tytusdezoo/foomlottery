@@ -176,16 +176,16 @@ contract Lottery {
         //console.log("%x shas C",R);
         //console.log("%x mask C",mask);
         uint C = 0;
-            console.log("%x R1in C",R);
+        //console.log("%x R1in C",R);
         (R, C) = hasher.MiMCSponge(R, C, 0);
-            console.log("%x R1 C",R);
-            console.log("%x C1 C",C);
-            console.log("%x mask C",mask);
+        //console.log("%x R1 C",R);
+        //console.log("%x C1 C",C);
+        //console.log("%x mask C",mask);
         R = addmod(R, mask, FIELD_SIZE);
-            console.log("%x R2in C",R);
+        //console.log("%x R2in C",R);
         (R, C) = hasher.MiMCSponge(R, C, 0);
-            console.log("%x R2 C",R);
-            console.log("%x C2 C",C);
+        //console.log("%x R2 C",R);
+        //console.log("%x C2 C",C);
         bets[D.betsIndex].R = R;
         bets[D.betsIndex].C = C;
         emit LogBetIn(_secrethash,D.nextIndex+D.betsIndex,mask,R,C); // mask,R,C not needed
@@ -206,8 +206,8 @@ contract Lottery {
         uint _fee,
         uint _refund,
     	uint _rew1,
-	    uint _rew2,
-	    uint _rew3,
+	uint _rew2,
+	uint _rew3,
         uint _invest) payable external nonReentrant {
         require(msg.value == _refund, "Incorrect refund amount received by the contract");
         require(nullifier[_nullifierHash] == 0, "Incorrect nullifier");
@@ -248,8 +248,10 @@ contract Lottery {
             wallets[_recipient].balance += uint112(_invest);
             _reward -= _invest;
         }
-        require(_reward < _fee, "Insufficient reward");
-        _withdraw(_recipient,_reward - _fee);
+        require(_reward >= _fee, "Insufficient reward");
+        if (_reward - _fee > 0) {
+            _withdraw(_recipient,_reward - _fee);
+        }
         if (_fee > 0) {
             _withdraw(_relayer,_fee);
         }
@@ -360,15 +362,15 @@ contract Lottery {
         for(i = 0; i < D.commitIndex; i++) {
             uint R = bets[i].R;
             uint C = bets[i].C;
-            console.log("%x R Cr",R);
-            console.log("%x C Cr",C);
+            //console.log("%x R Cr",R);
+            //console.log("%x C Cr",C);
             rand=newhash+insertedIndex;
-            console.log("%x rand Cr",rand);
+            //console.log("%x rand Cr",rand);
             R = addmod(R, rand, FIELD_SIZE);
-            console.log("%x R Cr",R);
+            //console.log("%x R Cr",R);
             (R, C) = hasher.MiMCSponge(R, C, 0);
-            console.log("%x R Cr",R);
-            console.log("%x C Cr",C);
+            //console.log("%x R Cr",R);
+            //console.log("%x C Cr",C);
             currentLevelHash = R;
             if(i<D.commitIndex-1) {
                 insertedIndex = _insertleft(currentLevelHash);
@@ -411,7 +413,7 @@ contract Lottery {
     /**
      * @dev Commit remaining dividends before balance changes
      */
-    function collectDividend(address _who) public nonReentrant {
+    function collectDividend(address _who) public {
         updateDividendPeriod();
         uint last = wallets[_who].lastDividendPeriod;
         if(last==0){

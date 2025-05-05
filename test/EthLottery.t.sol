@@ -84,8 +84,6 @@ contract EthLotteryTest is Test {
         bytes memory result = vm.ffi(inputs);
         (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint root, uint nullifierHash, uint rew1, uint rew2, uint rew3) =
             abi.decode(result, (uint256[2], uint256[2][2], uint256[2], uint, uint, uint, uint, uint));
-        console.log(nullifierHash);
-
         return (pA, pB, pC, root, nullifierHash, rew1, rew2, rew3);
     }
 
@@ -96,8 +94,8 @@ contract EthLotteryTest is Test {
 
         bytes memory result = vm.ffi(inputs);
         (commitment, secret) = abi.decode(result, (uint, uint));
-	console.log("%x commmitment\n",commitment);
-	console.log("%x secret\n",secret);
+	//console.log("%x commmitment\n",commitment);
+	//console.log("%x secret\n",secret);
 
         return (commitment, secret);
     }
@@ -137,16 +135,15 @@ contract EthLotteryTest is Test {
     }
 
     function _collect(uint secret,uint mask,uint rand,bytes32[] memory leaves) internal {
-	//console.log("%x secret\n",secret);
         (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint root, uint nullifierHash, uint rew1, uint rew2, uint rew3) =
             _getWitnessAndProof(secret, mask, rand, recipient, relayer, leaves);
-	console.log("%d rew1 ???\n",rew1);
-	console.log("%d rew2\n",rew2);
-	console.log("%d rew3\n",rew3);
-	//console.log("now: %d\n",block.number);
+	//console.log("%x rew1 ???\n",rew1);
+	//console.log("%x rew2\n",rew2);
+	//console.log("%x rew3\n",rew3);
         uint _reward = betMin * rew1 * 2**betPower1 +
                        betMin * rew2 * 2**betPower2 +
                        betMin * rew3 * 2**betPower3 ;
+	console.log("%d reward\n",_reward);
         // 3. Verify proof against the withdraw contract.
         assertTrue(withdraw.verifyProof(pA,pB,pC,[uint256(root),uint256(nullifierHash),rew1,rew2,rew3,uint256(uint160(recipient)),uint256(uint160(relayer)),fee,refund]));
         // 4. Withdraw funds from the contract.

@@ -15,7 +15,7 @@ async function main() {
   const secret = hexToBigint(inputs[0]);
   const mask = hexToBigint(inputs[1]);
   const rand = hexToBigint(inputs[2]);
-  console.log(bigintToHex(secret),"secret");
+//console.log(bigintToHex(secret),"secret");
   const terces = reverseBits((secret+rand)%21888242871839275222246405745257275088548364400416034343698204186575808495617n,31*8);
 
   // 1.5. calculate reward
@@ -24,18 +24,18 @@ async function main() {
   const rew1 = (maskdice &                                       0b1111111111n)?0n:1n ;
   const rew2 = (maskdice &                       0b11111111111111110000000000n)?0n:1n ;
   const rew3 = (dice     & 0b111111111111111111111100000000000000000000000000n)?0n:1n ;
-  console.log(rew1,"rew1");
-  console.log(rew2,"rew2");
-  console.log(rew3,"rew3");
+//console.log(rew1,"rew1");
+//console.log(rew2,"rew2");
+//console.log(rew3,"rew3");
 
   // 2. Get nullifier hash and commitment
   const nullifierHash = await pedersenHash(leBigintToBuffer(terces, 31));
   const SecretHashIn = await pedersenHash(leBigintToBuffer(secret, 31));
-  console.log(bigintToHex(SecretHashIn),"L");
-  console.log(bigintToHex(mask),"mask");
-  console.log(bigintToHex(rand),"rand");
+//console.log(bigintToHex(SecretHashIn),"L");
+//console.log(bigintToHex(mask),"mask");
+//console.log(bigintToHex(rand),"rand");
   const commitment = await mimcsponge3(SecretHashIn,mask,rand);
-  console.log(bigintToHex(commitment),"leaf");
+//console.log(bigintToHex(commitment),"leaf");
 
   // 3. Create merkle tree, insert leaves and get merkle proof for commitment
   const leaves = inputs.slice(7, inputs.length).map((l) => hexToBigint(l));
@@ -65,7 +65,7 @@ async function main() {
     pathIndices: merkleProof.pathIndices,
   };
 
-  console.log(input);
+//console.log(input);
 
   // 5. Create groth16 proof for witness
   const { proof } = await snarkjs.groth16.fullProve(
@@ -80,7 +80,7 @@ async function main() {
 
   // 6. Return abi encoded witness
   const witness = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["uint256[2]", "uint256[2][2]", "uint256[2]", "bytes32", "bytes32", "uint", "uint", "uint"],
+    ["uint256[2]", "uint256[2][2]", "uint256[2]", "uint", "uint", "uint", "uint", "uint"],
     [
       pA,
       // Swap x coordinates: this is for proof verification with the Solidity precompile for EC Pairings, and not required
@@ -98,6 +98,8 @@ async function main() {
     ]
   );
 
+//console.log(bigintToHex(nullifierHash),"nullifierHash");
+//console.log(bigintToHex(rew1),"rew1");
   return witness;
 }
 
