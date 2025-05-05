@@ -13,24 +13,29 @@ async function main() {
 
   // 1. Get nullifier and secret
   const secret = hexToBigint(inputs[0]);
-  console.log("start  %x", secret);
-  const terces = reverseBits(secret,31*8);
   const mask = hexToBigint(inputs[1]);
   const rand = hexToBigint(inputs[2]);
+  console.log(bigintToHex(secret),"secret");
+  const terces = reverseBits((secret+rand)%21888242871839275222246405745257275088548364400416034343698204186575808495617n,31*8);
 
   // 1.5. calculate reward
   const dice = await mimcsponge2(secret,rand);
   const maskdice= mask & dice;
-  const rew1 = (maskdice &                                       0b1111111111n)?0:1
-  const rew2 = (maskdice &                       0b11111111111111110000000000n)?0:1
-  const rew3 = (dice     & 0b111111111111111111111100000000000000000000000000n)?0:1
+  const rew1 = (maskdice &                                       0b1111111111n)?0n:1n ;
+  const rew2 = (maskdice &                       0b11111111111111110000000000n)?0n:1n ;
+  const rew3 = (dice     & 0b111111111111111111111100000000000000000000000000n)?0n:1n ;
+  console.log(rew1,"rew1");
+  console.log(rew2,"rew2");
+  console.log(rew3,"rew3");
 
   // 2. Get nullifier hash and commitment
-  const nullifierHash = await pedersenHash(leBigintToBuffer((terces+rand)%21888242871839275222246405745257275088548364400416034343698204186575808495617n, 32));
-  const SecretHashIn = await pedersenHash(leBigintToBuffer(secret, 32));
-  console.log("mimcin  %x", SecretHashIn,mask,rand);
+  const nullifierHash = await pedersenHash(leBigintToBuffer(terces, 31));
+  const SecretHashIn = await pedersenHash(leBigintToBuffer(secret, 31));
+  console.log(bigintToHex(SecretHashIn),"L");
+  console.log(bigintToHex(mask),"mask");
+  console.log(bigintToHex(rand),"rand");
   const commitment = await mimcsponge3(SecretHashIn,mask,rand);
-  console.log("mimcout %x", commitment);
+  console.log(bigintToHex(commitment),"leaf");
 
   // 3. Create merkle tree, insert leaves and get merkle proof for commitment
   const leaves = inputs.slice(7, inputs.length).map((l) => hexToBigint(l));
@@ -59,6 +64,8 @@ async function main() {
     pathElements: merkleProof.pathElements.map((x) => x.toString()),
     pathIndices: merkleProof.pathIndices,
   };
+
+  console.log(input);
 
   // 5. Create groth16 proof for witness
   const { proof } = await snarkjs.groth16.fullProve(

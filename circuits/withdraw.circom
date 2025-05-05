@@ -14,7 +14,7 @@ template CommitmentHasher() {
     component secretHasher = Pedersen(248);
     component secretBits = Num2Bits(248);
     component nullifierHasher = Pedersen(248);
-    component nullifierBits = Num2Bits(248);
+    component nullifierBits = Num2Bits(256); // Num2Bits(248);
     secretBits.in <== secret;
     nullifierBits.in <== secret + rand;
     for (var i = 0; i < 248; i++) {
@@ -66,8 +66,8 @@ template Withdraw(levels,power1,power2,power3) {
 
     // evaluate lottery
     signal test[power1+power2];
-    component lottoBits = Num2Bits(power1+power2+power3);
-    component maskBits = Num2Bits(power1+power2);
+    component lottoBits = Num2Bits(256); // Num2Bits(power1+power2+power3);
+    component maskBits = Num2Bits(256); // Num2Bits(power1+power2);
     lottoBits.in <== lotto;
     maskBits.in <== mask;
     var j = 0;

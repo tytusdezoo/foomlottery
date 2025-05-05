@@ -44,7 +44,7 @@ const ZERO_VALUES = [
 
 // Creates a fixed height merkle-tree with MiMC hash function (just like MerkleTreeWithHistory.sol)
 async function mimicMerkleTree(leaves = []) {
-  const pedersen = await circomlibjs.buildPedersenHash();
+  const pedersen = await circomlibjs.buildPedersenHash(); //TODO, not needed, fromMontgomery is in mimc
   const mimcsponge = await circomlibjs.buildMimcSponge();
 
   const mimcspongeMultiHash = (left, right) =>

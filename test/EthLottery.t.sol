@@ -84,6 +84,7 @@ contract EthLotteryTest is Test {
         bytes memory result = vm.ffi(inputs);
         (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint root, uint nullifierHash, uint rew1, uint rew2, uint rew3) =
             abi.decode(result, (uint256[2], uint256[2][2], uint256[2], uint, uint, uint, uint, uint));
+        console.log(nullifierHash);
 
         return (pA, pB, pC, root, nullifierHash, rew1, rew2, rew3);
     }
@@ -95,8 +96,8 @@ contract EthLotteryTest is Test {
 
         bytes memory result = vm.ffi(inputs);
         (commitment, secret) = abi.decode(result, (uint, uint));
-	//console.log("%x commmitment\n",commitment);
-	//console.log("%x secret\n",secret);
+	console.log("%x commmitment\n",commitment);
+	console.log("%x secret\n",secret);
 
         return (commitment, secret);
     }
@@ -139,6 +140,9 @@ contract EthLotteryTest is Test {
 	//console.log("%x secret\n",secret);
         (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint root, uint nullifierHash, uint rew1, uint rew2, uint rew3) =
             _getWitnessAndProof(secret, mask, rand, recipient, relayer, leaves);
+	console.log("%d rew1 ???\n",rew1);
+	console.log("%d rew2\n",rew2);
+	console.log("%d rew3\n",rew3);
 	//console.log("now: %d\n",block.number);
         uint _reward = betMin * rew1 * 2**betPower1 +
                        betMin * rew2 * 2**betPower2 +
@@ -170,7 +174,7 @@ contract EthLotteryTest is Test {
         return(bytes32(leaf));
     }
 
-    function test_mimc() public {
+    function _notest_mimc() public view {
         uint inL=1;
         uint inR=0;
         uint k=0;
@@ -182,8 +186,8 @@ contract EthLotteryTest is Test {
         console.log("%x oR",oR);
     }
 
-    function _notest_lottery_single_deposit() public {
-        uint max=21888242871839275222246405745257275088548364400416034343698204186575808495617;
+    function test_lottery_single_deposit() public {
+        //uint max=21888242871839275222246405745257275088548364400416034343698204186575808495617;
 	//console.log("%x max\n",max);
         //(uint _amount,uint commitment,uint secret,uint mask,uint rand,bytes32 leaf) = _play_and_get_data();
         (,,uint secret,uint mask,uint rand,bytes32 leaf) = _play_and_get_data();
