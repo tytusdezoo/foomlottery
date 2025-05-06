@@ -272,6 +272,9 @@ contract Lottery {
         uint _refund) payable external nonReentrant {
         require(msg.value == _refund, "Incorrect refund amount received by the contract");
         require(D.nextIndex<=_betIndex && _betIndex<D.nextIndex+D.betsIndex, "Bet probably processed");
+
+// TODO: make sure not to cancel bets after commit has need placed (for bets inside commit group).
+
         uint betId=_betIndex-D.nextIndex;
         require(betId<betsMax, "Cannot find your bet"); // probably, bet already processed
         require(cancel.verifyProof( _pA, _pB, _pC, [ uint(bets[betId].R), uint(bets[betId].C), uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund, _mask ]), "Invalid withdraw proof");
