@@ -272,9 +272,8 @@ contract Lottery {
         uint _refund) payable external nonReentrant {
         require(msg.value == _refund, "Incorrect refund amount received by the contract");
         require(D.nextIndex<=_betIndex && _betIndex<D.nextIndex+D.betsIndex, "Bet probably processed");
-
-// TODO: make sure not to cancel bets after commit has need placed (for bets inside commit group).
-
+        rememberHash();
+        require(D.commitBlock != 0 || _betIndex>=D.nextIndex+D.commitIndex || (commitBlockHash==0 && block.number>D.commitBlock), "Commit in progress"); // do not allow generator to cancel bets after selecting commitBlock for random index
         uint betId=_betIndex-D.nextIndex;
         require(betId<betsMax, "Cannot find your bet"); // probably, bet already processed
         require(cancel.verifyProof( _pA, _pB, _pC, [ uint(bets[betId].R), uint(bets[betId].C), uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund, _mask ]), "Invalid withdraw proof");
@@ -311,7 +310,6 @@ contract Lottery {
           (bool ok,) =_recipient.call{ value: _refund }("");
           require(ok);
         }
-        rememberHash();
     }
 
 
@@ -388,8 +386,11 @@ contract Lottery {
         betsSum = betsWaiting;
         betsWaiting = 0;
         D.betsIndex = uint8(j);
-        commitHash = 0;
+
+        commitHash = 0; // consider a constant
+        commitBlockHash = 0;
         D.commitBlock = 0;
+        D.commitIndex = 0; // to enable easier cancelbet
         //return(rand,currentLevelHash); // only last leaf is returned :-(
     }
 
@@ -481,11 +482,12 @@ contract Lottery {
      * @dev deposit security deposit to reset commit
      */
     function resetcommit() payable external onlyOwner {
-        require(commitHash!=0 && blockhash(D.commitBlock)==0, "No failed commit");
         uint amount=_deposit(betsSum);
         require(amount >= betsSum, "transfer too low");
         commitHash = 0;
+        commitBlockHash = 0;
         D.commitBlock = 0;
+        D.commitIndex = 0;
         betsSum += betsWaiting;
         betsWaiting = 0;
         emit LogResetCommit(msg.sender);
