@@ -12,7 +12,7 @@ async function main() {
   const inputs = process.argv.slice(2, process.argv.length);
 
   let power = hexToBigint(inputs[0]);
-  if(power<1||power>=2*5){ Throw new Error("Wrong Input");}
+  if(power<1||power>=2*5){ throw new Error("Wrong Input");}
   let hash = 0n;
   let secret = 0n;
   let i = 0n;
@@ -27,7 +27,7 @@ async function main() {
   if(ticket >= 256n) { throw new Error("Failed to find ticket"); }
   secret = secret<<8n | i;
 
-  // 3. Return abi encoded hash, secret, mask, mimcR, mimcC, ticket
+  // 3. Return abi encoded hash, secret+power
   const res = ethers.AbiCoder.defaultAbiCoder().encode(
     ["uint", "uint"],
     [bigintToHex(hash), bigintToHex(secret)]
