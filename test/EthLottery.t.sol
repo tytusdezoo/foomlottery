@@ -74,7 +74,6 @@ contract EthLotteryTest is Test {
         // Deploy Groth16 verifier contracts.
         withdraw = IWithdraw(address(new WithdrawG16Verifier()));
         cancel = ICancel(address(new CancelBetG16Verifier()));
-
         // Deploy lottery contract.
         lottery = new EthLottery(withdraw, cancel, IHasher(mimcHasher), IERC20(address(0)), betMin);
     	vm.recordLogs();
@@ -135,6 +134,17 @@ contract EthLotteryTest is Test {
         lottery.play{value: _amount*betMin}(playData.hash,0);
         uint256 gasUsed = gasStart - gasleft();
         console.log("Gas used in _play: %d", gasUsed);
+        
+        return playData;
+    }
+
+    function _badplay(uint _amount) internal returns (PlayData memory) {
+        // 1. Generate commitment and deposit
+        PlayData memory playData = _getTicket(_amount, 0);
+        uint256 gasStart = gasleft();
+        lottery.badplay{value: _amount*betMin}(playData.hash,0);
+        uint256 gasUsed = gasStart - gasleft();
+        console.log("Gas used in _badplay: %d", gasUsed);
         
         return playData;
     }
@@ -256,7 +266,7 @@ contract EthLotteryTest is Test {
         return (index,rand,currentLevelHash,selectedLeaves);
     }
 
-    function test_lottery_single_deposit() public {
+    function test1_lottery_single_deposit() public {
         PlayData memory playDataForget = _play(1024+2);
         uint256 ticket = playDataForget.ticket; // only this ticket is needed to recover the rest of the data
         console.log("%x ticket", ticket);
@@ -267,7 +277,7 @@ contract EthLotteryTest is Test {
         _collect(playData.secret, playData.mask, rand, leaves);
     }
 
-    function test_lottery_many_deposits() public {
+    function test2_lottery_many_deposits() public {
         // 1. Make many deposits with random commitments -- this will let us test with a non-empty merkle tree
         for (uint256 i = 0; i < 100; i++) {
             _fake_play(i);
@@ -284,4 +294,22 @@ contract EthLotteryTest is Test {
         (/*uint index*/,uint rand,/*uint currentLevelHash*/,bytes32[] memory leaves) = _get_leaves(playData.mimcR,playData.mimcC);
         _collect(playData.secret,playData.mask,rand,leaves);
     }
+
+/*
+    function test3_lottery_single_deposit() public {
+        PlayData memory playDataForget = _play(3);
+        uint256 ticket = playDataForget.ticket; // only this ticket is needed to recover the rest of the data
+        console.log("%x ticket", ticket);
+        _commit_reveal();
+
+        PlayData memory playData = _getTicket(0, ticket);
+        (,uint rand,,bytes32[] memory leaves) = _get_leaves(playData.mimcR,playData.mimcC);
+        _collect(playData.secret, playData.mask, rand, leaves);
+        PlayData memory playDataForget2 = _play(3);
+        PlayData memory playDataForget3 = _badplay(3);
+        PlayData memory playDataForget4 = _play(3);
+        PlayData memory playDataForget5 = _badplay(3);
+        PlayData memory playDataForget6 = _play(1024+2);
+    }
+*/
 }

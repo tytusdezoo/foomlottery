@@ -89,16 +89,17 @@ contract Lottery {
     //BetsRC public bets[betsMax]; // bets in queue
     // it removes index range check on every interaction
     mapping(uint => BetsRC) public bets;
-    uint128 public betsSum = 0; // sum of bets in queue
-    uint128 public betsWaiting = 0; // sum of bets waiting for new generator commit
+    // should be together too
+    uint128 public betsSum = 0; // sum of bets in queue, TODO prevent 0
+    uint128 public betsWaiting = 0; // sum of bets waiting for new generator commit, TODO prevent 0
     //uint8 public betsIndex = 0; // index of the next slot in queue
     mapping (uint => uint) public nullifier; // nullifier hash for each bet
 
     // generator data
     //uint64 public commitBlock = 0;
     //uint8 public commitIndex = 0;
-    uint public commitHash = 0; // TODO prevent 0 values
-    uint public commitBlockHash = 0; // TODO prevent 0 values
+    uint public commitHash = 0; // TODO prevent 0
+    uint public commitBlockHash = 0; // TODO prevent 0
 
     // mertkeltree
     mapping(uint => uint) public filledSubtrees;
@@ -125,6 +126,10 @@ contract Lottery {
         for (uint i = 0; i < merkleTreeLevels; i++) {
             filledSubtrees[i] = zeros(i);
         }
+        for(uint i=0;i<betsMax;i++){
+            bets[i]=BetsRC(1,1);
+        }
+
         roots[0] = zeros(merkleTreeLevels - 1);
     }
 
@@ -168,25 +173,50 @@ contract Lottery {
         }
         uint mask = getMask(_amount);
         uint R = _secrethash;
-        //console.log("%x shas C",R);
-        //console.log("%x mask C",mask);
         uint C = 0;
-        //console.log("%x R1in C",R);
         (R, C) = hasher.MiMCSponge(R, C, 0);
-        //console.log("%x R1 C",R);
-        //console.log("%x C1 C",C);
-        //console.log("%x mask C",mask);
         R = addmod(R, mask, FIELD_SIZE);
-        //console.log("%x R2in C",R);
         (R, C) = hasher.MiMCSponge(R, C, 0);
-        //console.log("%x R2 C",R);
-        //console.log("%x C2 C",C);
         bets[D.betsIndex].R = R;
         bets[D.betsIndex].C = C;
         emit LogBetIn(D.nextIndex+D.betsIndex,R,C);
         D.betsIndex++;
     }
 
+    /**
+     * @dev Play in lottery
+     */
+    function badplay(uint _secrethash,uint _amount) payable external nonReentrant {
+        require(0<_secrethash &&_secrethash < FIELD_SIZE, "_secrethash should be inside the field");
+        require(D.betsIndex < betsMax && D.betsIndex + D.nextIndex < 2 ** merkleTreeLevels - 1, "No more bets allowed");
+        // 13k
+        uint amount = _deposit(_amount);
+        if(D.commitBlock == 0) {
+            betsSum += uint128(amount);
+        }
+        else {
+            rememberHash();
+            betsWaiting += uint128(amount);
+        }
+        uint mask = getMask(amount);
+        // 20k
+        uint R = _secrethash;
+        //uint C = 0; //0;
+        //C = addmod(C, mask, FIELD_SIZE); // cost: 0k
+        uint C = mask;
+        (R, C) = hasher.MiMCSponge(R, C, 0); // cost: 20k
+        // 42k
+        //R = addmod(R, mask, FIELD_SIZE);
+        //(R, C) = hasher.MiMCSponge(R, C, 0);
+        //bets[D.betsIndex]=BetsRC(R,C);
+        bets[D.betsIndex].R = R; // cost: 6k
+        bets[D.betsIndex].C = C;
+        // 87k
+        //return;
+        emit LogBetIn(D.nextIndex+D.betsIndex,R,C);
+        D.betsIndex++;
+        // 91k
+    }
     /**
      * @dev collect the reward
      */
