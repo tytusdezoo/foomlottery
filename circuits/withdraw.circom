@@ -64,20 +64,24 @@ template Withdraw(levels,power1,power2,power3) {
     reward3*(reward3-1) === 0;
 
     // compute mask
+    component eq[power2+1];
     signal isequal[power2+1];
     signal mask;
+    mask <-- (power<=power1)?((2**(power1+power2+1)-1)<<power)&(2**(power1+power2+1)-1):(((2**power2-1)<<(power+power1))|(2**power1-1))&(2**(power1+power2+1)-1);
     var sum = 0;
     for(var i = 0; i <= power2; i++) {
-        component eq = IsEqual();
-        eq.in[0]=i;
-        eq.in[1]=power;
-        isequal[i] === eq.out;
-        sum += isequal[i];
+        eq[i] = IsEqual();
+        eq[i].in[0] <== i;
+        eq[i].in[1] <== power;
+        isequal[i] <== eq[i].out * mask;
+        sum += eq[i].out;
         if(i<=power1){
-            mask * isequal[i] === isequal[i] * ((2**(power1+power2+1)-1)<<i)&(2**(power1+power2+1)-1);
+            var val=((2**(power1+power2+1)-1)<<i)&(2**(power1+power2+1)-1);
+            isequal[i] === eq[i].out * val;
         }
         else{
-            mask * isequal[i] === isequal[i] * (((2**power2-1)<<(i+power1))|(2**power1-1))&(2**(power1+power2+1)-1);
+            var val=(((2**power2-1)<<(i+power1))|(2**power1-1))&(2**(power1+power2+1)-1);
+            isequal[i] === eq[i].out * val;
         }
     }
     sum === 1;
@@ -93,14 +97,16 @@ template Withdraw(levels,power1,power2,power3) {
     // evaluate lottery
     signal test[power1+power2];
     component lottoBits = Num2Bits(256);
+    component maskBits = Num2Bits(power1+power2+1);
     lottoBits.in <== lotto;
+    maskBits.in <== mask;
     var j = 0;
     for ( j=j ; j < power1; j++) {
-        test[j] <== lottoBits.out[j] * ... (power<=j||power>power1); //*maskBits.out[j];
+        test[j] <== lottoBits.out[j] * maskBits.out[j];
         test[j] * reward1 === 0;
     }
     for ( j=j ; j < power1+power2; j++) {
-        test[j] <== lottoBits.out[j] * ... (power<=j-power1||power<=power1); //*maskBits.out[j];
+        test[j] <== lottoBits.out[j] * maskBits.out[j];
         test[j] * reward2 === 0;
     }
     for ( j=j ; j < power1+power2+power3; j++) { // no more mask

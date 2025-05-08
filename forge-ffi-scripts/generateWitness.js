@@ -19,7 +19,9 @@ async function main() {
   const terces = reverseBits((secret+rand)%21888242871839275222246405745257275088548364400416034343698204186575808495617n,31*8);
 
   // 1.5. calculate reward
-  const mask = (power<=power1)?((2**(power1+power2+1)-1)<<i)&(2**(power1+power2+1)-1):(((2**power2-1)<<(i+power1))|(2**power1-1))&(2**(power1+power2+1)-1);
+  const power1=10n;
+  const power2=16n;
+  const mask = (power<=power1)?((2n**(power1+power2+1n)-1n)<<power)&(2n**(power1+power2+1n)-1n):(((2n**power2-1n)<<(power+power1))|(2n**power1-1n))&(2n**(power1+power2+1n)-1n);
   const dice = await mimcsponge2(secret,rand);
   const maskdice= mask & dice;
   const rew1 = (maskdice &                                       0b1111111111n)?0n:1n ;
@@ -35,7 +37,7 @@ async function main() {
 //console.log(bigintToHex(SecretHashIn),"L");
 //console.log(bigintToHex(mask),"mask");
 //console.log(bigintToHex(rand),"rand");
-  const commitment = await mimcsponge2(SecretHashIn+power+1,rand);
+  const commitment = await mimcsponge2(SecretHashIn+power+1n,rand);
 //console.log(bigintToHex(commitment),"leaf");
 
   // 3. Create merkle tree, insert leaves and get merkle proof for commitment

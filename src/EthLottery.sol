@@ -15,8 +15,7 @@ contract EthLottery is Lottery {
     }
 
     function _deposit(uint amount) internal override returns (uint) {
-        if(amount>0){
-            require(amount==msg.value);}
+        require(amount==msg.value);
         return(msg.value);
     }
 

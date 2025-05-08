@@ -7,7 +7,7 @@ interface IWithdraw {
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool);
 }
 interface ICancel {
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[6] calldata _pubSignals) external view returns (bool);
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[5] calldata _pubSignals) external view returns (bool);
 }
 interface IHasher {
   function MiMCSponge(uint in_xL, uint in_xR, uint k) external pure returns (uint xL, uint xR);
@@ -129,7 +129,7 @@ contract Lottery {
     /**
      * @dev Calculate ticket price
      */
-    function getAmount(uint _power) pure public returns (uint) {
+    function getAmount(uint _power) view public returns (uint) {
         require(_power >= 0 && _power<0x1F-1, "Invalid bet amount");
         return(betMin * (2 + 2**_power));
     }
@@ -140,7 +140,7 @@ contract Lottery {
     function play(uint _secrethash,uint _power) payable external nonReentrant {
         require(0<_secrethash &&_secrethash < FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
         require(D.betsIndex < betsMax && D.betsIndex + D.nextIndex < 2 ** merkleTreeLevels - 1, "No more bets allowed");
-        amount=_deposit(getAmount(_power)));
+        _deposit(getAmount(_power));
         uint newHash = _secrethash + _power + 1;
         bets[D.betsIndex] = newHash;
         emit LogBetIn(D.nextIndex+D.betsIndex,newHash);
@@ -169,7 +169,7 @@ contract Lottery {
         require(isKnownRoot(_root), "Cannot find your merkle root"); // Make sure to use a recent one
         require(withdraw.verifyProof( _pA, _pB, _pC, [ _root, _nullifierHash, _rew1, _rew2, _rew3, uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
         nullifier[_nullifierHash] = 1;
-        uint reward = betMin * _rew1 * 2**betPower1 +
+        uint reward =  betMin * _rew1 * 2**betPower1 +
                        betMin * _rew2 * 2**betPower2 +
                        betMin * _rew3 * 2**betPower3 ;
         emit LogWin(uint(_nullifierHash),reward);
@@ -238,7 +238,7 @@ contract Lottery {
         uint power=bets[betId]&0x1f;
         require(power>0);
         require(cancel.verifyProof( _pA, _pB, _pC, [uint(bets[betId]-power-1), uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
-        uint reward=getAmount(power-1));
+        uint reward=getAmount(power-1);
         bets[betId]=0x20;
         emit LogCancel(_betIndex);
         collectDividend(_recipient);
@@ -416,11 +416,11 @@ contract Lottery {
         require(ok);
     }
 
-    function betSum() view public return (uint){
+    function betSum() view public returns (uint){
         uint betsum=0;
         for(uint i=0;i<D.commitIndex;i++){
             uint power=bets[i]&0x1f;
-            if(power){
+            if(power>0){
                 betsum+=getAmount(power-1);}}
         return(betsum);
     }
@@ -430,9 +430,9 @@ contract Lottery {
      */
     function resetcommit() payable external onlyOwner {
 	require(D.commitIndex>0, "No need for reset");
-        uint betsum=betSum()
-        uint amount=_deposit(betsum);
-        require(amount >= betsum, "transfer too low");
+        uint betsum=betSum();
+        _deposit(betsum);
+        //require(amount >= betsum, "transfer too low");
         commitHash = 0;
         commitBlockHash = 0;
         D.commitBlock = 0;
