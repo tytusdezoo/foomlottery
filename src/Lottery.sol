@@ -7,11 +7,10 @@ interface IWithdraw {
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool);
 }
 interface ICancel {
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[7] calldata _pubSignals) external view returns (bool);
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[6] calldata _pubSignals) external view returns (bool);
 }
 interface IHasher {
-  function MiMCSponge(uint256 in_xL, uint256 in_xR, uint256 k) external pure returns (uint256 xL, uint256 xR);
-  //function MiMCSponge(uint in_xL, uint in_xR, uint k) external pure returns (uint256 xL, uint256 xR);
+  function MiMCSponge(uint in_xL, uint in_xR, uint k) external pure returns (uint xL, uint xR);
 }
 
 /**
@@ -82,16 +81,8 @@ contract Lottery {
     //uint32 public dividendPeriod = 1; // current dividend period
 
     // betting parameters
-    struct BetsRC {
-        uint R; // total bet volume in period
-        uint C; // total eligible funds in period
-    }
-    //BetsRC public bets[betsMax]; // bets in queue
     // it removes index range check on every interaction
-    mapping(uint => BetsRC) public bets;
-    // should be together too
-    uint128 public betsSum = 0; // sum of bets in queue, TODO prevent 0
-    uint128 public betsWaiting = 0; // sum of bets waiting for new generator commit, TODO prevent 0
+    mapping(uint => uint) public bets;
     //uint8 public betsIndex = 0; // index of the next slot in queue
     mapping (uint => uint) public nullifier; // nullifier hash for each bet
 
@@ -121,13 +112,13 @@ contract Lottery {
         D.dividendPeriod = 1;
         D.status = uint8(_NOT_ENTERED);
         wallets[owner] = Wallet(uint112(1),uint112(1),uint16(D.dividendPeriod),uint16(0));
-        periods[0]=Period(0,0);
+        //periods[0]=Period(0,0); // not needed
         periods[D.dividendPeriod]=Period(1,1);
         for (uint i = 0; i < merkleTreeLevels; i++) {
             filledSubtrees[i] = zeros(i);
         }
         for(uint i=0;i<betsMax;i++){
-            bets[i]=BetsRC(1,1);
+            bets[i]=0x20;
         }
 
         roots[0] = zeros(merkleTreeLevels - 1);
@@ -136,87 +127,26 @@ contract Lottery {
 /* lottery functions */
 
     /**
-     * @dev Calculate mask for lottery
+     * @dev Calculate ticket price
      */
-    function getMask(uint _amount) view public returns (uint) {
-        uint mask = 0;
-        for(uint i = 0; i <= betPower2; i++) {
-            require(_amount >= betMin * (2 + 2**i), "Invalid bet amount");
-            if(_amount == betMin * (2 + 2**i)) {
-                if(i<=betPower1){
-                    mask=(2**(betPower1+betPower2+1)-1)<<i;
-                }
-                else{
-                    mask=((2**betPower2-1)<<(i+betPower1))|(2**betPower1-1);
-                }
-                mask=mask&(2**(betPower1+betPower2+1)-1);
-                break;
-            }
-        }
-        require(mask != 0, "Invalid bet amount");
-        return (mask);
+    function getAmount(uint _power) pure public returns (uint) {
+        require(_power >= 0 && _power<0x1F-1, "Invalid bet amount");
+        return(betMin * (2 + 2**_power));
     }
 
     /**
      * @dev Play in lottery
      */
-    function play(uint _secrethash,uint _amount) payable external nonReentrant {
-        require(0<_secrethash &&_secrethash < FIELD_SIZE, "_secrethash should be inside the field");
+    function play(uint _secrethash,uint _power) payable external nonReentrant {
+        require(0<_secrethash &&_secrethash < FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
         require(D.betsIndex < betsMax && D.betsIndex + D.nextIndex < 2 ** merkleTreeLevels - 1, "No more bets allowed");
-        _amount=_deposit(_amount);
-        if(D.commitBlock == 0) {
-            betsSum += uint128(_amount);
-        }
-        else {
-            rememberHash();
-            betsWaiting += uint128(_amount);
-        }
-        uint mask = getMask(_amount);
-        uint R = _secrethash;
-        uint C = 0;
-        (R, C) = hasher.MiMCSponge(R, C, 0);
-        R = addmod(R, mask, FIELD_SIZE);
-        (R, C) = hasher.MiMCSponge(R, C, 0);
-        bets[D.betsIndex].R = R;
-        bets[D.betsIndex].C = C;
-        emit LogBetIn(D.nextIndex+D.betsIndex,R,C);
+        amount=_deposit(getAmount(_power)));
+        uint newHash = _secrethash + _power + 1;
+        bets[D.betsIndex] = newHash;
+        emit LogBetIn(D.nextIndex+D.betsIndex,newHash);
         D.betsIndex++;
     }
 
-    /**
-     * @dev Play in lottery
-     */
-    function badplay(uint _secrethash,uint _amount) payable external nonReentrant {
-        require(0<_secrethash &&_secrethash < FIELD_SIZE, "_secrethash should be inside the field");
-        require(D.betsIndex < betsMax && D.betsIndex + D.nextIndex < 2 ** merkleTreeLevels - 1, "No more bets allowed");
-        // 13k
-        uint amount = _deposit(_amount);
-        if(D.commitBlock == 0) {
-            betsSum += uint128(amount);
-        }
-        else {
-            rememberHash();
-            betsWaiting += uint128(amount);
-        }
-        uint mask = getMask(amount);
-        // 20k
-        uint R = _secrethash;
-        //uint C = 0; //0;
-        //C = addmod(C, mask, FIELD_SIZE); // cost: 0k
-        uint C = mask;
-        (R, C) = hasher.MiMCSponge(R, C, 0); // cost: 20k
-        // 42k
-        //R = addmod(R, mask, FIELD_SIZE);
-        //(R, C) = hasher.MiMCSponge(R, C, 0);
-        //bets[D.betsIndex]=BetsRC(R,C);
-        bets[D.betsIndex].R = R; // cost: 6k
-        bets[D.betsIndex].C = C;
-        // 87k
-        //return;
-        emit LogBetIn(D.nextIndex+D.betsIndex,R,C);
-        D.betsIndex++;
-        // 91k
-    }
     /**
      * @dev collect the reward
      */
@@ -239,43 +169,43 @@ contract Lottery {
         require(isKnownRoot(_root), "Cannot find your merkle root"); // Make sure to use a recent one
         require(withdraw.verifyProof( _pA, _pB, _pC, [ _root, _nullifierHash, _rew1, _rew2, _rew3, uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
         nullifier[_nullifierHash] = 1;
-        uint _reward = betMin * _rew1 * 2**betPower1 +
+        uint reward = betMin * _rew1 * 2**betPower1 +
                        betMin * _rew2 * 2**betPower2 +
                        betMin * _rew3 * 2**betPower3 ;
-        emit LogWin(uint(_nullifierHash),_reward);
-        currentBets += uint128(_reward);
+        emit LogWin(uint(_nullifierHash),reward);
+        currentBets += uint128(reward);
         collectDividend(generator);
-        uint generatorReward = _reward * generatorFeePerCent / 100;
+        uint generatorReward = reward * generatorFeePerCent / 100;
         currentBalance += uint128(generatorReward);
         wallets[generator].balance += uint112(generatorReward);
         collectDividend(_recipient);
-        _reward = _reward * (100 - dividendFeePerCent - generatorFeePerCent) / 100;
+        reward = reward * (100 - dividendFeePerCent - generatorFeePerCent) / 100;
         if(_invest>0 && wallets[_recipient].balance < maxBalance) {
-            if(_invest > _reward) {
-                _invest = _reward;
+            if(_invest > reward) {
+                _invest = reward;
             }
             currentBalance += uint128(_invest);
             wallets[_recipient].balance += uint112(_invest);
-            _reward -= _invest;
+            reward -= _invest;
         }
         /* process withdrawal */
-        if(betMin * 2**betPower2 < _reward) { // limit max withdrawal
-            _invest = _reward - (betMin * 2**betPower2);
+        if(betMin * 2**betPower2 < reward) { // limit max withdrawal
+            _invest = reward - (betMin * 2**betPower2);
             currentBalance += uint128(_invest);
             wallets[_recipient].balance += uint112(_invest);
             wallets[_recipient].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // wait 1 period for more funds
-            _reward -= _invest;
+            reward -= _invest;
         }
         uint balance = _balance();
-        if(balance < _reward) {
-            _invest = _reward - balance;
+        if(balance < reward) {
+            _invest = reward - balance;
             currentBalance += uint128(_invest);
             wallets[_recipient].balance += uint112(_invest);
-            _reward -= _invest;
+            reward -= _invest;
         }
-        require(_reward >= _fee, "Insufficient reward");
-        if (_reward - _fee > 0) {
-            _withdraw(_recipient,_reward - _fee);
+        require(reward >= _fee, "Insufficient reward");
+        if (reward - _fee > 0) {
+            _withdraw(_recipient,reward - _fee);
         }
         if (_fee > 0) {
             _withdraw(_relayer,_fee);
@@ -292,7 +222,6 @@ contract Lottery {
      */
     function cancelbet(
         uint _betIndex,
-        uint _mask,
         uint[2] calldata _pA,
         uint[2][2] calldata _pB,
         uint[2] calldata _pC,
@@ -306,33 +235,23 @@ contract Lottery {
         require(D.commitBlock != 0 || _betIndex>=D.nextIndex+D.commitIndex || (commitBlockHash==0 && block.number>D.commitBlock), "Commit in progress"); // do not allow generator to cancel bets after selecting commitBlock for random index
         uint betId=_betIndex-D.nextIndex;
         require(betId<betsMax, "Cannot find your bet"); // probably, bet already processed
-        require(cancel.verifyProof( _pA, _pB, _pC, [ uint(bets[betId].R), uint(bets[betId].C), uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund, _mask ]), "Invalid withdraw proof");
-        bets[betId]=BetsRC(0,0);
-        /* should be a function */
-        uint _reward = 2 * betMin; // fee: betMin
-        uint i=0;
-        for( ; i<=betPower1 ; i++){
-            if((_mask & (2**i))==0){
-                _reward = betMin * (1 + 2**(i+1)); // fee: betMin
-            }
-        }
-        for( ; i<=betPower2 ; i++){
-            if((_mask & (2**(i+betPower1)))==0){
-                _reward = betMin * (1 + 2**(i+1)); // fee: betMin
-            }
-        }
+        uint power=bets[betId]&0x1f;
+        require(power>0);
+        require(cancel.verifyProof( _pA, _pB, _pC, [uint(bets[betId]-power-1), uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
+        uint reward=getAmount(power-1));
+        bets[betId]=0x20;
         emit LogCancel(_betIndex);
         collectDividend(_recipient);
         /* process withdrawal */
         uint balance = _balance();
-        if(balance < _reward) {
-            uint _invest = _reward - balance;
+        if(balance < reward) {
+            uint _invest = reward - balance;
             currentBalance += uint128(_invest);
             wallets[_recipient].balance += uint112(_invest);
-            _reward -= _invest;
+            reward -= _invest;
         }
-        require(_reward < _fee, "Insufficient reward");
-        _withdraw(_recipient,_reward - _fee);
+        require(reward < _fee, "Insufficient reward");
+        _withdraw(_recipient,reward - _fee);
         if (_fee > 0) {
             _withdraw(_relayer,_fee);
         }
@@ -386,17 +305,12 @@ contract Lottery {
         uint j;
         uint currentLevelHash;
         for(i = 0; i < D.commitIndex; i++) {
-            uint R = bets[i].R;
-            uint C = bets[i].C;
-            //console.log("%x R Cr",R);
-            //console.log("%x C Cr",C);
-            rand=newhash+insertedIndex;
-            //console.log("%x rand Cr",rand);
-            R = addmod(R, rand, FIELD_SIZE);
-            //console.log("%x R Cr",R);
+            uint R = bets[i];
+            uint C = 0;
             (R, C) = hasher.MiMCSponge(R, C, 0);
-            //console.log("%x R Cr",R);
-            //console.log("%x C Cr",C);
+            rand=newhash+insertedIndex;
+            R = addmod(R, rand, FIELD_SIZE);
+            (R, C) = hasher.MiMCSponge(R, C, 0);
             currentLevelHash = R;
             if(i<D.commitIndex-1) {
                 insertedIndex = _insertleft(currentLevelHash);
@@ -404,24 +318,18 @@ contract Lottery {
             else {
                 insertedIndex = _insert(currentLevelHash);
             }
-            //console.log("%x rand C",rand);
-            //console.log("%x leaf C",currentLevelHash);
             emit LogBetHash(insertedIndex,rand,currentLevelHash); // currentLevelHash for speedup
         }
         for(j = 0; i < D.betsIndex; i++) { // queue unprocessed bets
-            bets[j].R=bets[i].R;
-            bets[j].C=bets[i].C;
+            bets[j]=bets[i];
             j++;
         }
-        betsSum = betsWaiting;
-        betsWaiting = 0;
         D.betsIndex = uint8(j);
 
         commitHash = 0; // consider a constant
         commitBlockHash = 0;
         D.commitBlock = 0;
         D.commitIndex = 0; // to enable easier cancelbet
-        //return(rand,currentLevelHash); // only last leaf is returned :-(
     }
 
 /* investment functions */
@@ -508,18 +416,27 @@ contract Lottery {
         require(ok);
     }
 
+    function betSum() view public return (uint){
+        uint betsum=0;
+        for(uint i=0;i<D.commitIndex;i++){
+            uint power=bets[i]&0x1f;
+            if(power){
+                betsum+=getAmount(power-1);}}
+        return(betsum);
+    }
+
     /**
      * @dev deposit security deposit to reset commit
      */
     function resetcommit() payable external onlyOwner {
-        uint amount=_deposit(betsSum);
-        require(amount >= betsSum, "transfer too low");
+	require(D.commitIndex>0, "No need for reset");
+        uint betsum=betSum()
+        uint amount=_deposit(betsum);
+        require(amount >= betsum, "transfer too low");
         commitHash = 0;
         commitBlockHash = 0;
         D.commitBlock = 0;
         D.commitIndex = 0;
-        betsSum += betsWaiting;
-        betsWaiting = 0;
         emit LogResetCommit(msg.sender);
     }
 
@@ -659,7 +576,7 @@ contract Lottery {
     }
 
     // events
-    event LogBetIn(uint indexed index,uint indexed R,uint indexed C);
+    event LogBetIn(uint indexed index,uint indexed newHash);
     event LogBetHash(uint indexed index,uint indexed newhash,uint indexed currentLevelHash);
     event LogCancel(uint indexed index);
     event LogWin(uint indexed nullifierHash, uint indexed reward);
@@ -759,7 +676,7 @@ contract Lottery {
         return false;
     }
 
-    function zeros(uint256 i) public pure returns (uint) {
+    function zeros(uint256 i) public pure returns (uint) { // should store R+C
         if (i == 0)       return uint(0x2fe54c60d3acabf3343a35b6eba15db4821b340f76e741e2249685ed4899af6c);
         else if (i == 1)  return uint(0x256a6135777eee2fd26f54b8b7037a25439d5235caee224154186d2b8a52e31d);
         else if (i == 2)  return uint(0x1151949895e82ab19924de92c40a3d6f7bcb60d92b00504b8199613683f0c200);

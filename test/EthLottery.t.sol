@@ -30,15 +30,6 @@ contract EthLotteryTest is Test {
     uint public constant betPower2 = 16; // power of the second bet = 65536
     uint public constant betPower3 = 22; // power of the third bet = 4194304
 
-    struct PlayData {
-        uint256 hash;
-        uint256 secret; // this is the secret (240bit)
-        uint256 mask;	 // is encoded in lower 8 bits of ticket
-        uint256 mimcR;	 // this can be computed from secret+mask
-        uint256 mimcC;	 // -''-
-        uint256 ticket; // only this ticket is needed to recover the rest of the data
-    }
-
     struct CollectData {
         uint256[2] pA;
         uint256[2][2] pB;
@@ -81,7 +72,7 @@ contract EthLotteryTest is Test {
 
     function _getWitnessAndProof(
         uint _secret,
-        uint _mask,
+        uint _power,
         uint _rand,
         address _recipient,
         address _relayer,
@@ -91,7 +82,7 @@ contract EthLotteryTest is Test {
         inputs[0] = "node";
         inputs[1] = "forge-ffi-scripts/generateWitness.js";
         inputs[2] = vm.toString(bytes32(_secret));
-        inputs[3] = vm.toString(bytes32(_mask));
+        inputs[3] = vm.toString(bytes32(_power));
         inputs[4] = vm.toString(bytes32(_rand));
         inputs[5] = vm.toString(_recipient);
         inputs[6] = vm.toString(_relayer);
@@ -108,51 +99,30 @@ contract EthLotteryTest is Test {
         return (pA, pB, pC, root, nullifierHash, rew1, rew2, rew3);
     }
 
-    function _getTicket(uint _amount, uint _ticket) internal returns (PlayData memory) {
-        string[] memory inputs = new string[](4);
+    function _getHash(uint _power) internal returns (uint hash, uint secret_power) {
+        string[] memory inputs = new string[](3);
         inputs[0] = "node";
-        inputs[1] = "forge-ffi-scripts/generateCommitment.js";
-        inputs[2] = vm.toString(bytes32(_amount));
-        inputs[3] = vm.toString(bytes32(_ticket));
-
+        inputs[1] = "forge-ffi-scripts/getHash.js";
+        inputs[2] = vm.toString(bytes32(_power));
         bytes memory result = vm.ffi(inputs);
-        (uint256 hash, uint256 secret, uint256 mask, uint256 mimcR, uint256 mimcC, uint256 ticket) = abi.decode(result, (uint256, uint256, uint256, uint256, uint256, uint256));
-        return PlayData({
-            hash: hash,
-            secret: secret,
-            mask: mask,
-            mimcR: mimcR,
-            mimcC: mimcC,
-            ticket: ticket
-        });
+        (uint256 hash, uint256 secret_power) = abi.decode(result, (uint256, uint256));
+        return (hash, secret_power);
     }
 
-    function _play(uint _amount) internal returns (PlayData memory) {
-        // 1. Generate commitment and deposit
-        PlayData memory playData = _getTicket(_amount, 0);
+    function _play(uint _power) internal returns (uint secret_power,uint hash) {
+        (uint256 hash, uint256 secret_power) = _getHash(_power);
         uint256 gasStart = gasleft();
-        lottery.play{value: _amount*betMin}(playData.hash,0);
+        lottery.play{value: betMin * (2 + 2**_power)}(hash,_power);
         uint256 gasUsed = gasStart - gasleft();
         console.log("Gas used in _play: %d", gasUsed);
-        
-        return playData;
+        return (secret_power,hash);
     }
 
-    function _badplay(uint _amount) internal returns (PlayData memory) {
-        // 1. Generate commitment and deposit
-        PlayData memory playData = _getTicket(_amount, 0);
-        uint256 gasStart = gasleft();
-        lottery.badplay{value: _amount*betMin}(playData.hash,0);
-        uint256 gasUsed = gasStart - gasleft();
-        console.log("Gas used in _badplay: %d", gasUsed);
-        
-        return playData;
-    }
-
-    function _get_collect_data(uint secret, uint mask, uint rand, bytes32[] memory leaves) internal returns (CollectData memory) {
+    function _get_collect_data(uint secret_power, uint rand, bytes32[] memory leaves) internal returns (CollectData memory) {
+        uint secret=secret_power>>8;
+        uint power=secret_power&0xFF;
         (uint256[2] memory pA, uint256[2][2] memory pB, uint256[2] memory pC, uint root, uint nullifierHash, uint rew1, uint rew2, uint rew3) =
-            _getWitnessAndProof(secret, mask, rand, recipient, relayer, leaves);
-        
+            _getWitnessAndProof(secret, power, rand, recipient, relayer, leaves);
         return CollectData({
             pA: pA,
             pB: pB,
@@ -165,8 +135,8 @@ contract EthLotteryTest is Test {
         });
     }
 
-    function _collect(uint secret, uint mask, uint rand, bytes32[] memory leaves) internal {
-        CollectData memory data = _get_collect_data(secret, mask, rand, leaves);        
+    function _collect(uint secret, uint power, uint rand, bytes32[] memory leaves) internal {
+        CollectData memory data = _get_collect_data(secret, power, rand, leaves);        
         uint _reward = betMin * data.rew1 * 2**betPower1 +
                        betMin * data.rew2 * 2**betPower2 +
                        betMin * data.rew3 * 2**betPower3;
@@ -177,7 +147,6 @@ contract EthLotteryTest is Test {
             data.pC,
             [uint256(data.root),uint256(data.nullifierHash),data.rew1,data.rew2,data.rew3,uint256(uint160(recipient)),uint256(uint160(relayer)),fee,refund]
         ));
-        
         uint256 gasStart = gasleft();
         lottery.collect(
             data.pA,
@@ -195,18 +164,15 @@ contract EthLotteryTest is Test {
             0
         );
         uint256 gasUsed = gasStart - gasleft();
-        
         if(_reward>0){
             assertGt(recipient.balance,(_reward*94)/100);
         }
-        
         console.log("Gas used in _collect: %d", gasUsed);
     }
 
-    function _fake_play(uint i) internal /*returns (bytes32)*/ {
-        uint _amount=3;
-        uint commitment = uint(uint256(keccak256(abi.encode(i))) % FIELD_SIZE);
-        lottery.play{value: _amount*betMin}(commitment,0);
+    function _fake_play() internal /*returns (bytes32)*/ {
+        uint commitment = uint(uint240(keccak256(abi.encode(i)))<<5);
+        lottery.play{value: 3*betMin}(commitment,0);
     }
 
     function _commit_reveal() internal {
@@ -226,7 +192,7 @@ contract EthLotteryTest is Test {
         vm.roll(++blocknumber);
     }
 
-    function _get_leaves(uint inR, uint inC) internal returns (uint,uint,uint,bytes32[] memory) {
+    function _get_leaves(uint hash_power_1) internal returns (uint,uint,uint,bytes32[] memory) {
         Vm.Log[] memory entries = vm.getRecordedLogs();
         // push all new entries to allEntries
         for (uint256 i = 0; i < entries.length; i++) {
@@ -236,18 +202,14 @@ contract EthLotteryTest is Test {
         bytes32[] memory leaves = new bytes32[](maxLeaves);
         uint leavesCount = 0;
         uint index = 2**32;
-        uint mimcR;
-        uint mimcC;
         uint rand; // newhash
         uint currentLevelHash; // leaf
-        uint logBetIn = uint(keccak256(abi.encodePacked("LogBetIn(uint256,uint256,uint256)")));
+        uint logBetIn = uint(keccak256(abi.encodePacked("LogBetIn(uint256,uint256)")));
         uint logBetHash = uint(keccak256(abi.encodePacked("LogBetHash(uint256,uint256,uint256)")));
         for (uint256 i = 0; i < allEntries.length; i++) {
             if (uint(allEntries[i].topics[0]) == logBetIn){
-                if (uint(allEntries[i].topics[2]) == inR && uint(allEntries[i].topics[3]) == inC) {
+                if (uint(allEntries[i].topics[2]) == hash_power_1) {
                     index = uint(allEntries[i].topics[1]);
-                    mimcR = uint(allEntries[i].topics[2]); // not used
-                    mimcC = uint(allEntries[i].topics[3]); // not used
                 }
             }
             if (uint(allEntries[i].topics[0]) == logBetHash){
@@ -267,49 +229,29 @@ contract EthLotteryTest is Test {
     }
 
     function test1_lottery_single_deposit() public {
-        PlayData memory playDataForget = _play(1024+2);
-        uint256 ticket = playDataForget.ticket; // only this ticket is needed to recover the rest of the data
-        console.log("%x ticket", ticket);
+        (uint secret_power,) = _play(10); // hash can be restored later
+        console.log("%x ticket", secret_power);
         _commit_reveal();
 
-        PlayData memory playData = _getTicket(0, ticket);
-        (/*uint index*/,uint rand,/*uint currentLevelHash*/,bytes32[] memory leaves) = _get_leaves(playData.mimcR,playData.mimcC);
-        _collect(playData.secret, playData.mask, rand, leaves);
+        (hash,) = _getHash(secret_power);
+        (/*uint index*/,uint rand,/*uint currentLevelHash*/,bytes32[] memory leaves) = _get_leaves(hash+(secret_power&0x1f)+1);
+        _collect(secret_power,rand,leaves);
     }
 
     function test2_lottery_many_deposits() public {
         // 1. Make many deposits with random commitments -- this will let us test with a non-empty merkle tree
         for (uint256 i = 0; i < 100; i++) {
-            _fake_play(i);
+            _fake_play();
         }
         _commit_reveal();
         // 2. Generate commitment and deposit.
-        PlayData memory playData = _play(3);
+        (uint secret_power,uint hash) = _play(10);
         // 3. Make more deposits.
         for (uint256 i = 101; i < 200; i++) {
-            _fake_play(i);
+            _fake_play();
         }
         _commit_reveal();
-
-        (/*uint index*/,uint rand,/*uint currentLevelHash*/,bytes32[] memory leaves) = _get_leaves(playData.mimcR,playData.mimcC);
-        _collect(playData.secret,playData.mask,rand,leaves);
+        (/*uint index*/,uint rand,/*uint currentLevelHash*/,bytes32[] memory leaves) = _get_leaves(hash+(secret_power&0x1f)+1);
+        _collect(secret_power,rand,leaves);
     }
-
-/*
-    function test3_lottery_single_deposit() public {
-        PlayData memory playDataForget = _play(3);
-        uint256 ticket = playDataForget.ticket; // only this ticket is needed to recover the rest of the data
-        console.log("%x ticket", ticket);
-        _commit_reveal();
-
-        PlayData memory playData = _getTicket(0, ticket);
-        (,uint rand,,bytes32[] memory leaves) = _get_leaves(playData.mimcR,playData.mimcC);
-        _collect(playData.secret, playData.mask, rand, leaves);
-        PlayData memory playDataForget2 = _play(3);
-        PlayData memory playDataForget3 = _badplay(3);
-        PlayData memory playDataForget4 = _play(3);
-        PlayData memory playDataForget5 = _badplay(3);
-        PlayData memory playDataForget6 = _play(1024+2);
-    }
-*/
 }

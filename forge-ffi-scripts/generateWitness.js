@@ -13,12 +13,13 @@ async function main() {
 
   // 1. Get nullifier and secret
   const secret = hexToBigint(inputs[0]);
-  const mask = hexToBigint(inputs[1]);
+  const power = hexToBigint(inputs[1]); // use power instead !!!
   const rand = hexToBigint(inputs[2]);
 //console.log(bigintToHex(secret),"secret");
   const terces = reverseBits((secret+rand)%21888242871839275222246405745257275088548364400416034343698204186575808495617n,31*8);
 
   // 1.5. calculate reward
+  const mask = (power<=power1)?((2**(power1+power2+1)-1)<<i)&(2**(power1+power2+1)-1):(((2**power2-1)<<(i+power1))|(2**power1-1))&(2**(power1+power2+1)-1);
   const dice = await mimcsponge2(secret,rand);
   const maskdice= mask & dice;
   const rew1 = (maskdice &                                       0b1111111111n)?0n:1n ;
@@ -34,7 +35,7 @@ async function main() {
 //console.log(bigintToHex(SecretHashIn),"L");
 //console.log(bigintToHex(mask),"mask");
 //console.log(bigintToHex(rand),"rand");
-  const commitment = await mimcsponge3(SecretHashIn,mask,rand);
+  const commitment = await mimcsponge2(SecretHashIn+power+1,rand);
 //console.log(bigintToHex(commitment),"leaf");
 
   // 3. Create merkle tree, insert leaves and get merkle proof for commitment
@@ -59,7 +60,7 @@ async function main() {
 
     // Private inputs
     secret: secret,
-    mask: mask,
+    power: power,
     rand: rand,
     pathElements: merkleProof.pathElements.map((x) => x.toString()),
     pathIndices: merkleProof.pathIndices,

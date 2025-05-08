@@ -19,8 +19,7 @@ template SecretHasher() {
 
 // Verifies that commitment that corresponds to given secret and nullifier is included in the merkle tree of deposits
 template CancelBet() {
-    signal input inR;
-    signal input inC;
+    signal input inHash;
     signal input recipient; // not taking part in any computations
     signal input relayer;  // not taking part in any computations
     signal input fee;      // not taking part in any computations
@@ -31,19 +30,7 @@ template CancelBet() {
 
     component hasher = SecretHasher();
     hasher.secret <== secret;
-
-    component S0 = MiMCFeistel(220);
-    S0.k <== 0;
-    S0.xL_in <== hasher.commitment;
-    S0.xR_in <== 0;
-
-    component S1 = MiMCFeistel(220);
-    S1.k <== 0;
-    S1.xL_in <== S0.xL_out + mask;
-    S1.xR_in <== S0.xR_out;
-
-    S1.xL_out === inR;
-    S1.xR_out === inC;
+    hasher.commitment === inHash;
 
     signal recipientSquare;
     signal feeSquare;
@@ -55,4 +42,4 @@ template CancelBet() {
     refundSquare <== refund * refund;
 }
 
-component main {public [inR, inC, recipient, relayer, fee, refund, mask]} = CancelBet();
+component main {public [inHash, recipient, relayer, fee, refund, mask]} = CancelBet();

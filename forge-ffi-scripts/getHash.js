@@ -12,25 +12,31 @@ async function main() {
   const inputs = process.argv.slice(2, process.argv.length);
 
   let power = hexToBigint(inputs[0]);
-  if(power<1||power>=2*5){ throw new Error("Wrong Input");}
   let hash = 0n;
   let secret = 0n;
   let i = 0n;
-  for(; i < 256n; i++) {
-    secret = rbigint(31);
-    hash = await pedersenHash(leBigintToBuffer(secret, 31));
-    if((hash & 0x1fn)==0n) {
-      ticket = i;
-      break;
-    }
+  let secret_power = 0n;
+  if(power>=0x1fn){
+    secret_power = power;
+    hash = await pedersenHash(leBigintToBuffer(secret_power>>8n, 31));
   }
-  if(ticket >= 256n) { throw new Error("Failed to find ticket"); }
-  secret = secret<<8n | i;
+  else{
+    for(; i < 256n; i++) {
+      secret = rbigint(31);
+      hash = await pedersenHash(leBigintToBuffer(secret, 31));
+      if((hash & 0x1fn)==0n) {
+        ticket = i;
+        break;
+      }
+    }
+    if(ticket >= 256n) { throw new Error("Failed to find ticket"); }
+    secret_power = secret<<8n | power;
+  }
 
   // 3. Return abi encoded hash, secret+power
   const res = ethers.AbiCoder.defaultAbiCoder().encode(
     ["uint", "uint"],
-    [bigintToHex(hash), bigintToHex(secret)]
+    [bigintToHex(hash), bigintToHex(secret_power)]
   );
   return res;
 }
