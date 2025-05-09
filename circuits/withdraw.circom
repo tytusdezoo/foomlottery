@@ -122,14 +122,15 @@ template Withdraw(levels,power1,power2,power3) {
 
     // NEW BLOCK END
 
-    component tree = MerkleTreeChecker(levels);
+    //component tree = MerkleTreeChecker(levels);
+    component tree = MerkleTreeInsert(levels);
     tree.leaf <== mimc2.outs[0];
     tree.index <== pathIndex;
-    tree.root === root;
     for (var i = 0; i < levels; i++) {
         tree.pathElements[i] <== pathElements[i];
         //tree.pathIndices[i] <== pathIndices[i];
     }
+    root === tree.root;
 
     // Add hidden signals to make sure that tampering with recipient or fee will invalidate the snark proof
     // Most likely it is not required, but it's better to stay on the safe side and it only takes 2 constraints

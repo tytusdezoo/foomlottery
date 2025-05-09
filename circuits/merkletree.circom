@@ -97,8 +97,8 @@ template MerkleTreeInsert(levels) {
 template MerkleTreeChecker(levels) {
     signal input leaf;
     signal input index;
-    signal output root;
     signal input pathElements[levels];
+    signal output root;
     //signal input pathIndices[levels]; now calculated from index
 
     component indexBits = Num2Bits(levels);
