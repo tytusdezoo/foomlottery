@@ -122,7 +122,6 @@ template Withdraw(levels,power1,power2,power3) {
 
     // NEW BLOCK END
 
-    //component tree = MerkleTreeChecker(levels);
     component tree = MerkleTreeInsert(levels);
     tree.leaf <== mimc2.outs[0];
     tree.index <== pathIndex;

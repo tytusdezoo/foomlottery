@@ -91,31 +91,3 @@ template MerkleTreeInsert(levels) {
 
     root <== hashers[levels - 1].hash;
 }
-
-// Verifies that merkle proof is correct for given merkle root and a leaf
-// pathIndices input is an array of 0/1 selectors telling whether given pathElement is on the left or right side of merkle path
-template MerkleTreeChecker(levels) {
-    signal input leaf;
-    signal input index;
-    signal input pathElements[levels];
-    signal output root;
-    //signal input pathIndices[levels]; now calculated from index
-
-    component indexBits = Num2Bits(levels);
-    indexBits.in <== index;
-    component selectors[levels];
-    component hashers[levels];
-
-    for (var i = 0; i < levels; i++) {
-        selectors[i] = DualMux();
-        selectors[i].in[0] <== i == 0 ? leaf : hashers[i - 1].hash;
-        selectors[i].in[1] <== pathElements[i];
-        selectors[i].s <== indexBits.out[i];
-
-        hashers[i] = HashLeftRight();
-        hashers[i].left <== selectors[i].out[0];
-        hashers[i].right <== selectors[i].out[1];
-    }
-
-    root <== hashers[levels - 1].hash;
-}

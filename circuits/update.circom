@@ -1,7 +1,5 @@
 pragma circom 2.2.0;
 
-include "./lib/bitify.circom";
-include "./lib/mimcsponge.circom"; // NEW
 include "./merkletree.circom";
 
 // updates merkel tree with new hashes
@@ -14,26 +12,33 @@ template Update(numhashes,levels) {
 
     component inserts[numhashes];
     component is0[numhashes];
-    var newroot = 0;
     var paths[numhashes][levels];
+    signal t1[numhashes];
+    signal t2[numhashes];
+    signal roots[numhashes];
     for(var i = 0; i < numhashes; i++) {
-        inserts[i] = component MerkleTreeChecker(levels);
+        inserts[i] = MerkleTreeInsert(levels);
         inserts[i].leaf <== newhashes[i];
-        inserts[i].index <== ind + i;
+        inserts[i].index <== index + i;
         for (var j = 0; j < levels; j++) {
-            insert[i].pathElements[j] <== i == 0 ? pathElements[j] : paths[i-1][j];
+            inserts[i].pathElements[j] <== i == 0 ? pathElements[j] : paths[i-1][j];
         }
         for (var j = 0; j < levels; j++) {
-            paths[i][j] <== insert[i].newElements[j];
+            paths[i][j] = inserts[i].newElements[j];
         }
+        is0[i] = IsZero();
+        is0[i].in <== newhashes[i];
         if( i == 0 ){
             oldRoot === inserts[i].root;
+            roots[0] <== inserts[i].root;
         }
-        is0[i] = component IsZero();
-        is0[i].in[0] <== newhashes[i];
-        newroot += (1-is0[i].out) * (inserts[i].root - newroot);
+        else{
+            t1[i] <== is0[i].out * roots[i-1];
+            t2[i] <== (1-is0[i].out) * inserts[i].root;
+            roots[i] <== t1[i] + t2[i];
+        }
     }
-    newRoot === newroot;
+    newRoot === roots[numhashes-1];
 }
 
-component main {public [oldRoot, newRoot, index, newhashes]} = Withdraw(8,32);
+component main {public [oldRoot, newRoot, index, newhashes]} = Update(8,32);
