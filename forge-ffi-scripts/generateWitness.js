@@ -45,6 +45,7 @@ async function main() {
   // fix leaves
   //  leaves[0] = commitment;
   const tree = await mimicMerkleTree(leaves);
+  const merkleIndex = tree.indexOf(commitment);
   const merkleProof = tree.proof(commitment);
 
   // 4. Format witness input to exactly match circuit expectations
@@ -64,6 +65,7 @@ async function main() {
     secret: secret,
     power: power,
     rand: rand,
+    pathIndex: merkleIndex,
     pathElements: merkleProof.pathElements.map((x) => x.toString()),
     pathIndices: merkleProof.pathIndices,
   };
