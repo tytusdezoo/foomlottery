@@ -111,6 +111,7 @@ contract Lottery {
         D.periodStartBlock = uint64(block.number);
         D.dividendPeriod = 1;
         D.status = uint8(_NOT_ENTERED);
+        D.nextIndex = uint32(1);
         wallets[owner] = Wallet(uint112(1),uint112(1),uint16(D.dividendPeriod),uint16(0));
         //periods[0]=Period(0,0); // not needed
         periods[D.dividendPeriod]=Period(1,1);
@@ -118,7 +119,7 @@ contract Lottery {
             filledSubtrees[i] = zeros(i);
         }
         for(uint i=0;i<betsMax;i++){
-            bets[i]=0x20;
+            bets[i]=zeros(0);
         }
 
         roots[0] = zeros(merkleTreeLevels - 1);
