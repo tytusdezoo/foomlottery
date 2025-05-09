@@ -1,4 +1,4 @@
-# Foom Lottery V1
+# Foom Lottery V2
 
 Tornado Cash is a non-custodial Ethereum and ERC20 privacy solution based on zkSNARKs.
 
