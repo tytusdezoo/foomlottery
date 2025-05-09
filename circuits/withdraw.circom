@@ -125,7 +125,7 @@ template Withdraw(levels,power1,power2,power3) {
     component tree = MerkleTreeChecker(levels);
     tree.leaf <== mimc2.outs[0];
     tree.index <== pathIndex;
-    tree.root <== root;
+    tree.root === root;
     for (var i = 0; i < levels; i++) {
         tree.pathElements[i] <== pathElements[i];
         //tree.pathIndices[i] <== pathIndices[i];
