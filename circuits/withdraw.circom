@@ -41,8 +41,9 @@ template Withdraw(levels,power1,power2,power3) {
     signal input secret;
     signal input power; // NEW
     signal input rand; // NEW
+    signal input pathIndex;
     signal input pathElements[levels];
-    signal input pathIndices[levels];
+    //signal input pathIndices[levels];
 
     component hasher = CommitmentHasher();
     hasher.secret <== secret;
@@ -123,10 +124,11 @@ template Withdraw(levels,power1,power2,power3) {
 
     component tree = MerkleTreeChecker(levels);
     tree.leaf <== mimc2.outs[0];
+    tree.index <== pathIndex;
     tree.root <== root;
     for (var i = 0; i < levels; i++) {
         tree.pathElements[i] <== pathElements[i];
-        tree.pathIndices[i] <== pathIndices[i];
+        //tree.pathIndices[i] <== pathIndices[i];
     }
 
     // Add hidden signals to make sure that tampering with recipient or fee will invalidate the snark proof

@@ -1,5 +1,6 @@
 pragma circom 2.2.0;
 
+include "./lib/bitify.circom";
 include "./lib/mimcsponge.circom";
 
 // Computes MiMC([left, right])
@@ -31,10 +32,13 @@ template DualMux() {
 // pathIndices input is an array of 0/1 selectors telling whether given pathElement is on the left or right side of merkle path
 template MerkleTreeChecker(levels) {
     signal input leaf;
+    signal input index;
     signal input root;
     signal input pathElements[levels];
-    signal input pathIndices[levels];
+    //signal input pathIndices[levels]; now calculated from index
 
+    component indexBits = Num2Bits(levels);
+    indexBits.in <== index;
     component selectors[levels];
     component hashers[levels];
 
@@ -42,7 +46,7 @@ template MerkleTreeChecker(levels) {
         selectors[i] = DualMux();
         selectors[i].in[0] <== i == 0 ? leaf : hashers[i - 1].hash;
         selectors[i].in[1] <== pathElements[i];
-        selectors[i].s <== pathIndices[i];
+        selectors[i].s <== indexBits.out[i];
 
         hashers[i] = HashLeftRight();
         hashers[i].left <== selectors[i].out[0];
