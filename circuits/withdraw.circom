@@ -7,8 +7,8 @@ include "./merkletree.circom";
 
 template CommitmentHasher() {
     signal input secret;
-    signal input rand; // NEW
-    signal output commitment;
+    signal input rand_index; // NEW
+    signal output secretHash;
     signal output nullifierHash;
 
     component secretHasher = Pedersen(248);
@@ -16,17 +16,17 @@ template CommitmentHasher() {
     component nullifierHasher = Pedersen(248);
     component nullifierBits = Num2Bits(256);
     secretBits.in <== secret;
-    nullifierBits.in <== secret + rand;
+    nullifierBits.in <== secret + rand_index;
     for (var i = 0; i < 248; i++) {
         secretHasher.in[i] <== secretBits.out[i];
         nullifierHasher.in[i] <== nullifierBits.out[248 -1 -i];
     }
 
-    commitment <== secretHasher.out[0];
+    secretHash <== secretHasher.out[0];
     nullifierHash <== nullifierHasher.out[0];
 }
 
-// Verifies that commitment that corresponds to given secret and nullifier is included in the merkle tree of deposits
+// Verifies that secretHash that corresponds to given secret and nullifier is included in the merkle tree of deposits
 template Withdraw(levels,power1,power2,power3) {
     signal input root;
     signal input nullifierHash;
@@ -47,12 +47,12 @@ template Withdraw(levels,power1,power2,power3) {
 
     component hasher = CommitmentHasher();
     hasher.secret <== secret;
-    hasher.rand <== rand; // NEW
+    hasher.rand_index <== rand + pathIndex; // NEW
     hasher.nullifierHash === nullifierHash;
 
     // test legal hash
     component hasherBits = Num2Bits(256);
-    hasherBits.in <== hasher.commitment;
+    hasherBits.in <== hasher.secretHash;
     hasherBits.out[0] === 0;
     hasherBits.out[1] === 0;
     hasherBits.out[2] === 0;
@@ -90,7 +90,7 @@ template Withdraw(levels,power1,power2,power3) {
     // create secret random number
     component mimc1 = MiMCSponge(2, 220, 1);
     mimc1.ins[0] <== secret;
-    mimc1.ins[1] <== rand;
+    mimc1.ins[1] <== rand + pathIndex;
     mimc1.k <== 0;
     signal lotto;
     lotto <== mimc1.outs[0];
@@ -116,8 +116,8 @@ template Withdraw(levels,power1,power2,power3) {
 
     // NEW calculate new leaf hash
     component mimc2 = MiMCSponge(2, 220, 1);
-    mimc2.ins[0] <== hasher.commitment + power + 1;
-    mimc2.ins[1] <== rand;
+    mimc2.ins[0] <== hasher.secretHash + power + 1;
+    mimc2.ins[1] <== rand + pathIndex;
     mimc2.k <== 0;
 
     // NEW BLOCK END
@@ -127,13 +127,9 @@ template Withdraw(levels,power1,power2,power3) {
     tree.index <== pathIndex;
     for (var i = 0; i < levels; i++) {
         tree.pathElements[i] <== pathElements[i];
-        //tree.pathIndices[i] <== pathIndices[i];
     }
     root === tree.root;
 
-    // Add hidden signals to make sure that tampering with recipient or fee will invalidate the snark proof
-    // Most likely it is not required, but it's better to stay on the safe side and it only takes 2 constraints
-    // Squares are used to prevent optimizer from removing those constraints
     signal recipientSquare;
     signal feeSquare;
     signal relayerSquare;

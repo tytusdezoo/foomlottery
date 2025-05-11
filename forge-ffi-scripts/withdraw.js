@@ -1,9 +1,11 @@
+#!/usr/bin/node
+
 const path = require("path");
 const snarkjs = require("snarkjs");
 const { ethers } = require("ethers");
 const { hexToBigint, bigintToHex, leBigintToBuffer, reverseBits, } = require("./utils/bigint.js");
 const { pedersenHash } = require("./utils/pedersen.js");
-const { mimcsponge2,mimcsponge3, } = require("./utils/mimcsponge.js");
+const { mimcsponge2 } = require("./utils/mimcsponge.js");
 const { mimicMerkleTree } = require("./utils/mimcMerkleTree.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
@@ -11,43 +13,31 @@ const { mimicMerkleTree } = require("./utils/mimcMerkleTree.js");
 async function main() {
   const inputs = process.argv.slice(2, process.argv.length);
 
-  // 1. Get nullifier and secret
   const secret = hexToBigint(inputs[0]);
   const power = hexToBigint(inputs[1]); // use power instead !!!
   const rand = hexToBigint(inputs[2]);
-//console.log(bigintToHex(secret),"secret");
-  const terces = reverseBits((secret+rand)%21888242871839275222246405745257275088548364400416034343698204186575808495617n,31*8);
+  const index = hexToBigint(inputs[3]);
+  const terces = reverseBits((secret+rand+index)%21888242871839275222246405745257275088548364400416034343698204186575808495617n,31*8);
 
   // 1.5. calculate reward
   const power1=10n;
   const power2=16n;
   const mask = (power<=power1)?((2n**(power1+power2+1n)-1n)<<power)&(2n**(power1+power2+1n)-1n):(((2n**power2-1n)<<(power+power1))|(2n**power1-1n))&(2n**(power1+power2+1n)-1n);
-  const dice = await mimcsponge2(secret,rand);
+  const dice = await mimcsponge2(secret,rand+index);
   const maskdice= mask & dice;
   const rew1 = (maskdice &                                       0b1111111111n)?0n:1n ;
   const rew2 = (maskdice &                       0b11111111111111110000000000n)?0n:1n ;
   const rew3 = (dice     & 0b111111111111111111111100000000000000000000000000n)?0n:1n ;
-//console.log(rew1,"rew1");
-//console.log(rew2,"rew2");
-//console.log(rew3,"rew3");
 
-  // 2. Get nullifier hash and commitment
   const nullifierHash = await pedersenHash(leBigintToBuffer(terces, 31));
-  const SecretHashIn = await pedersenHash(leBigintToBuffer(secret, 31));
-//console.log(bigintToHex(SecretHashIn),"L");
-//console.log(bigintToHex(mask),"mask");
-//console.log(bigintToHex(rand),"rand");
-  const commitment = await mimcsponge2(SecretHashIn+power+1n,rand);
-//console.log(bigintToHex(commitment),"leaf");
 
-  // 3. Create merkle tree, insert leaves and get merkle proof for commitment
-  const leaves = inputs.slice(7, inputs.length).map((l) => hexToBigint(l));
-  // fix leaves
-  //  leaves[0] = commitment;
+  const leaves = inputs.slice(8, inputs.length).map((l) => hexToBigint(l));
   const tree = await mimicMerkleTree(leaves);
-  //const merkleProof = tree.proof(commitment);
-  const merkleIndex = tree.indexOf(commitment);
-  const merkleProof = tree.path(merkleIndex)
+  //const SecretHashIn = await pedersenHash(leBigintToBuffer(secret, 31));
+  //const leaf = await mimcsponge2(SecretHashIn+power+1n,rand+index);
+  //const merkleProof = tree.proof(leaf);
+  //const merkleIndex = tree.indexOf(leaf);
+  const merkleProof = tree.path(index)
 
   // 4. Format witness input to exactly match circuit expectations
   const input = {
@@ -57,16 +47,16 @@ async function main() {
     reward1: rew1,
     reward2: rew2,
     reward3: rew3,
-    recipient: hexToBigint(inputs[3]),
-    relayer: hexToBigint(inputs[4]),
-    fee: BigInt(inputs[5]),
-    refund: BigInt(inputs[6]),
+    recipient: hexToBigint(inputs[4]),
+    relayer: hexToBigint(inputs[5]),
+    fee: BigInt(inputs[6]),
+    refund: BigInt(inputs[7]),
 
     // Private inputs
     secret: secret,
     power: power,
     rand: rand,
-    pathIndex: merkleIndex,
+    pathIndex: index,
     pathElements: merkleProof.pathElements.map((x) => x.toString()),
     //pathIndices: merkleProof.pathIndices,
   };

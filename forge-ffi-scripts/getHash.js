@@ -21,7 +21,7 @@ async function main() {
     hash = await pedersenHash(leBigintToBuffer(secret_power>>8n, 31));
   }
   else{
-    for(; i < 256n; i++) {
+    for(; i < 10000n; i++) {
       secret = rbigint(31);
       hash = await pedersenHash(leBigintToBuffer(secret, 31));
       if((hash & 0x1fn)==0n) {
@@ -29,7 +29,7 @@ async function main() {
         break;
       }
     }
-    if(ticket >= 256n) { throw new Error("Failed to find ticket"); }
+    if(ticket >= 10000n) { throw new Error("Failed to find ticket"); }
     secret_power = secret<<8n | power;
   }
 

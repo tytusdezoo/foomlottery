@@ -9,8 +9,8 @@ interface IWithdraw {
 interface ICancel {
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[5] calldata _pubSignals) external view returns (bool);
 }
-interface IHasher {
-  function MiMCSponge(uint in_xL, uint in_xR, uint k) external pure returns (uint xL, uint xR);
+interface IUpdate {
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[13] calldata _pubSignals) external view returns (bool);
 }
 
 /**
@@ -20,7 +20,7 @@ contract Lottery {
     IERC20 public immutable token; // FOOM token
     IWithdraw public immutable withdraw;
     ICancel public immutable cancel;
-    IHasher public immutable hasher;
+    IUpdate public immutable update;
 
     // keep together
     struct Data {
@@ -29,8 +29,8 @@ contract Lottery {
         uint32 nextIndex;
         uint32 dividendPeriod; // current dividend period
         uint32 commitCount;
-        uint8 betsIndex; // index of the next slot in queue
-        uint8 commitIndex;
+        uint8 betsIndex; // index of the next slot in bet queue (>=1)
+        uint8 commitIndex; // number of bets to insert into tree + 1 (>=1)
         uint8 currentRootIndex;
         uint8 status;
     }
@@ -41,13 +41,14 @@ contract Lottery {
 
     uint public constant FIELD_SIZE = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
     uint public constant merkleTreeLevels = 32 ; // number of Merkle Tree levels
-    uint public constant merkleTreeReportLevel = 8 ; // report completed Merkle Tree level
+    //uint public constant merkleTreeReportLevel = 8 ; // report completed Merkle Tree level
     uint public constant periodBlocks = 16384 ; // number of blocks in a period
     uint public          betMin; // TODO: set to constant later !
     uint public constant betPower1 = 10; // power of the first bet = 1024
     uint public constant betPower2 = 16; // power of the second bet = 65536
     uint public constant betPower3 = 22; // power of the third bet = 4194304
     uint public constant betsMax = 128; // maximum number of bets in queue, max 8bit
+    uint public constant betsUpdate = 8; // maximum number of bets in queue to insert
     uint public constant dividendFeePerCent = 4; // 4% of dividends go to the shareholders (wall)
     uint public constant generatorFeePerCent = 1; // 1% of dividends go to the generator
     uint public constant maxBalance = 2**108; // maximum balance of a user and maximum size of bets in period
@@ -80,49 +81,56 @@ contract Lottery {
     uint128 public currentShares = 1; // sum of funds eligible for dividend in current period
     //uint32 public dividendPeriod = 1; // current dividend period
 
+    // generator data
+    //uint64 public commitBlock = 0;
+    //uint8 public commitIndex = 0;
+    uint128 public oldRand =0; // 
+    uint public commitHash = 0; // TODO prevent 0
+    uint public commitBlockHash = 0; // TODO prevent 0
+
     // betting parameters
     // it removes index range check on every interaction
     mapping(uint => uint) public bets;
     //uint8 public betsIndex = 0; // index of the next slot in queue
     mapping (uint => uint) public nullifier; // nullifier hash for each bet
 
-    // generator data
-    //uint64 public commitBlock = 0;
-    //uint8 public commitIndex = 0;
-    uint public commitHash = 0; // TODO prevent 0
-    uint public commitBlockHash = 0; // TODO prevent 0
-
     // mertkeltree
-    mapping(uint => uint) public filledSubtrees;
+    //mapping(uint => uint) public filledSubtrees;
     mapping(uint => uint) public roots;
     //uint8 public currentRootIndex = 0;
     //uint32 public nextIndex = 0;
 
     // constructor
-    constructor(IWithdraw _Withdraw,ICancel _Cancel,IHasher _Hasher,IERC20 _Token,uint _BetMin) {
+    constructor(IWithdraw _Withdraw,ICancel _Cancel,IUpdate _Update,IERC20 _Token,uint _BetMin) {
         require(merkleTreeLevels<=32,"Tree too large");
         withdraw = _Withdraw;
         cancel = _Cancel;
-        hasher = _Hasher;
+        update = _Update;
         token = _Token;
         betMin = _BetMin;
         owner = msg.sender;
         generator = msg.sender;
         D.periodStartBlock = uint64(block.number);
-        D.dividendPeriod = 1;
+        D.dividendPeriod = uint32(1);
         D.status = uint8(_NOT_ENTERED);
         D.nextIndex = uint32(1);
+        D.betsIndex = uint8(1);
+        D.commitIndex = uint8(1);
         wallets[owner] = Wallet(uint112(1),uint112(1),uint16(D.dividendPeriod),uint16(0));
         //periods[0]=Period(0,0); // not needed
         periods[D.dividendPeriod]=Period(1,1);
-        for (uint i = 0; i < merkleTreeLevels; i++) {
-            filledSubtrees[i] = zeros(i);
-        }
+        //for (uint i = 0; i < merkleTreeLevels; i++) {
+        //    filledSubtrees[i] = zeros(i);
+        //}
         for(uint i=0;i<betsMax;i++){
-            bets[i]=zeros(0);
+            // 0x4a302ef755ccfe9e93c776ac80fd096a6d5c52c50e578294d145994d13cbfbd7 sha256("FOOM")
+            // 0x202a8f96045740e4004986fd2b650cf51b0cc148fb60f01312e628237deef281 mimcsponge(sha256("FOOM"),0);
+            // 0x0e70c0ce4936fef410bff8991ee5051bfce7d594013b64aba97369ce4f2e2454 root
+            bets[i]=0x4a302ef755ccfe9e93c776ac80fd096a6d5c52c50e578294d145994d13cbfbd7;
         }
-
-        roots[0] = zeros(merkleTreeLevels - 1);
+        roots[0] = 0x0e70c0ce4936fef410bff8991ee5051bfce7d594013b64aba97369ce4f2e2454;
+        emit LogBetIn(0,0x4a302ef755ccfe9e93c776ac80fd096a6d5c52c50e578294d145994d13cbfbd7);
+        emit LogBetHash(0,0x4a302ef755ccfe9e93c776ac80fd096a6d5c52c50e578294d145994d13cbfbd7,0);
     }
 
 /* lottery functions */
@@ -269,13 +277,15 @@ contract Lottery {
      * @dev commit the generator secret
      */
     function commit(uint _commitHash) external onlyGenerator {
+        require(D.betsIndex >1 , "No bets");
         require(commitHash == 0, "Commit hash already set");
         require(D.commitBlock == 0, "Commit block already set");
         commitHash = _commitHash;
         D.commitBlock = uint64(block.number);
-        D.commitIndex = D.betsIndex;
+        D.commitIndex = uint8(D.betsIndex<betsUpdate?D.betsIndex:betsUpdate);
         D.commitCount ++;
         commitBlockHash = 0;
+        //TODO, log commit
     }
 
     /**
@@ -284,53 +294,69 @@ contract Lottery {
     function rememberHash() public {
         if(D.commitBlock != 0 && commitBlockHash == 0){
           commitBlockHash = uint(blockhash(D.commitBlock));
-          /* rest is for testing only , TODO remove later */
-          if(commitBlockHash == 0 && D.commitBlock==block.number-1){
-            commitBlockHash=uint(keccak256(abi.encodePacked(block.number-1)));}
-          require(commitBlockHash != 0, "blockhash() not found");
+              /* rest is for testing only , TODO remove later */
+              if(commitBlockHash == 0 && D.commitBlock==block.number-1){
+                commitBlockHash=uint(keccak256(abi.encodePacked(block.number-1)));}
+          //TODO, log hash
         } 
+    }
+
+    /**
+     * @dev remember commitBlockHash
+     */
+    function commited() view public returns (uint oldRoot,uint index,uint,uint,uint[betsUpdate] memory newhashes) {
+        oldRoot=roots[D.currentRootIndex];
+        index=D.nextIndex-1;
+        //uint[betsUpdate] memory newhashes;
+        for(uint i = 0;i < betsUpdate; i++){
+            if(i<D.commitIndex){
+                newhashes[i]=bets[i];}
+            else{
+                newhashes[i]=0;}}
+        return(oldRoot,index,oldRand,commitBlockHash,newhashes);
     }
 
     /**
      * @dev reveal the generator secret
      */
-    function reveal(uint _revealSecret) external onlyGenerator /* returns (uint, uint) */ {
+    function reveal(
+        uint _revealSecret,
+        uint[2] calldata _pA,
+        uint[2][2] calldata _pB,
+        uint[2] calldata _pC,
+        uint _newRoot) external {
         require(uint(keccak256(abi.encodePacked(_revealSecret))) == commitHash, "Invalid reveal secret");
+        require(D.commitIndex > 1, "Nothing to commit");
         require(D.commitBlock != 0, "Commit not set");
         rememberHash();
         require(commitBlockHash != 0, "Commit block hash not found");
-        uint newhash = uint240(uint(keccak256(abi.encodePacked(_revealSecret,commitBlockHash))));
-        uint insertedIndex=D.nextIndex;
-        uint rand;
-        uint i;
-        uint j;
-        uint currentLevelHash;
-        for(i = 0; i < D.commitIndex; i++) {
-            uint R = bets[i];
-            uint C = 0;
-            (R, C) = hasher.MiMCSponge(R, C, 0);
-            rand=newhash+insertedIndex;
-            R = addmod(R, rand, FIELD_SIZE);
-            (R, C) = hasher.MiMCSponge(R, C, 0);
-            currentLevelHash = R;
-            if(i<D.commitIndex-1) {
-                insertedIndex = _insertleft(currentLevelHash);
-            }
-            else {
-                insertedIndex = _insert(currentLevelHash);
-            }
-            emit LogBetHash(insertedIndex,rand,currentLevelHash); // currentLevelHash for speedup
-        }
-        for(j = 0; i < D.betsIndex; i++) { // queue unprocessed bets
+        uint newRand = uint128(uint(keccak256(abi.encodePacked(_revealSecret,commitBlockHash))));
+        uint[betsUpdate] memory newhashes;
+        uint i=0;
+        for(;i < betsUpdate; i++){
+            if(i<D.commitIndex){
+                if(bets[i]!=0 && i>0){
+                    emit LogBetHash(D.nextIndex-1+i,bets[i],newRand);}
+                newhashes[i]=bets[i];}
+            else{
+                newhashes[i]=0;}}
+        require(update.verifyProof( _pA, _pB, _pC, [ uint(roots[D.currentRootIndex]), uint(_newRoot), uint(D.nextIndex-1), uint(oldRand), uint(newRand),
+                newhashes[0], newhashes[1], newhashes[2], newhashes[3], newhashes[4], newhashes[5], newhashes[6], newhashes[7]] ), "Invalid update proof");
+        i=D.commitIndex-1;
+        uint j=0;
+        for(;i<D.betsIndex;i++) { // queue unprocessed bets
             bets[j]=bets[i];
             j++;
         }
         D.betsIndex = uint8(j);
-
-        commitHash = 0; // consider a constant
-        commitBlockHash = 0;
+        D.nextIndex+=D.commitIndex-1;
+        D.commitIndex = 1;
         D.commitBlock = 0;
-        D.commitIndex = 0; // to enable easier cancelbet
+        commitHash = 0; // consider a constant
+        commitBlockHash = 0; // consider a constant
+        oldRand=uint128(newRand);
+        D.currentRootIndex = uint8((D.currentRootIndex + 1) % ROOT_HISTORY_SIZE);
+        roots[D.currentRootIndex] = _newRoot;
     }
 
 /* investment functions */
@@ -419,7 +445,7 @@ contract Lottery {
 
     function betSum() view public returns (uint){
         uint betsum=0;
-        for(uint i=0;i<D.commitIndex;i++){
+        for(uint i=1;i<D.commitIndex;i++){
             uint power=bets[i]&0x1f;
             if(power>0){
                 betsum+=getAmount(power-1);}}
@@ -430,14 +456,14 @@ contract Lottery {
      * @dev deposit security deposit to reset commit
      */
     function resetcommit() payable external onlyOwner {
-	require(D.commitIndex>0, "No need for reset");
+	require(D.commitIndex>1, "No need for reset");
         uint betsum=betSum();
         _deposit(betsum);
         //require(amount >= betsum, "transfer too low");
         commitHash = 0;
         commitBlockHash = 0;
         D.commitBlock = 0;
-        D.commitIndex = 0;
+        D.commitIndex = 1;
         emit LogResetCommit(msg.sender);
     }
 
@@ -578,7 +604,7 @@ contract Lottery {
 
     // events
     event LogBetIn(uint indexed index,uint indexed newHash);
-    event LogBetHash(uint indexed index,uint indexed newhash,uint indexed currentLevelHash);
+    event LogBetHash(uint indexed index,uint indexed newHash,uint indexed newRand);
     event LogCancel(uint indexed index);
     event LogWin(uint indexed nullifierHash, uint indexed reward);
     event LogTreeHash(uint indexed level,uint indexed index,uint indexed levelHash);
@@ -592,6 +618,7 @@ contract Lottery {
     /**
      * @dev Hash 2 tree leaves, returns MiMC(_left, _right)
      */
+    /*
     function hashLeftRight(uint _left, uint _right) public view returns (uint) {
         //require(uint(_left) < FIELD_SIZE, "_left should be inside the field");
         //require(uint(_right) < FIELD_SIZE, "_right should be inside the field");
@@ -602,7 +629,9 @@ contract Lottery {
         (R, C) = hasher.MiMCSponge(R, C, 0);
         return uint(R);
     }
+    */
 
+    /*
     function _insert(uint _leaf) internal returns (uint index) {
         uint currentIndex = D.nextIndex++;
         uint currentLevelHash = _leaf;
@@ -630,10 +659,12 @@ contract Lottery {
         roots[newRootIndex] = currentLevelHash;
         return D.nextIndex-1;
     }
+    */
 
     /**
      * @dev insert a leaf into the merkletree without updating the root
      */
+    /*
     function _insertleft(uint _leaf) internal returns (uint index) { // from MerkleTreeWithHistory
         uint currentIndex = D.nextIndex++;
         uint currentLevelHash = _leaf;
@@ -655,6 +686,7 @@ contract Lottery {
         }
         return D.nextIndex-1;
     }
+    */
 
     /**
      * @dev Whether the root is present in the root history
@@ -677,6 +709,7 @@ contract Lottery {
         return false;
     }
 
+    /*
     function zeros(uint256 i) public pure returns (uint) { // should store R+C
         if (i == 0)       return uint(0x2fe54c60d3acabf3343a35b6eba15db4821b340f76e741e2249685ed4899af6c);
         else if (i == 1)  return uint(0x256a6135777eee2fd26f54b8b7037a25439d5235caee224154186d2b8a52e31d);
@@ -712,4 +745,5 @@ contract Lottery {
         else if (i == 31) return uint(0x2c7a07d20dff79d01fecedc1134284a8d08436606c93693b67e333f671bf69cc);
         else revert("Index out of bounds");
     }
+    */
 }
