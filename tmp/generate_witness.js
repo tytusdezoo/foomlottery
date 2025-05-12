@@ -1,0 +1,1 @@
+../circuit_artifacts/update_js/generate_witness.js

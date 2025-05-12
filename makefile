@@ -2,7 +2,7 @@
 ARTIFACTS_DIR = circuit_artifacts
 
 # Default target
-all: setup compile ptau gen_withdraw gen_cancelbet gen_update
+all: setup compile gen_withdraw gen_cancelbet gen_update
 
 # Create necessary directories
 setup:
@@ -18,31 +18,39 @@ compile:
 	circom circuits/update.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
 
 # Powers of tau ceremony
-ptau:
+ptau16:
 	@echo "Performing powers of tau ceremony..."
 	cd $(ARTIFACTS_DIR) && \
-	snarkjs powersoftau new bn128 20 pot16_0000.ptau -v && \
+	snarkjs powersoftau new bn128 16 pot16_0000.ptau -v && \
 	snarkjs powersoftau contribute pot16_0000.ptau pot16_0001.ptau --name="First contribution" -v && \
 	snarkjs powersoftau prepare phase2 pot16_0001.ptau pot16_final.ptau -v
+
+ptau20:
+	@echo "Performing powers of tau ceremony..."
+	cd $(ARTIFACTS_DIR) && \
+	snarkjs powersoftau new bn128 20 pot20_0000.ptau -v && \
+	snarkjs powersoftau contribute pot20_0000.ptau pot20_0001.ptau --name="First contribution" -v && \
+	snarkjs powersoftau prepare phase2 pot20_0001.ptau pot20_final.ptau -v
+
 
 # Generate zkey and withdraw contract
 gen_withdraw:
 	cd $(ARTIFACTS_DIR) && \
-	snarkjs groth16 setup withdraw.r1cs pot16_final.ptau withdraw_final.zkey && \
+	snarkjs groth16 setup withdraw.r1cs pot20_final.ptau withdraw_final.zkey && \
 	snarkjs zkey export solidityverifier withdraw_final.zkey ../src/Withdraw.sol && sed -i 's/Groth16Verifier/WithdrawG16Verifier/' ../src/Withdraw.sol && \
 	snarkjs zkey export verificationkey withdraw_final.zkey withdraw_verification_key.json
 
 # Generate zkey and cancelbet contract
 gen_cancelbet:
 	cd $(ARTIFACTS_DIR) && \
-	snarkjs groth16 setup cancelbet.r1cs pot16_final.ptau cancelbet_final.zkey && \
+	snarkjs groth16 setup cancelbet.r1cs pot20_final.ptau cancelbet_final.zkey && \
 	snarkjs zkey export solidityverifier cancelbet_final.zkey ../src/CancelBet.sol && sed -i 's/Groth16Verifier/CancelBetG16Verifier/' ../src/CancelBet.sol && \
 	snarkjs zkey export verificationkey cancelbet_final.zkey cancelbet_verification_key.json
 
 # Generate zkey and update contract
 gen_update:
 	cd $(ARTIFACTS_DIR) && \
-	snarkjs groth16 setup update.r1cs pot16_final.ptau update_final.zkey && \
+	snarkjs groth16 setup update.r1cs pot20_final.ptau update_final.zkey && \
 	snarkjs zkey export solidityverifier update_final.zkey ../src/Update.sol && sed -i 's/Groth16Verifier/UpdateG16Verifier/' ../src/Update.sol && \
 	snarkjs zkey export verificationkey update_final.zkey update_verification_key.json
 

@@ -1,5 +1,6 @@
 #!/usr/bin/node
 
+const fs = require("fs");
 const path = require("path");
 const snarkjs = require("snarkjs");
 const { ethers } = require("ethers");
@@ -8,8 +9,10 @@ const { mimicMerkleTree } = require("./utils/mimcMerkleTree.js");
 const { mimcsponge2 } = require("./utils/mimcsponge.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
-//test:
-//./forge-ffi-scripts/update.js 0 0 0x4a302ef755ccfe9e93c776ac80fd096a6d5c52c50e578294d145994d13cbfbd7 0 0 0 0 0 0 0 0x202a8f96045740e4004986fd2b650cf51b0cc148fb60f01312e628237deef281
+//test: betsUpdate = 8;
+// ./forge-ffi-scripts/update.js 0 1 0x00ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae52 0 0 0 0 0 0 0 0x16d18e1425b426e92d3d897958aabf099087b2401bfed53290f5a81fe73c69a5
+// ./forge-ffi-scripts/update.js 0 1 0x00ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae52 1 2 0 0 0 0 0 0x16d18e1425b426e92d3d897958aabf099087b2401bfed53290f5a81fe73c69a5
+// ./forge-ffi-scripts/update.js 0 1 0x00ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae52 1 2 3 0 0 0 0 0x16d18e1425b426e92d3d897958aabf099087b2401bfed53290f5a81fe73c69a5 # fails
 //real	0m14.653s
 //user	1m35.988s
 //sys	0m4.841s
@@ -28,6 +31,7 @@ async function main() {
     if(newHashes[i]==0){
       break;}}
   const newLeaves = await Promise.all(newHashes.slice(1, i).map(async (h,j) => await mimcsponge2(h,newRand+BigInt(oldLeaves.length)+BigInt(j))));
+  console.log(newLeaves);
   const tree = await mimicMerkleTree(oldLeaves);
   const oldProof = tree.path(oldLeaves.length-1)
   tree.bulkInsert(newLeaves);
@@ -46,7 +50,11 @@ async function main() {
     pathElements: oldProof.pathElements.map((x) => x.toString()),
   };
 
-//console.log(input);
+  // Write input to input.json
+  // only for debugging
+  BigInt.prototype.toJSON = function () { return this.toString(); };
+  fs.writeFileSync(path.join(__dirname, '../tmp/update_input.json'), JSON.stringify(input, null, 2));
+  //console.log(JSON.stringify(input));
 
   // 5. Create groth16 proof for witness
   const { proof } = await snarkjs.groth16.fullProve(
@@ -61,7 +69,7 @@ async function main() {
 
   // 6. Return abi encoded witness
   const witness = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["uint256[2]", "uint256[2][2]", "uint256[2]", "uint", "uint", "uint", "uint", "uint", "uint[8]"], // uint[betsUpdate]
+    ["uint256[2]", "uint256[2][2]", "uint256[2]", "uint", "uint", "uint", "uint", "uint", "uint["+betsUpdate+"]"],
     [
       pA,
       // Swap x coordinates: this is for proof verification with the Solidity precompile for EC Pairings, and not required
@@ -69,6 +77,8 @@ async function main() {
       [
         [pB[0][1], pB[0][0]],
         [pB[1][1], pB[1][0]],
+        //[pB[0][0], pB[0][1]],// did note help :-(
+        //[pB[1][0], pB[1][1]],
       ],
       pC,
       bigintToHex(oldProof.pathRoot),
@@ -79,7 +89,29 @@ async function main() {
       newHashes.map((x) => bigintToHex(x)),
     ]
   );
+  // 4. Format witness input to exactly match circuit expectations
+  // only for debugging
+  const zkpublic = [
+    (oldProof.pathRoot).toString(),
+    (newProof.pathRoot).toString(),
+    (oldLeaves.length-1).toString(),
+    (oldRand).toString(),
+    (newRand).toString(),
+    ...newHashes.map((x) => x.toString()), // spread the array into individual elements
+  ];
+  fs.writeFileSync(path.join(__dirname, '../tmp/update_public.json'), JSON.stringify(zkpublic, null, 2));
+  // only for debugging
+  const zkproof = {
+    pi_a: [pA[0],pA[1],1],
+    pi_b: [[pB[0][0],pB[0][1]],[pB[1][0],pB[1][1]],[1,0]],
+    pi_c: [pC[0],pC[1],1],
+    protocol: "groth16",
+    curve: "bn128",
+  };  
+  fs.writeFileSync(path.join(__dirname, '../tmp/update_proof.json'), JSON.stringify(zkproof, null, 2));
+
   return witness;
+  
 }
 
 main()

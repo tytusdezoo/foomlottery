@@ -348,14 +348,14 @@ contract EthLotteryTest is Test {
             [uint(data.oldRoot),uint(data.newRoot),uint(index),uint(oldRand),uint(newRand),
             uint(hashes[0]),uint(hashes[1]),uint(hashes[2]),uint(hashes[3]),uint(hashes[4]),uint(hashes[5]),uint(hashes[6]),uint(hashes[7])]
         ));*/
-        /*assertTrue(update.verifyProof(
+        assertTrue(update.verifyProof(
             data.pA,
             data.pB,
             data.pC,
             [uint(data.oldRoot),uint(data.newRoot),uint(data.index),uint(data.oldRand),uint(data.newRand),
             uint(data.hashes[0]),uint(data.hashes[1]),uint(data.hashes[2]),uint(data.hashes[3]),
             uint(data.hashes[4]),uint(data.hashes[5]),uint(data.hashes[6]),uint(data.hashes[7])]
-        ));*/
+        ));
         console.log("after assert");
         uint revealGasStart = gasleft();
         lottery.reveal(_revealSecret,data.pA,data.pB,data.pC,data.newRoot);
