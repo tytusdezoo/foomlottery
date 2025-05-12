@@ -30,7 +30,9 @@ template DualMux() {
 
 template MerkleTreeInsert(levels) {
     signal input leaf;
-    signal input index;
+    signal input now[levels];
+    signal input next[levels];
+    //signal input index;
     signal input pathElements[levels];
     signal output root;
     signal output newElements[levels];
@@ -70,10 +72,10 @@ template MerkleTreeInsert(levels) {
         0x2688d58bf9b7e2730ab510122d6d24bdcacd07becc79eea37fff58a8edb074e5];// 31
       //"0x2753cfd5199dc55cf85933769e95affd5b112737e3b97540c74477322402b407" // ROOT
  
-    component index0Bits = Num2Bits(levels);
-    index0Bits.in <== index;
-    component index1Bits = Num2Bits(levels+1);
-    index1Bits.in <== index+1;
+    //component index0Bits = Num2Bits(levels);
+    //index0Bits.in <== index;
+    //component index1Bits = Num2Bits(levels+1);
+    //index1Bits.in <== index+1;
     component selector[levels];
     component hashers[levels];
 
@@ -81,13 +83,13 @@ template MerkleTreeInsert(levels) {
         selector[i] = DualMux();
         selector[i].in[0] <== i == 0 ? leaf : hashers[i - 1].hash;
         selector[i].in[1] <== pathElements[i];
-        selector[i].s <== index0Bits.out[i];
+        selector[i].s <== now[i];
 
         hashers[i] = HashLeftRight();
         hashers[i].left <== selector[i].out[0];
         hashers[i].right <== selector[i].out[1];
 
-        newElements[i] <== ((i == 0 ? leaf : selector[i].out[0]) - zeros[i]) * index1Bits.out[i] + zeros[i];
+        newElements[i] <== ((i == 0 ? leaf : selector[i].out[0]) - zeros[i]) * next[i] + zeros[i];
     }
 
     root <== hashers[levels - 1].hash;

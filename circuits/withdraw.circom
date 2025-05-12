@@ -122,13 +122,20 @@ template Withdraw(levels,power1,power2,power3) {
 
     // NEW BLOCK END
 
-    component tree = MerkleTreeInsert(levels);
-    tree.leaf <== mimc2.outs[0];
-    tree.index <== pathIndex;
+    component bits[2];
+    bits[0] = Num2Bits(levels);
+    bits[0].in <== pathIndex;
+    bits[1] = Num2Bits(levels);
+    bits[1].in <== pathIndex + 1;
+    component path = MerkleTreeInsert(levels);
+    path.leaf <== mimc2.outs[0];
+    //tree.index <== pathIndex;
     for (var i = 0; i < levels; i++) {
-        tree.pathElements[i] <== pathElements[i];
+        path.now[i] <== bits[0].out[i];
+        path.next[i] <== bits[1].out[i];
+        path.pathElements[i] <== pathElements[i];
     }
-    root === tree.root;
+    root === path.root;
 
     signal recipientSquare;
     signal feeSquare;

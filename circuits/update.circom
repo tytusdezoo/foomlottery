@@ -14,33 +14,38 @@ template Update(numhashes,levels) {
 
     signal input pathElements[levels];
 
-    // must compute here rand addition, too expensive in contract
-
+    component bits[numhashes+1];
     component mimc[numhashes];
-    component inserts[numhashes];
+    component path[numhashes];
     component is0[numhashes];
-    //signal paths[numhashes][levels];
     signal roots[numhashes];
+    bits[0] = Num2Bits(levels);
+    bits[0].in <== index;
     for(var i = 0; i < numhashes; i++) {
+        bits[i+1] = Num2Bits(levels);
+        bits[i+1].in <== index + i + 1;
+
         mimc[i] = MiMCSponge(2, 220, 1);
         mimc[i].ins[0] <== newhashes[i];
         mimc[i].ins[1] <== i == 0 ? oldRand + index : newRand + index + i;
         mimc[i].k <== 0;
 
-        inserts[i] = MerkleTreeInsert(levels);
-        inserts[i].leaf <== mimc[i].outs[0];
-        inserts[i].index <== index + i;
+        path[i] = MerkleTreeInsert(levels);
+        path[i].leaf <== mimc[i].outs[0];
+        //inserts[i].index <== index + i;
         for (var j = 0; j < levels; j++) {
-            inserts[i].pathElements[j] <== i == 0 ? pathElements[j] : inserts[i-1].newElements[j];
+            path[i].now[j] <== bits[i].out[j];
+            path[i].next[j] <== bits[i+1].out[j];
+            path[i].pathElements[j] <== i == 0 ? pathElements[j] : path[i-1].newElements[j];
         }
         is0[i] = IsZero();
         is0[i].in <== newhashes[i];
         if( i == 0 ){
-            oldRoot === inserts[i].root;
-            roots[0] <== inserts[i].root;
+            oldRoot === path[0].root;
+            roots[0] <== path[0].root;
         }
         else{
-            roots[i] <== (roots[i-1] -  inserts[i].root) * is0[i].out + inserts[i].root;
+            roots[i] <== (roots[i-1] -  path[i].root) * is0[i].out + path[i].root;
         }
     }
     newRoot === roots[numhashes-1];
