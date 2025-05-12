@@ -19,9 +19,7 @@ template Update(numhashes,levels) {
     component mimc[numhashes];
     component inserts[numhashes];
     component is0[numhashes];
-    var paths[numhashes][levels];
-    signal t1[numhashes];
-    signal t2[numhashes];
+    //signal paths[numhashes][levels];
     signal roots[numhashes];
     for(var i = 0; i < numhashes; i++) {
         mimc[i] = MiMCSponge(2, 220, 1);
@@ -33,10 +31,7 @@ template Update(numhashes,levels) {
         inserts[i].leaf <== mimc[i].outs[0];
         inserts[i].index <== index + i;
         for (var j = 0; j < levels; j++) {
-            inserts[i].pathElements[j] <== i == 0 ? pathElements[j] : paths[i-1][j];
-        }
-        for (var j = 0; j < levels; j++) {
-            paths[i][j] = inserts[i].newElements[j];
+            inserts[i].pathElements[j] <== i == 0 ? pathElements[j] : inserts[i-1].newElements[j];
         }
         is0[i] = IsZero();
         is0[i].in <== newhashes[i];
@@ -45,9 +40,7 @@ template Update(numhashes,levels) {
             roots[0] <== inserts[i].root;
         }
         else{
-            t1[i] <== is0[i].out * roots[i-1];
-            t2[i] <== (1-is0[i].out) * inserts[i].root;
-            roots[i] <== t1[i] + t2[i];
+            roots[i] <== (roots[i-1] -  inserts[i].root) * is0[i].out + inserts[i].root;
         }
     }
     newRoot === roots[numhashes-1];

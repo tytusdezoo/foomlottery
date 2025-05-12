@@ -87,7 +87,7 @@ template MerkleTreeInsert(levels) {
         hashers[i].left <== selector[i].out[0];
         hashers[i].right <== selector[i].out[1];
 
-        newElements[i] <== selector[i].in[0] * index1Bits.out[i] + zeros[i] * (1-index1Bits.out[i]);
+        newElements[i] <== ((i == 0 ? leaf : selector[i].out[0]) - zeros[i]) * index1Bits.out[i] + zeros[i];
     }
 
     root <== hashers[levels - 1].hash;
