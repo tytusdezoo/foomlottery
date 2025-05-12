@@ -330,15 +330,20 @@ contract EthLotteryTest is Test {
         console.log("after remember");
         // compute update
         (uint oldRoot,uint index,uint oldRand,uint commitBlockHash,uint[betsUpdate] memory hashes) = lottery.commited(); // could be taken from log
+        console.log(oldRoot,"oldRoot");
         console.log("after commited");
         (uint lastRand,,uint[] memory leaves) = _getLeaves(0);
         console.log("after getLeaves");
         console.log(leaves[0]);
         assertEq(index,leaves.length -1);
+        console.log("index ok");
         assertEq(lastRand,oldRand);
+        console.log("lastRand ok");
         //assertEq(hashes[0],leaves[leaves.length-1]); // hashes != leaves !!!
         uint newRand = uint128(uint(keccak256(abi.encodePacked(_revealSecret,commitBlockHash))));
         UpdateData memory data = _getUpdateData(oldRand,newRand,uint[8](hashes),leaves);        
+        console.log("update ok");
+        console.log(data.oldRoot,"data.oldRoot");
         assertEq(oldRoot,data.oldRoot);
         console.log("after getUpdateData");
         /*assertTrue(update.verifyProof(

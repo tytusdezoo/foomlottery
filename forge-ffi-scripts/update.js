@@ -10,7 +10,8 @@ const { mimcsponge2 } = require("./utils/mimcsponge.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 //test: betsUpdate = 8;
-// ./forge-ffi-scripts/update.js 0 1 0x00ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae52 1 2 3 4 5 6 7 0x16d18e1425b426e92d3d897958aabf099087b2401bfed53290f5a81fe73c69a5 # fails
+// ./forge-ffi-scripts/update.js 0 1 0x00ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae52 1 2 3 4 5 6 7 0x16d18e1425b426e92d3d897958aabf099087b2401bfed53290f5a81fe73c69a5
+// ./forge-ffi-scripts/update.js 0 0 0x00ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae52 0 0 0 0 0 0 0 0x16d18e1425b426e92d3d897958aabf099087b2401bfed53290f5a81fe73c69a5
 //real	0m14.653s
 //user	1m35.988s
 //sys	0m4.841s
@@ -29,9 +30,13 @@ async function main() {
     if(newHashes[i]==0){
       break;}}
   const newLeaves = await Promise.all(newHashes.slice(1, i).map(async (h,j) => await mimcsponge2(h,newRand+BigInt(oldLeaves.length)+BigInt(j))));
-  console.log(newLeaves);
   const tree = await mimicMerkleTree(oldLeaves);
   const oldProof = tree.path(oldLeaves.length-1)
+//console.log(oldLeaves[0],"leaf");
+//console.log(oldLeaves.length-1,"index");
+//console.log(oldProof.pathRoot,"root");
+//console.log(bigintToHex(oldProof.pathRoot),"root hex");
+//return;
   tree.bulkInsert(newLeaves);
   const newProof = tree.path(oldLeaves.length+newLeaves.length-1)
 
@@ -75,8 +80,6 @@ async function main() {
       [
         [pB[0][1], pB[0][0]],
         [pB[1][1], pB[1][0]],
-        //[pB[0][0], pB[0][1]],// did note help :-(
-        //[pB[1][0], pB[1][1]],
       ],
       pC,
       bigintToHex(oldProof.pathRoot),

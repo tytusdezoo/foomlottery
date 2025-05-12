@@ -9,6 +9,7 @@ const { mimcsponge2 } = require("./utils/mimcsponge.js");
 const { mimicMerkleTree } = require("./utils/mimcMerkleTree.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
+// forge-ffi-scripts/withdraw.js 0x00713bf224fe30b7dd98a71c9fbedd2256b6baa7f7352625b2d20a8d57ed573b 0x000000000000000000000000000000000000000000000000000000000000000a 0x000000000000000000000000000000009c9066d48f17e8c6b1a65301e91a2e36 0x0000000000000000000000000000000000000000000000000000000000000001 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 0x0000000000000000000000000000000000000000 0 0 0x16d18e1425b426e92d3d897958aabf099087b2401bfed53290f5a81fe73c69a5 0x10be442a30c17aeae384745acc09e61e2ec2d14f7d374d98f6bab9c5d7e38071
 
 async function main() {
   const inputs = process.argv.slice(2, process.argv.length);
@@ -37,7 +38,7 @@ async function main() {
   //const leaf = await mimcsponge2(SecretHashIn+power+1n,rand+index);
   //const merkleProof = tree.proof(leaf);
   //const merkleIndex = tree.indexOf(leaf);
-  const merkleProof = tree.path(index)
+  const merkleProof = tree.path(Number(index));
 
   // 4. Format witness input to exactly match circuit expectations
   const input = {

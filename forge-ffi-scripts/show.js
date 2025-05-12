@@ -24,11 +24,9 @@ async function main() {
   //const zero = leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([foom, 0])));
   //const zero = leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([0x4a302ef755ccfe9e93c776ac80fd096a6d5c52c50e578294d145994d13cbfbd7, 0])));
   console.log(bigintToHex(zero),"mimcsponge([foom hex,0]) hex"); // 0x16d18e1425b426e92d3d897958aabf099087b2401bfed53290f5a81fe73c69a5
-
-  const inputs = process.argv.slice(2, process.argv.length);
-  const leaves = inputs.slice(0, inputs.length).map((l) => hexToBigint(l));
-
-  const tree = await mimicMerkleTree(leaves);
+  //const inputs = process.argv.slice(2, process.argv.length);
+  //const leaves = inputs.slice(0, inputs.length).map((l) => hexToBigint(l));
+  const tree = await mimicMerkleTree([zero]);
   const path = tree.path(0);
   let i=0;
   for(;i<32;i++){
