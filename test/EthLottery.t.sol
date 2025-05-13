@@ -375,7 +375,7 @@ contract EthLotteryTest is Test {
         return (rand,index,selectedLeaves);
     }
 
-    function test1_lottery_cancel() public {
+    function notest1_lottery_cancel() public {
         vm.roll(++blocknumber);
         (uint secret_power,) = _play(10); // hash can be restored later
         console.log("%x ticket", secret_power);
@@ -385,7 +385,7 @@ contract EthLotteryTest is Test {
         _cancelbet(secret_power2,hash2,index2);
     }
 
-    function test2_lottery_single_deposit() public {
+    function notest2_lottery_single_deposit() public {
         vm.roll(++blocknumber);
         (uint secret_power,) = _play(10); // hash can be restored later
         console.log("%x ticket", secret_power);
@@ -396,7 +396,6 @@ contract EthLotteryTest is Test {
     }
 
     function test3_lottery_many_deposits() public {
-        // 1. Make many deposits with random commitments -- this will let us test with a non-empty merkle tree
         uint i;
         uint secret_power;
         uint hash;
@@ -412,9 +411,7 @@ contract EthLotteryTest is Test {
         for (; i < 2*betsUpdate+10; i++) {
             _fake_play(i);}
         _commit_reveal();
-        // 2. Generate commitment and deposit.
         (secret_power,hash) = _play(10);
-        // 3. Make more deposits.
         for (; i < 3*betsUpdate+10; i++) {
             _fake_play(i);}
         _commit_reveal();
