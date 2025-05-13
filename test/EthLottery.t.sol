@@ -35,6 +35,9 @@ contract EthLotteryTest is Test {
     uint public constant betPower2 = 16; // power of the second bet = 65536
     uint public constant betPower3 = 22; // power of the third bet = 4194304
 
+    uint logBetIn = uint(keccak256(abi.encodePacked("LogBetIn(uint256,uint256)")));
+    uint logBetHash = uint(keccak256(abi.encodePacked("LogBetHash(uint256,uint256,uint256)"))); // index,hash,rand
+
     struct WithdrawData {
         uint[2] pA;
         uint[2][2] pB;
@@ -44,6 +47,14 @@ contract EthLotteryTest is Test {
         uint rew1;
         uint rew2;
         uint rew3;
+    }
+
+    struct CancelBetData {
+        uint[2] pA;
+        uint[2][2] pB;
+        uint[2] pC;
+        uint hash;
+        uint secret;
     }
 
     struct UpdateData {
@@ -119,6 +130,27 @@ contract EthLotteryTest is Test {
         return (pA, pB, pC, oldRoot, newRoot, index, oldRand, newRand, hashes);
     }
 
+    function _getCancelBet(
+        uint _secret_power,
+        uint _hash,
+        address _recipient,
+        address _relayer
+    ) internal returns (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint hash, uint secret) {
+        string[] memory inputs = new string[](8);
+        inputs[0] = "node";
+        inputs[1] = "forge-ffi-scripts/cancelBet.js";
+        inputs[2] = vm.toString(bytes32(_secret_power));
+        inputs[3] = vm.toString(bytes32(_hash));
+        inputs[4] = vm.toString(_recipient);
+        inputs[5] = vm.toString(_relayer);
+        inputs[6] = "0";
+        inputs[7] = "0";
+        bytes memory result = vm.ffi(inputs);
+        (pA, pB, pC, hash, secret) =
+            abi.decode(result, (uint[2], uint[2][2], uint[2], uint, uint));
+        return (pA, pB, pC, hash, secret);
+    }
+
     function _getWithdraw(
         uint _secret,
         uint _power,
@@ -183,19 +215,34 @@ contract EthLotteryTest is Test {
         });
     }
 
-    function _collect(uint secret_power, uint rand, uint index, uint[] memory leaves) internal {
+    function _getCancelBetData(uint _secret_power, uint _hash) internal returns (CancelBetData memory) {
+        (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint hash, uint secret) =
+            _getCancelBet(_secret_power, _hash, recipient, relayer);
+        return CancelBetData({
+            pA: pA,
+            pB: pB,
+            pC: pC,
+            hash: hash,
+            secret: secret
+        });
+    }
+
+    function _withdraw(uint secret_power, uint rand, uint index, uint[] memory leaves) internal {
         WithdrawData memory data = _getWithdrawData(secret_power, rand, index, leaves);        
         uint _reward = betMin * data.rew1 * 2**betPower1 +
                        betMin * data.rew2 * 2**betPower2 +
                        betMin * data.rew3 * 2**betPower3;
         console.log("%d reward",_reward);        
+        uint gasStart = gasleft();
         assertTrue(withdraw.verifyProof(
             data.pA,
             data.pB,
             data.pC,
             [uint(data.root),uint(data.nullifierHash),data.rew1,data.rew2,data.rew3,uint(uint160(recipient)),uint(uint160(relayer)),fee,refund]
         ));
-        uint gasStart = gasleft();
+        uint gasUsed = gasStart - gasleft();
+        console.log("Gas used in withdraw.verifyProof: %d", gasUsed);
+        gasStart = gasleft();
         lottery.collect(
             data.pA,
             data.pB,
@@ -211,11 +258,39 @@ contract EthLotteryTest is Test {
             data.rew3,
             0
         );
-        uint gasUsed = gasStart - gasleft();
+        gasUsed = gasStart - gasleft();
         if(_reward>0){
             assertGt(recipient.balance,(_reward*94)/100);
         }
-        console.log("Gas used in _collect: %d", gasUsed);
+        console.log("Gas used in _withdraw: %d", gasUsed);
+    }
+
+    function _cancelbet(uint secret_power, uint hash, uint index) internal {
+        CancelBetData memory data = _getCancelBetData(secret_power, hash);        
+        uint gasStart = gasleft();
+        assertTrue(cancel.verifyProof(
+            data.pA,
+            data.pB,
+            data.pC,
+            [uint(data.hash),uint(uint160(recipient)),uint(uint160(relayer)),fee,refund]
+        ));
+        uint gasUsed = gasStart - gasleft();
+        console.log("Gas used in cancel.verifyProof: %d", gasUsed);
+        gasStart = gasleft();
+        console.log(index,"cancel index");
+        console.log(hash,"hash");
+        lottery.cancelbet(
+            data.pA,
+            data.pB,
+            data.pC,
+            index,
+            recipient,
+            relayer,
+            fee,
+            refund
+        );
+        gasUsed = gasStart - gasleft();
+        console.log("Gas used in _cancelbet: %d", gasUsed);
     }
 
     // compute mimc(hash,rand+index)
@@ -230,11 +305,8 @@ contract EthLotteryTest is Test {
         leaf = abi.decode(result, (uint));
     }
 
-    function _getLeaves(uint hash_power_1) internal returns (uint,uint,uint[] memory) {
+    function _getLogs() internal {
         Vm.Log[] memory entries = vm.getRecordedLogs();
-        //uint logBetIn = uint(keccak256(abi.encodePacked("LogBetIn(uint256,uint256)")));
-        uint lastrand;
-        uint logBetHash = uint(keccak256(abi.encodePacked("LogBetHash(uint256,uint256,uint256)"))); // index,hash,rand
         //console.log(logBetIn,"logBetIn");
         //console.log(logBetHash,"logBetHash");
         //console.log(entries.length,"entries.length");
@@ -243,7 +315,7 @@ contract EthLotteryTest is Test {
             if (uint(entries[i].topics[0]) == logBetHash){ // add topic[4]
                 uint lastindex = uint(entries[i].topics[1]);
                 uint lasthash = uint(entries[i].topics[2]);
-                lastrand = uint(entries[i].topics[3]);
+                uint lastrand = uint(entries[i].topics[3]);
                 uint leaf = _getLeaf(lastindex,lasthash,lastrand); // very slow !!!
                 //console.log(leaf,"leaf");
                 bytes32[] memory newTopics = new bytes32[](5);
@@ -255,22 +327,37 @@ contract EthLotteryTest is Test {
             }
             allEntries.push(entries[i]);
         }
-        //console.log(allEntries.length,"allEntries.length");
+    }
+
+    function _getIndex(uint hash_power_1) internal returns (uint) {
+        _getLogs();
+        for (uint i = 0; i < allEntries.length; i++) {
+            if (uint(allEntries[i].topics[0]) == logBetIn){
+                uint lastindex = uint(allEntries[i].topics[1]);
+                uint lasthash = uint(allEntries[i].topics[2]);
+                if (lasthash == hash_power_1) {
+                    return(lastindex);
+                }
+            }
+        }
+        return(0);
+    }
+
+
+    function _getLeaves(uint hash_power_1) internal returns (uint,uint,uint[] memory) {
+        _getLogs();
         uint maxLeaves = allEntries.length/2;
         uint[] memory leaves = new uint[](maxLeaves+2);
         uint leavesCount = 0;
         uint index = 0; // taken by zero
         uint rand = 0;
-        lastrand = 0;
-        //console.log("start");
+        uint lastrand = 0;
         for (uint i = 0; i < allEntries.length; i++) {
             if (uint(allEntries[i].topics[0]) == logBetHash){
                 uint lastindex = uint(allEntries[i].topics[1]);
                 uint lasthash = uint(allEntries[i].topics[2]);
                 lastrand = uint(allEntries[i].topics[3]);
                 uint leaf = uint(allEntries[i].topics[4]);
-                //uint leaf = _getLeaf(lastindex,lasthash,lastrand); // very slow !!!
-                //console.log(leaf,"leaf");
                 leaves[leavesCount++] = leaf;
                 if (lasthash == hash_power_1 && hash_power_1>0) {
                     index = lastindex;
@@ -278,7 +365,6 @@ contract EthLotteryTest is Test {
                 }
             }
         }
-        //console.log(leavesCount,"leavesCount");
         assertGt(leavesCount,0);        
         uint[] memory selectedLeaves = new uint[](leavesCount);
         for(uint i = 0; i < leavesCount; i++) {
@@ -286,22 +372,30 @@ contract EthLotteryTest is Test {
         }
         if(rand==0){
           rand=lastrand;}
-        //console.log(rand,"rand");
-        //console.log(index,"index");
         return (rand,index,selectedLeaves);
     }
 
-    function test1_lottery_single_deposit() public {
+    function test1_lottery_cancel() public {
+        vm.roll(++blocknumber);
+        (uint secret_power,) = _play(10); // hash can be restored later
+        console.log("%x ticket", secret_power);
+        _commit_reveal();
+        (uint secret_power2,uint hash2) = _play(4); // hash can be restored later
+        (uint index2) = _getIndex(hash2+(secret_power2&0x1f)+1);
+        _cancelbet(secret_power2,hash2,index2);
+    }
+
+    function test2_lottery_single_deposit() public {
         vm.roll(++blocknumber);
         (uint secret_power,) = _play(10); // hash can be restored later
         console.log("%x ticket", secret_power);
         _commit_reveal();
         (uint hash,) = _getHash(secret_power);
         (uint rand,uint index,uint[] memory leaves) = _getLeaves(hash+(secret_power&0x1f)+1);
-        _collect(secret_power,rand,index,leaves);
+        _withdraw(secret_power,rand,index,leaves);
     }
 
-    function test2_lottery_many_deposits() public {
+    function test3_lottery_many_deposits() public {
         // 1. Make many deposits with random commitments -- this will let us test with a non-empty merkle tree
         uint i;
         uint secret_power;
@@ -326,14 +420,14 @@ contract EthLotteryTest is Test {
         _commit_reveal();
         _commit_reveal();
         (rand,index,leaves) = _getLeaves(hash+(secret_power&0x1f)+1);
-        _collect(secret_power,rand,index,leaves);
+        _withdraw(secret_power,rand,index,leaves);
         (secret_power,hash) = _play(2);
         for (; i < 4*betsUpdate+10; i++) {
             _fake_play(i);}
         _commit_reveal();
         _commit_reveal();
         (rand,index,leaves) = _getLeaves(hash+(secret_power&0x1f)+1);
-        _collect(secret_power,rand,index,leaves);
+        _withdraw(secret_power,rand,index,leaves);
     }
 
     function _commit_reveal() internal {
@@ -370,13 +464,6 @@ contract EthLotteryTest is Test {
         //console.log(data.oldRoot,"data.oldRoot");
         assertEq(oldRoot,data.oldRoot);
         //console.log("after getUpdateData");
-        /*assertTrue(update.verifyProof(
-            data.pA,
-            data.pB,
-            data.pC,
-            [uint(data.oldRoot),uint(data.newRoot),uint(index),uint(oldRand),uint(newRand),
-            uint(hashes[0]),uint(hashes[1]),uint(hashes[2]),uint(hashes[3]),uint(hashes[4]),uint(hashes[5]),uint(hashes[6]),uint(hashes[7])]
-        ));*/
         //console.log("assert update");
         uint[5+betsUpdate] memory pubdata;
         pubdata[0]=data.oldRoot;
@@ -386,6 +473,7 @@ contract EthLotteryTest is Test {
         pubdata[4]=data.newRand;
         for(uint i=0;i<betsUpdate;i++){
             pubdata[5+i]=data.hashes[i];}
+        uint revealGasStart = gasleft();
         assertTrue(update.verifyProof(
             data.pA,
             data.pB,
@@ -395,10 +483,12 @@ contract EthLotteryTest is Test {
             //uint(data.hashes[0]),uint(data.hashes[1]),uint(data.hashes[2]),uint(data.hashes[3]),
             //uint(data.hashes[4]),uint(data.hashes[5]),uint(data.hashes[6]),uint(data.hashes[7]),]
         ));
-        //console.log("after assert");
-        uint revealGasStart = gasleft();
-        lottery.reveal(_revealSecret,data.pA,data.pB,data.pC,data.newRoot);
         uint revealGasUsed = revealGasStart - gasleft();
+        console.log("Gas used in update.verifyProof: %d", revealGasUsed);
+        //console.log("after assert");
+        revealGasStart = gasleft();
+        lottery.reveal(_revealSecret,data.pA,data.pB,data.pC,data.newRoot);
+        revealGasUsed = revealGasStart - gasleft();
         console.log("Gas used in _reveal: %d", revealGasUsed);
         vm.roll(++blocknumber);
     }

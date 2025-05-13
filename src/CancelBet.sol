@@ -61,9 +61,6 @@ contract CancelBetG16Verifier {
     uint256 constant IC5x = 19213327380788845395286040980861285481487573597134787052192731667674746494243;
     uint256 constant IC5y = 17288999358942577961958974241242750280526846730865019913358791672415826248407;
     
-    uint256 constant IC6x = 3675752235465517768883057658594449342174098255522741830597076428738725135514;
-    uint256 constant IC6y = 9973555681574962162981227355404125459271098366452534109625573647631006336475;
-    
  
     // Memory data
     uint16 constant pVk = 0;
@@ -71,7 +68,7 @@ contract CancelBetG16Verifier {
 
     uint16 constant pLastMem = 896;
 
-    function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[6] calldata _pubSignals) public view returns (bool) {
+    function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[5] calldata _pubSignals) public view returns (bool) {
         assembly {
             function checkField(v) {
                 if iszero(lt(v, r)) {
@@ -124,8 +121,6 @@ contract CancelBetG16Verifier {
                 g1_mulAccC(_pVk, IC4x, IC4y, calldataload(add(pubSignals, 96)))
                 
                 g1_mulAccC(_pVk, IC5x, IC5y, calldataload(add(pubSignals, 128)))
-                
-                g1_mulAccC(_pVk, IC6x, IC6y, calldataload(add(pubSignals, 160)))
                 
 
                 // -A
@@ -189,8 +184,6 @@ contract CancelBetG16Verifier {
             checkField(calldataload(add(_pubSignals, 96)))
             
             checkField(calldataload(add(_pubSignals, 128)))
-            
-            checkField(calldataload(add(_pubSignals, 160)))
             
 
             // Validate all evaluations

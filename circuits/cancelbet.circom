@@ -24,7 +24,6 @@ template CancelBet() {
     signal input relayer;  // not taking part in any computations
     signal input fee;      // not taking part in any computations
     signal input refund;   // not taking part in any computations
-    signal input mask;     // not taking part in any computations
     
     signal input secret;
 
@@ -42,4 +41,4 @@ template CancelBet() {
     refundSquare <== refund * refund;
 }
 
-component main {public [inHash, recipient, relayer, fee, refund, mask]} = CancelBet();
+component main {public [inHash, recipient, relayer, fee, refund]} = CancelBet();

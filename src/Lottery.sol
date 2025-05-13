@@ -219,10 +219,10 @@ contract Lottery {
      * @dev cancel bet, no privacy !
      */
     function cancelbet( // do not change bets[1] add nullifier !!!
-        uint _betIndex,
         uint[2] calldata _pA,
         uint[2][2] calldata _pB,
         uint[2] calldata _pC,
+        uint _betIndex,
         address _recipient,
         address _relayer,
         uint _fee,
@@ -233,10 +233,15 @@ contract Lottery {
         require(D.commitBlock != 0 || _betIndex-D.nextIndex>=D.commitIndex-1, "Commit in progress"); // do not allow generator to cancel bets after selecting commitBlock for random index
         //uint betId=_betIndex-D.nextIndex-1;
         uint pos = (D.betsStart+1+(_betIndex-D.nextIndex)) % betsMax;
-        uint power=bets[pos]&0x1f;
-        require(power>0);
-        require(cancel.verifyProof( _pA, _pB, _pC, [uint(bets[pos]-power-1), uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
-        uint reward=getAmount(power-1);
+        uint power1=bets[pos]&0x1f;
+        //console.log(_betIndex,"_betIndex");
+        //console.log(D.nextIndex,"D.nextIndex");
+        //console.log(D.betsStart,"D.betsStart");
+        //console.log(pos,"pos");
+        //console.log(bets[pos]-power1,"bets[pos]-power1");
+        require(power1>0);
+        require(cancel.verifyProof( _pA, _pB, _pC, [uint(bets[pos]-power1), uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid cancel proof");
+        uint reward=getAmount(power1-1);
         bets[pos]=0x20;
         emit LogCancel(_betIndex);
         collectDividend(_recipient);
@@ -248,7 +253,7 @@ contract Lottery {
             wallets[_recipient].balance += uint112(_invest);
             reward -= _invest;
         }
-        require(reward < _fee, "Insufficient reward");
+        require(reward >= _fee, "Insufficient reward");
         _withdraw(_recipient,reward - _fee);
         if (_fee > 0) {
             _withdraw(_relayer,_fee);
