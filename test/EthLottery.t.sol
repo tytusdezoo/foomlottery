@@ -375,7 +375,7 @@ contract EthLotteryTest is Test {
         return (rand,index,selectedLeaves);
     }
 
-    function notest1_lottery_cancel() public {
+    function test1_lottery_cancel() public {
         vm.roll(++blocknumber);
         (uint secret_power,) = _play(10); // hash can be restored later
         console.log("%x ticket", secret_power);
@@ -385,7 +385,7 @@ contract EthLotteryTest is Test {
         _cancelbet(secret_power2,hash2,index2);
     }
 
-    function notest2_lottery_single_deposit() public {
+    function test2_lottery_single_deposit() public {
         vm.roll(++blocknumber);
         (uint secret_power,) = _play(10); // hash can be restored later
         console.log("%x ticket", secret_power);
