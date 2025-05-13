@@ -125,7 +125,7 @@ template Withdraw(levels,power1,power2,power3) {
     component bits[2];
     bits[0] = Num2Bits(levels);
     bits[0].in <== pathIndex;
-    bits[1] = Num2Bits(levels);
+    bits[1] = Num2Bits(levels+1);
     bits[1].in <== pathIndex + 1;
     component path = MerkleTreeInsert(levels);
     path.leaf <== mimc2.outs[0];

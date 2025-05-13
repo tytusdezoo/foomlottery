@@ -22,7 +22,7 @@ template Update(numhashes,levels) {
     bits[0] = Num2Bits(levels);
     bits[0].in <== index;
     for(var i = 0; i < numhashes; i++) {
-        bits[i+1] = Num2Bits(levels);
+        bits[i+1] = Num2Bits(levels+1);
         bits[i+1].in <== index + i + 1;
 
         mimc[i] = MiMCSponge(2, 220, 1);

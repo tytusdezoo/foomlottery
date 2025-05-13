@@ -28,7 +28,8 @@ contract Lottery {
         uint64 commitBlock;
         uint32 nextIndex;
         uint32 dividendPeriod; // current dividend period
-        uint32 commitCount;
+        //uint32 commitCount;
+        uint8 betsStart; // index of last commited bet
         uint8 betsIndex; // index of the next slot in bet queue (>=1)
         uint8 commitIndex; // number of bets to insert into tree + 1 (>=1)
         uint8 currentRootIndex;
@@ -114,6 +115,7 @@ contract Lottery {
         D.dividendPeriod = uint32(1);
         D.status = uint8(_NOT_ENTERED);
         D.nextIndex = uint32(1);
+        D.betsStart = uint8(0);
         D.betsIndex = uint8(1);
         D.commitIndex = uint8(1);
         wallets[owner] = Wallet(uint112(1),uint112(1),uint16(D.dividendPeriod),uint16(0));
@@ -154,11 +156,12 @@ contract Lottery {
      */
     function play(uint _secrethash,uint _power) payable external nonReentrant {
         require(0<_secrethash &&_secrethash < FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
-        require(D.betsIndex < betsMax && D.betsIndex + D.nextIndex < 2 ** merkleTreeLevels - 1, "No more bets allowed");
+        require(D.betsIndex < betsMax -1 && D.nextIndex + D.betsIndex < 2 ** merkleTreeLevels - 1, "No more bets allowed");
         _deposit(getAmount(_power));
         uint newHash = _secrethash + _power + 1;
-        bets[D.betsIndex] = newHash;
-        emit LogBetIn(D.nextIndex+D.betsIndex,newHash);
+        uint pos = (D.betsStart + D.betsIndex) % betsMax;
+        bets[pos] = newHash;
+        emit LogBetIn(D.nextIndex-1+D.betsIndex,newHash);
         D.betsIndex++;
     }
 
@@ -235,7 +238,7 @@ contract Lottery {
    /**
      * @dev cancel bet, no privacy !
      */
-    function cancelbet(
+    function cancelbet( // do not change bets[1] add nullifier !!!
         uint _betIndex,
         uint[2] calldata _pA,
         uint[2][2] calldata _pB,
@@ -245,7 +248,10 @@ contract Lottery {
         uint _fee,
         uint _refund) payable external nonReentrant {
         require(msg.value == _refund, "Incorrect refund amount received by the contract");
-        require(D.nextIndex<=_betIndex && _betIndex<D.nextIndex+D.betsIndex, "Bet probably processed");
+        require(D.nextIndex<=_betIndex && _betIndex<D.nextIndex-1+D.betsIndex, "Bet probably processed");
+
+// TODO: continue !!!
+
         rememberHash();
         require(D.commitBlock != 0 || _betIndex>=D.nextIndex+D.commitIndex || (commitBlockHash==0 && block.number>D.commitBlock), "Commit in progress"); // do not allow generator to cancel bets after selecting commitBlock for random index
         uint betId=_betIndex-D.nextIndex;
@@ -289,7 +295,7 @@ contract Lottery {
         commitHash = _commitHash;
         D.commitBlock = uint64(block.number);
         D.commitIndex = uint8(D.betsIndex<betsUpdate?D.betsIndex:betsUpdate);
-        D.commitCount ++;
+        //D.commitCount ++;
         commitBlockHash = 0;
         //TODO, log commit
     }
@@ -598,7 +604,7 @@ contract Lottery {
      * @dev Returns data for generator
      */
     function getStatus() public view returns (uint , uint , uint ,uint ) {
-        return (D.betsIndex,D.commitCount,D.commitBlock,commitHash);
+        return (D.betsIndex,D.commitBlock,commitHash);
     }
 
     /**

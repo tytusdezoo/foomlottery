@@ -228,14 +228,14 @@ contract EthLotteryTest is Test {
 
     function _getLeaves(uint hash_power_1) internal returns (uint,uint,uint[] memory) {
         Vm.Log[] memory entries = vm.getRecordedLogs();
-        uint logBetIn = uint(keccak256(abi.encodePacked("LogBetIn(uint256,uint256)")));
+        //uint logBetIn = uint(keccak256(abi.encodePacked("LogBetIn(uint256,uint256)")));
         uint lastrand;
         uint logBetHash = uint(keccak256(abi.encodePacked("LogBetHash(uint256,uint256,uint256)"))); // index,hash,rand
-        console.log(logBetIn,"logBetIn");
-        console.log(logBetHash,"logBetHash");
-        console.log(entries.length,"entries.length");
+        //console.log(logBetIn,"logBetIn");
+        //console.log(logBetHash,"logBetHash");
+        //console.log(entries.length,"entries.length");
         for (uint i = 0; i < entries.length; i++) {
-            console.log(uint(entries[i].topics[0]));
+            //console.log(uint(entries[i].topics[0]));
             if (uint(entries[i].topics[0]) == logBetHash){ // add topic[4]
                 uint lastindex = uint(entries[i].topics[1]);
                 uint lasthash = uint(entries[i].topics[2]);
@@ -251,14 +251,14 @@ contract EthLotteryTest is Test {
             }
             allEntries.push(entries[i]);
         }
-        console.log(allEntries.length,"allEntries.length");
+        //console.log(allEntries.length,"allEntries.length");
         uint maxLeaves = allEntries.length/2;
         uint[] memory leaves = new uint[](maxLeaves+2);
         uint leavesCount = 0;
         uint index = 0; // taken by zero
         uint rand = 0;
         lastrand = 0;
-        console.log("start");
+        //console.log("start");
         for (uint i = 0; i < allEntries.length; i++) {
             if (uint(allEntries[i].topics[0]) == logBetHash){
                 uint lastindex = uint(allEntries[i].topics[1]);
@@ -266,8 +266,7 @@ contract EthLotteryTest is Test {
                 lastrand = uint(allEntries[i].topics[3]);
                 uint leaf = uint(allEntries[i].topics[4]);
                 //uint leaf = _getLeaf(lastindex,lasthash,lastrand); // very slow !!!
-                console.log(leaf,"leaf");
-
+                //console.log(leaf,"leaf");
                 leaves[leavesCount++] = leaf;
                 if (lasthash == hash_power_1 && hash_power_1>0) {
                     index = lastindex;
@@ -275,7 +274,7 @@ contract EthLotteryTest is Test {
                 }
             }
         }
-        console.log(leavesCount,"leavesCount");
+        //console.log(leavesCount,"leavesCount");
         assertGt(leavesCount,0);        
         uint[] memory selectedLeaves = new uint[](leavesCount);
         for(uint i = 0; i < leavesCount; i++) {
@@ -283,8 +282,8 @@ contract EthLotteryTest is Test {
         }
         if(rand==0){
           rand=lastrand;}
-        console.log(rand,"rand");
-        console.log(index,"index");
+        //console.log(rand,"rand");
+        //console.log(index,"index");
         return (rand,index,selectedLeaves);
     }
 
@@ -292,32 +291,35 @@ contract EthLotteryTest is Test {
         (uint secret_power,) = _play(10); // hash can be restored later
         console.log("%x ticket", secret_power);
         _commit_reveal();
-        console.log("commited");
-
+        //console.log("commited");
         (uint hash,) = _getHash(secret_power);
         (uint rand,uint index,uint[] memory leaves) = _getLeaves(hash+(secret_power&0x1f)+1);
         _collect(secret_power,rand,index,leaves);
     }
 
-    function notest2_lottery_many_deposits() public {
+    function test2_lottery_many_deposits() public {
         // 1. Make many deposits with random commitments -- this will let us test with a non-empty merkle tree
-        for (uint i = 0; i < 100; i++) {
+        uint i;
+        for (i = 0; i < 20; i++) {
             _fake_play(i);
         }
+        _commit_reveal();
+        _commit_reveal();
         _commit_reveal();
         // 2. Generate commitment and deposit.
         (uint secret_power,uint hash) = _play(10);
         // 3. Make more deposits.
-        for (uint i = 101; i < 200; i++) {
+        for (; i < 30; i++) {
             _fake_play(i);
         }
+        _commit_reveal();
         _commit_reveal();
         (uint rand,uint index,uint[] memory leaves) = _getLeaves(hash+(secret_power&0x1f)+1);
         _collect(secret_power,rand,index,leaves);
     }
 
     function _commit_reveal() internal {
-        (,uint commitCount,,)=lottery.getStatus();
+        (,uint commitCount,)=lottery.getStatus();
         uint _revealSecret = uint(keccak256(abi.encodePacked(commitCount)));
         uint _commitHash = uint(keccak256(abi.encodePacked(_revealSecret)));
         vm.roll(++blocknumber);
@@ -327,25 +329,25 @@ contract EthLotteryTest is Test {
         console.log("Gas used in _commit: %d", commitGasUsed);
         vm.roll(++blocknumber);
         lottery.rememberHash();
-        console.log("after remember");
+        //console.log("after remember");
         // compute update
         (uint oldRoot,uint index,uint oldRand,uint commitBlockHash,uint[betsUpdate] memory hashes) = lottery.commited(); // could be taken from log
-        console.log(oldRoot,"oldRoot");
-        console.log("after commited");
+        //console.log(oldRoot,"oldRoot");
+        //console.log("after commited");
         (uint lastRand,,uint[] memory leaves) = _getLeaves(0);
-        console.log("after getLeaves");
-        console.log(leaves[0]);
+        //console.log("after getLeaves");
+        //console.log(leaves[0]);
         assertEq(index,leaves.length -1);
-        console.log("index ok");
+        //console.log("index ok");
         assertEq(lastRand,oldRand);
-        console.log("lastRand ok");
+        //console.log("lastRand ok");
         //assertEq(hashes[0],leaves[leaves.length-1]); // hashes != leaves !!!
         uint newRand = uint128(uint(keccak256(abi.encodePacked(_revealSecret,commitBlockHash))));
         UpdateData memory data = _getUpdateData(oldRand,newRand,uint[8](hashes),leaves);        
-        console.log("update ok");
-        console.log(data.oldRoot,"data.oldRoot");
+        //console.log("update ok");
+        //console.log(data.oldRoot,"data.oldRoot");
         assertEq(oldRoot,data.oldRoot);
-        console.log("after getUpdateData");
+        //console.log("after getUpdateData");
         /*assertTrue(update.verifyProof(
             data.pA,
             data.pB,
@@ -361,7 +363,7 @@ contract EthLotteryTest is Test {
             uint(data.hashes[0]),uint(data.hashes[1]),uint(data.hashes[2]),uint(data.hashes[3]),
             uint(data.hashes[4]),uint(data.hashes[5]),uint(data.hashes[6]),uint(data.hashes[7])]
         ));
-        console.log("after assert");
+        //console.log("after assert");
         uint revealGasStart = gasleft();
         lottery.reveal(_revealSecret,data.pA,data.pB,data.pC,data.newRoot);
         uint revealGasUsed = revealGasStart - gasleft();
