@@ -331,7 +331,7 @@ contract EthLotteryTest is Test {
         lottery.rememberHash();
         //console.log("after remember");
         // compute update
-        (uint oldRoot,uint index,uint oldRand,uint commitBlockHash,uint[betsUpdate] memory hashes) = lottery.commited(); // could be taken from log
+        (uint oldRoot,uint index,uint oldRand,uint commitBlock, uint commitBlockHash,uint[betsUpdate] memory hashes) = lottery.commited(); // could be taken from log
         //console.log(oldRoot,"oldRoot");
         //console.log("after commited");
         (uint lastRand,,uint[] memory leaves) = _getLeaves(0);

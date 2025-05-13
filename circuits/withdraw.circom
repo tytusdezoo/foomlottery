@@ -92,7 +92,7 @@ template Withdraw(levels,power1,power2,power3) {
     mimc1.ins[0] <== secret;
     mimc1.ins[1] <== rand + pathIndex;
     mimc1.k <== 0;
-    signal lotto;
+    signal lotto; // remove signal
     lotto <== mimc1.outs[0];
 
     // evaluate lottery
