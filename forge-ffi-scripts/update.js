@@ -15,10 +15,15 @@ const { mimcsponge2 } = require("./utils/mimcsponge.js");
 //real	0m14.653s
 //user	1m35.988s
 //sys	0m4.841s
+// ./forge-ffi-scripts/update.js 0 1 0x00ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae52 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 0x16d18e1425b426e92d3d897958aabf099087b2401bfed53290f5a81fe73c69a5
+//real	0m41.248s
+//user	4m23.454s
+//sys	0m14.194s
 
 async function main() {
   const inputs = process.argv.slice(2, process.argv.length);
-  const betsUpdate = 8;
+  //const betsUpdate = 8;
+  const betsUpdate = 22;
 
   // 1. Get nullifier and secret
   const oldRand = hexToBigint(inputs[0]);

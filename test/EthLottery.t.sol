@@ -27,7 +27,8 @@ contract EthLotteryTest is Test {
     uint public constant fee = 0;
     uint public constant refund = 0;
 
-    uint public constant betsUpdate = 8; // TODO: compute correct value
+    //uint public constant betsUpdate = 8; // TODO: compute correct value
+    uint public constant betsUpdate = 22; // TODO: compute correct value
 
     uint public constant betMin = 1; // TODO: compute correct value
     uint public constant betPower1 = 10; // power of the first bet = 1024
@@ -111,7 +112,10 @@ contract EthLotteryTest is Test {
 
         bytes memory result = vm.ffi(inputs);
         (pA, pB, pC, oldRoot, newRoot, index, oldRand, newRand, hashes) =
-            abi.decode(result, (uint[2], uint[2][2], uint[2], uint, uint, uint, uint, uint, uint[8]));
+            abi.decode(result, (uint[2], uint[2][2], uint[2], uint, uint, uint, uint, uint, 
+            //uint[8] // betsUpdate
+            uint[22] // betsUpdate
+            ));
         return (pA, pB, pC, oldRoot, newRoot, index, oldRand, newRand, hashes);
     }
 
@@ -288,10 +292,10 @@ contract EthLotteryTest is Test {
     }
 
     function test1_lottery_single_deposit() public {
+        vm.roll(++blocknumber);
         (uint secret_power,) = _play(10); // hash can be restored later
         console.log("%x ticket", secret_power);
         _commit_reveal();
-        //console.log("commited");
         (uint hash,) = _getHash(secret_power);
         (uint rand,uint index,uint[] memory leaves) = _getLeaves(hash+(secret_power&0x1f)+1);
         _collect(secret_power,rand,index,leaves);
@@ -305,25 +309,26 @@ contract EthLotteryTest is Test {
         uint rand;
         uint index;
         uint[] memory leaves;
-        for (i = 0; i < 10; i++) {
+        vm.roll(++blocknumber);
+        for (i = 0; i < 1*betsUpdate+10; i++) {
             _fake_play(i);}
         vm.roll(++blocknumber);
         _commit_reveal();
         _commit_reveal();
-        for (; i < 20; i++) {
+        for (; i < 2*betsUpdate+10; i++) {
             _fake_play(i);}
         _commit_reveal();
         // 2. Generate commitment and deposit.
         (secret_power,hash) = _play(10);
         // 3. Make more deposits.
-        for (; i < 30; i++) {
+        for (; i < 3*betsUpdate+10; i++) {
             _fake_play(i);}
         _commit_reveal();
         _commit_reveal();
         (rand,index,leaves) = _getLeaves(hash+(secret_power&0x1f)+1);
         _collect(secret_power,rand,index,leaves);
         (secret_power,hash) = _play(2);
-        for (; i < 40; i++) {
+        for (; i < 4*betsUpdate+10; i++) {
             _fake_play(i);}
         _commit_reveal();
         _commit_reveal();
@@ -346,6 +351,7 @@ contract EthLotteryTest is Test {
         // compute update
         (uint oldRoot,uint index,uint oldRand,uint commitBlock, uint commitBlockHash,uint[betsUpdate] memory hashes) = lottery.commited(); // could be taken from log
         if(commitBlock==0){
+          console.log("no tickets");
           return;}
         //console.log(oldRoot,"oldRoot");
         //console.log("after commited");
@@ -358,7 +364,8 @@ contract EthLotteryTest is Test {
         //console.log("lastRand ok");
         //assertEq(hashes[0],leaves[leaves.length-1]); // hashes != leaves !!!
         uint newRand = uint128(uint(keccak256(abi.encodePacked(_revealSecret,commitBlockHash))));
-        UpdateData memory data = _getUpdateData(oldRand,newRand,uint[8](hashes),leaves);        
+        //UpdateData memory data = _getUpdateData(oldRand,newRand,uint[betsUpdate](hashes),leaves);        
+        UpdateData memory data = _getUpdateData(oldRand,newRand,hashes,leaves);        
         //console.log("update ok");
         //console.log(data.oldRoot,"data.oldRoot");
         assertEq(oldRoot,data.oldRoot);
@@ -370,13 +377,23 @@ contract EthLotteryTest is Test {
             [uint(data.oldRoot),uint(data.newRoot),uint(index),uint(oldRand),uint(newRand),
             uint(hashes[0]),uint(hashes[1]),uint(hashes[2]),uint(hashes[3]),uint(hashes[4]),uint(hashes[5]),uint(hashes[6]),uint(hashes[7])]
         ));*/
+        //console.log("assert update");
+        uint[5+betsUpdate] memory pubdata;
+        pubdata[0]=data.oldRoot;
+        pubdata[1]=data.newRoot;
+        pubdata[2]=data.index;
+        pubdata[3]=data.oldRand;
+        pubdata[4]=data.newRand;
+        for(uint i=0;i<betsUpdate;i++){
+            pubdata[5+i]=data.hashes[i];}
         assertTrue(update.verifyProof(
             data.pA,
             data.pB,
             data.pC,
-            [uint(data.oldRoot),uint(data.newRoot),uint(data.index),uint(data.oldRand),uint(data.newRand),
-            uint(data.hashes[0]),uint(data.hashes[1]),uint(data.hashes[2]),uint(data.hashes[3]),
-            uint(data.hashes[4]),uint(data.hashes[5]),uint(data.hashes[6]),uint(data.hashes[7])]
+            pubdata
+            //[uint(data.oldRoot),uint(data.newRoot),uint(data.index),uint(data.oldRand),uint(data.newRand),
+            //uint(data.hashes[0]),uint(data.hashes[1]),uint(data.hashes[2]),uint(data.hashes[3]),
+            //uint(data.hashes[4]),uint(data.hashes[5]),uint(data.hashes[6]),uint(data.hashes[7]),]
         ));
         //console.log("after assert");
         uint revealGasStart = gasleft();

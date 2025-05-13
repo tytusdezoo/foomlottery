@@ -10,7 +10,8 @@ interface ICancel {
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[5] calldata _pubSignals) external view returns (bool);
 }
 interface IUpdate {
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[13] calldata _pubSignals) external view returns (bool);
+  //function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[13] calldata _pubSignals) external view returns (bool);
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[27] calldata _pubSignals) external view returns (bool); // must reflect betsUpdate
 }
 
 /**
@@ -29,8 +30,9 @@ contract Lottery {
     uint public constant betPower1 = 10; // power of the first bet = 1024
     uint public constant betPower2 = 16; // power of the second bet = 65536
     uint public constant betPower3 = 22; // power of the third bet = 4194304
-    uint public constant betsMax = 16; //128; // maximum number of bets in queue, max 8bit
-    uint public constant betsUpdate = 8; // maximum number of bets in queue to insert
+    uint public constant betsMax = 48; //128; // maximum number of bets in queue, max 8bit
+    uint public constant betsUpdate = 22; // maximum number of bets in queue to insert
+    //uint public constant betsUpdate = 8; // maximum number of bets in queue to insert
     uint public constant dividendFeePerCent = 4; // 4% of dividends go to the shareholders (wall)
     uint public constant generatorFeePerCent = 1; // 1% of dividends go to the generator
     uint public constant maxBalance = 2**108; // maximum balance of a user and maximum size of bets in period
@@ -350,8 +352,15 @@ contract Lottery {
                 newhashes[i]=bets[pos];}
             else{
                 newhashes[i]=0;}}
-        require(update.verifyProof( _pA, _pB, _pC, [ uint(roots[D.currentRootIndex]), uint(_newRoot), uint(D.nextIndex-1), uint(oldRand), uint(newRand),
-                newhashes[0], newhashes[1], newhashes[2], newhashes[3], newhashes[4], newhashes[5], newhashes[6], newhashes[7]] ), "Invalid update proof");
+        uint[5+betsUpdate] memory pubdata;
+        pubdata[0]=uint(roots[D.currentRootIndex]);
+        pubdata[1]=uint(_newRoot);
+        pubdata[2]=uint(D.nextIndex-1);
+        pubdata[3]=uint(oldRand);
+        pubdata[4]=uint(newRand);
+        for(uint i=0;i<betsUpdate;i++){
+            pubdata[5+i]=newhashes[i];}
+        require(update.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");
         uint8 move=D.commitIndex-1;
         D.nextIndex+=move;
         D.betsStart =(D.betsStart+move) % uint8(betsMax);
