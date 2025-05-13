@@ -29,7 +29,7 @@ contract Lottery {
     uint public constant betPower1 = 10; // power of the first bet = 1024
     uint public constant betPower2 = 16; // power of the second bet = 65536
     uint public constant betPower3 = 22; // power of the third bet = 4194304
-    uint public constant betsMax = 128; // maximum number of bets in queue, max 8bit
+    uint public constant betsMax = 16; //128; // maximum number of bets in queue, max 8bit
     uint public constant betsUpdate = 8; // maximum number of bets in queue to insert
     uint public constant dividendFeePerCent = 4; // 4% of dividends go to the shareholders (wall)
     uint public constant generatorFeePerCent = 1; // 1% of dividends go to the generator
@@ -230,7 +230,7 @@ contract Lottery {
         rememberHash();
         require(D.commitBlock != 0 || _betIndex-D.nextIndex>=D.commitIndex-1, "Commit in progress"); // do not allow generator to cancel bets after selecting commitBlock for random index
         //uint betId=_betIndex-D.nextIndex-1;
-        uint pos = (D.betsStart+1+betIndex-D.nextIndex) % betsMax;
+        uint pos = (D.betsStart+1+(_betIndex-D.nextIndex)) % betsMax;
         uint power=bets[pos]&0x1f;
         require(power>0);
         require(cancel.verifyProof( _pA, _pB, _pC, [uint(bets[pos]-power-1), uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
@@ -353,9 +353,9 @@ contract Lottery {
         require(update.verifyProof( _pA, _pB, _pC, [ uint(roots[D.currentRootIndex]), uint(_newRoot), uint(D.nextIndex-1), uint(oldRand), uint(newRand),
                 newhashes[0], newhashes[1], newhashes[2], newhashes[3], newhashes[4], newhashes[5], newhashes[6], newhashes[7]] ), "Invalid update proof");
         uint8 move=D.commitIndex-1;
-        D.nextIndex+=move
-        D.betsStart =(D.betsStart+move) % betsMax;;
-        D.betsIndex-=move
+        D.nextIndex+=move;
+        D.betsStart =(D.betsStart+move) % uint8(betsMax);
+        D.betsIndex-=move;
         D.commitIndex = 1;
         D.commitBlock = 0;
         commitHash = _open;
@@ -598,8 +598,8 @@ contract Lottery {
     /**
      * @dev Returns data for generator
      */
-    function getStatus() public view returns (uint , uint , uint ,uint ) {
-        return (D.betsIndex,D.commitBlock,commitHash);
+    function getStatus() public view returns (uint,uint,uint,uint) {
+        return (D.nextIndex,D.betsIndex,D.commitBlock,commitHash);
     }
 
     /**

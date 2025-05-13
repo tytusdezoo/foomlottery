@@ -300,27 +300,40 @@ contract EthLotteryTest is Test {
     function test2_lottery_many_deposits() public {
         // 1. Make many deposits with random commitments -- this will let us test with a non-empty merkle tree
         uint i;
-        for (i = 0; i < 20; i++) {
-            _fake_play(i);
-        }
+        uint secret_power;
+        uint hash;
+        uint rand;
+        uint index;
+        uint[] memory leaves;
+        for (i = 0; i < 10; i++) {
+            _fake_play(i);}
+        vm.roll(++blocknumber);
         _commit_reveal();
         _commit_reveal();
+        for (; i < 20; i++) {
+            _fake_play(i);}
         _commit_reveal();
         // 2. Generate commitment and deposit.
-        (uint secret_power,uint hash) = _play(10);
+        (secret_power,hash) = _play(10);
         // 3. Make more deposits.
         for (; i < 30; i++) {
-            _fake_play(i);
-        }
+            _fake_play(i);}
         _commit_reveal();
         _commit_reveal();
-        (uint rand,uint index,uint[] memory leaves) = _getLeaves(hash+(secret_power&0x1f)+1);
+        (rand,index,leaves) = _getLeaves(hash+(secret_power&0x1f)+1);
+        _collect(secret_power,rand,index,leaves);
+        (secret_power,hash) = _play(2);
+        for (; i < 40; i++) {
+            _fake_play(i);}
+        _commit_reveal();
+        _commit_reveal();
+        (rand,index,leaves) = _getLeaves(hash+(secret_power&0x1f)+1);
         _collect(secret_power,rand,index,leaves);
     }
 
     function _commit_reveal() internal {
-        (,uint commitCount,)=lottery.getStatus();
-        uint _revealSecret = uint(keccak256(abi.encodePacked(commitCount)));
+        (uint nextIndex,,,)=lottery.getStatus();
+        uint _revealSecret = uint(keccak256(abi.encodePacked(nextIndex)));
         uint _commitHash = uint(keccak256(abi.encodePacked(_revealSecret)));
         vm.roll(++blocknumber);
         uint commitGasStart = gasleft();
@@ -332,6 +345,8 @@ contract EthLotteryTest is Test {
         //console.log("after remember");
         // compute update
         (uint oldRoot,uint index,uint oldRand,uint commitBlock, uint commitBlockHash,uint[betsUpdate] memory hashes) = lottery.commited(); // could be taken from log
+        if(commitBlock==0){
+          return;}
         //console.log(oldRoot,"oldRoot");
         //console.log("after commited");
         (uint lastRand,,uint[] memory leaves) = _getLeaves(0);
