@@ -6,7 +6,7 @@ const snarkjs = require("snarkjs");
 const { ethers } = require("ethers");
 const { hexToBigint, bigintToHex, leBigintToBuffer, reverseBits, } = require("./utils/bigint.js");
 const { mimicMerkleTree } = require("./utils/mimcMerkleTree.js");
-const { mimcsponge2 } = require("./utils/mimcsponge.js");
+const { mimcsponge3 } = require("./utils/mimcsponge.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 //test: betsUpdate = 8;
@@ -34,8 +34,8 @@ async function main() {
   for(;i<betsUpdate;i++){
     if(newHashes[i]==0){
       break;}}
-  const newLeaves = await Promise.all(newHashes.slice(1, i).map(async (h,j) => await mimcsponge2(h,newRand+BigInt(oldLeaves.length)+BigInt(j))));
-  const tree = await mimicMerkleTree(oldLeaves);
+  const newLeaves = await Promise.all(newHashes.slice(1, i).map(async (h,j) => await mimcsponge3(h,newRand,BigInt(oldLeaves.length)+BigInt(j))));
+  const tree = await mimicMerkleTree(0n,oldLeaves);
   const oldProof = tree.path(oldLeaves.length-1)
 //console.log(oldLeaves[0],"leaf");
 //console.log(oldLeaves.length-1,"index");
@@ -51,10 +51,10 @@ async function main() {
     oldRoot: oldProof.pathRoot,
     newRoot: newProof.pathRoot,
     index: oldLeaves.length-1,
-    oldRand: oldRand,
     newRand: newRand,
     newhashes: newHashes.map((x) => x.toString()),
     // Private inputs
+    oldRand: oldRand,
     pathElements: oldProof.pathElements.map((x) => x.toString()),
   };
 
@@ -77,7 +77,7 @@ async function main() {
 
   // 6. Return abi encoded witness
   const witness = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["uint256[2]", "uint256[2][2]", "uint256[2]", "uint", "uint", "uint", "uint", "uint", "uint["+betsUpdate+"]"],
+    ["uint256[2]", "uint256[2][2]", "uint256[2]", "uint", "uint", "uint", "uint", "uint["+betsUpdate+"]"],
     [
       pA,
       // Swap x coordinates: this is for proof verification with the Solidity precompile for EC Pairings, and not required
@@ -90,7 +90,7 @@ async function main() {
       bigintToHex(oldProof.pathRoot),
       bigintToHex(newProof.pathRoot),
       bigintToHex(oldLeaves.length-1),
-      bigintToHex(oldRand),
+      //bigintToHex(oldRand),
       bigintToHex(newRand),
       newHashes.map((x) => bigintToHex(x)),
     ]
@@ -101,7 +101,7 @@ async function main() {
     (oldProof.pathRoot).toString(),
     (newProof.pathRoot).toString(),
     (oldLeaves.length-1).toString(),
-    (oldRand).toString(),
+    //(oldRand).toString(),
     (newRand).toString(),
     ...newHashes.map((x) => x.toString()), // spread the array into individual elements
   ];

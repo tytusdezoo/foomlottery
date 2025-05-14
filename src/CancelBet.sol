@@ -43,23 +43,11 @@ contract CancelBetG16Verifier {
     uint256 constant deltay2 = 8495653923123431417604973247489272438418190587263600148770280649306958101930;
 
     
-    uint256 constant IC0x = 11969267714788285780849945279891710456320383655215730520741799566679330407264;
-    uint256 constant IC0y = 10698590052574678740735388952815014019607315069092446663626247962461523573662;
+    uint256 constant IC0x = 18922858707306837376993913363678602750634975496536612659177093085784195061765;
+    uint256 constant IC0y = 6404343415510239057136062943616236433213531540715639708714346970212747139110;
     
-    uint256 constant IC1x = 14851314275570594489200527836564763994727080873525770323142727509061850673638;
-    uint256 constant IC1y = 15903223278264672111940226920799997159801904340933050169845846238059340082870;
-    
-    uint256 constant IC2x = 13557112498187916465218374378314453350390706295550816461777471792875640125228;
-    uint256 constant IC2y = 4961916038659143487139209034365507558848029586220940918041937731944350046606;
-    
-    uint256 constant IC3x = 12017546734477990484001761054812845778203333497134625497244275446424460116505;
-    uint256 constant IC3y = 17557371087830690758181268163227668246861585513769406907483362420633882784446;
-    
-    uint256 constant IC4x = 848390987601129042682246632599268851043467057920665316274002218700804984541;
-    uint256 constant IC4y = 5338076453885834502569386409177595869327146283228187724401752700986666503573;
-    
-    uint256 constant IC5x = 19213327380788845395286040980861285481487573597134787052192731667674746494243;
-    uint256 constant IC5y = 17288999358942577961958974241242750280526846730865019913358791672415826248407;
+    uint256 constant IC1x = 20701208328217771242145951066866817161098439412586357594068263925027762212722;
+    uint256 constant IC1y = 19665826049264735777034399919008476950405513823874423501984675719205633520302;
     
  
     // Memory data
@@ -68,7 +56,7 @@ contract CancelBetG16Verifier {
 
     uint16 constant pLastMem = 896;
 
-    function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[5] calldata _pubSignals) public view returns (bool) {
+    function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[1] calldata _pubSignals) public view returns (bool) {
         assembly {
             function checkField(v) {
                 if iszero(lt(v, r)) {
@@ -113,14 +101,6 @@ contract CancelBetG16Verifier {
                 // Compute the linear combination vk_x
                 
                 g1_mulAccC(_pVk, IC1x, IC1y, calldataload(add(pubSignals, 0)))
-                
-                g1_mulAccC(_pVk, IC2x, IC2y, calldataload(add(pubSignals, 32)))
-                
-                g1_mulAccC(_pVk, IC3x, IC3y, calldataload(add(pubSignals, 64)))
-                
-                g1_mulAccC(_pVk, IC4x, IC4y, calldataload(add(pubSignals, 96)))
-                
-                g1_mulAccC(_pVk, IC5x, IC5y, calldataload(add(pubSignals, 128)))
                 
 
                 // -A
@@ -176,14 +156,6 @@ contract CancelBetG16Verifier {
             // Validate that all evaluations ∈ F
             
             checkField(calldataload(add(_pubSignals, 0)))
-            
-            checkField(calldataload(add(_pubSignals, 32)))
-            
-            checkField(calldataload(add(_pubSignals, 64)))
-            
-            checkField(calldataload(add(_pubSignals, 96)))
-            
-            checkField(calldataload(add(_pubSignals, 128)))
             
 
             // Validate all evaluations

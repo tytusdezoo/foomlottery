@@ -7,7 +7,7 @@ include "./merkletree.circom";
 
 template CommitmentHasher() {
     signal input secret;
-    signal input rand_index; // NEW
+    signal input nullifier; // NEW
     signal output secretHash;
     signal output nullifierHash;
 
@@ -16,7 +16,7 @@ template CommitmentHasher() {
     component nullifierHasher = Pedersen(248);
     component nullifierBits = Num2Bits(256);
     secretBits.in <== secret;
-    nullifierBits.in <== secret + rand_index;
+    nullifierBits.in <== nullifier;
     for (var i = 0; i < 248; i++) {
         secretHasher.in[i] <== secretBits.out[i];
         nullifierHasher.in[i] <== nullifierBits.out[248 -1 -i];
@@ -30,9 +30,7 @@ template CommitmentHasher() {
 template Withdraw(levels,power1,power2,power3) {
     signal input root;
     signal input nullifierHash;
-    signal input reward1; // NEW
-    signal input reward2; // NEW
-    signal input reward3; // NEW
+    signal input rewardbits;
     signal input recipient; // not taking part in any computations
     signal input relayer;  // not taking part in any computations
     signal input fee;      // not taking part in any computations
@@ -43,11 +41,17 @@ template Withdraw(levels,power1,power2,power3) {
     signal input rand; // NEW
     signal input pathIndex;
     signal input pathElements[levels];
-    //signal input pathIndices[levels];
+
+    // create secret random number
+    component mimc1 = MiMCSponge(3, 220, 1);
+    mimc1.ins[0] <== secret;
+    mimc1.ins[1] <== rand;
+    mimc1.ins[2] <== pathIndex;
+    mimc1.k <== 0;
 
     component hasher = CommitmentHasher();
     hasher.secret <== secret;
-    hasher.rand_index <== rand + pathIndex; // NEW
+    hasher.nullifier <== mimc1.outs[0]; // NEW
     hasher.nullifierHash === nullifierHash;
 
     // test legal hash
@@ -59,16 +63,12 @@ template Withdraw(levels,power1,power2,power3) {
     hasherBits.out[3] === 0;
     hasherBits.out[4] === 0;
 
-    // test reward values (probably not needed, tested in contract)
-    reward1*(reward1-1) === 0;
-    reward2*(reward2-1) === 0;
-    reward3*(reward3-1) === 0;
-
-    // compute mask
+    // compute mask TODO, remove later !!!
     component eq[power2+1];
     signal isequal[power2+1];
     signal mask;
     mask <-- (power<=power1)?((2**(power1+power2+1)-1)<<power)&(2**(power1+power2+1)-1):(((2**power2-1)<<(power+power1))|(2**power1-1))&(2**(power1+power2+1)-1);
+    //var mask = (power<=power1)?((2**(power1+power2+1)-1)<<power)&(2**(power1+power2+1)-1):(((2**power2-1)<<(power+power1))|(2**power1-1))&(2**(power1+power2+1)-1);
     var sum = 0;
     for(var i = 0; i <= power2; i++) {
         eq[i] = IsEqual();
@@ -87,37 +87,32 @@ template Withdraw(levels,power1,power2,power3) {
     }
     sum === 1;
 
-    // create secret random number
-    component mimc1 = MiMCSponge(2, 220, 1);
-    mimc1.ins[0] <== secret;
-    mimc1.ins[1] <== rand + pathIndex;
-    mimc1.k <== 0;
-    signal lotto; // remove signal
-    lotto <== mimc1.outs[0];
-
     // evaluate lottery
     signal test[power1+power2];
     component lottoBits = Num2Bits(256);
     component maskBits = Num2Bits(power1+power2+1);
-    lottoBits.in <== lotto;
+    component rewardBits = Num2Bits(3);
+    lottoBits.in <== mimc1.outs[0];
     maskBits.in <== mask;
+    rewardBits.in <== rewardbits;
     var j = 0;
     for ( j=j ; j < power1; j++) {
         test[j] <== lottoBits.out[j] * maskBits.out[j];
-        test[j] * reward1 === 0;
+        test[j] * rewardBits.out[0] === 0;
     }
     for ( j=j ; j < power1+power2; j++) {
         test[j] <== lottoBits.out[j] * maskBits.out[j];
-        test[j] * reward2 === 0;
+        test[j] * rewardBits.out[1] === 0;
     }
     for ( j=j ; j < power1+power2+power3; j++) { // no more mask
-        lottoBits.out[j]*reward3 === 0;
+        lottoBits.out[j]*rewardBits.out[2] === 0;
     }
 
     // NEW calculate new leaf hash
-    component mimc2 = MiMCSponge(2, 220, 1);
+    component mimc2 = MiMCSponge(3, 220, 1);
     mimc2.ins[0] <== hasher.secretHash + power + 1;
-    mimc2.ins[1] <== rand + pathIndex;
+    mimc2.ins[1] <== rand;
+    mimc2.ins[2] <== pathIndex;
     mimc2.k <== 0;
 
     // NEW BLOCK END
@@ -147,4 +142,4 @@ template Withdraw(levels,power1,power2,power3) {
     refundSquare <== refund * refund;
 }
 
-component main {public [root, nullifierHash, reward1, reward2, reward3, recipient, relayer, fee, refund]} = Withdraw(32,10,16,22);
+component main {public [root, nullifierHash, rewardbits, recipient, relayer, fee, refund]} = Withdraw(32,10,16,22);

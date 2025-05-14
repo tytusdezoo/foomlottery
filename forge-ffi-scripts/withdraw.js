@@ -5,7 +5,7 @@ const snarkjs = require("snarkjs");
 const { ethers } = require("ethers");
 const { hexToBigint, bigintToHex, leBigintToBuffer, reverseBits, } = require("./utils/bigint.js");
 const { pedersenHash } = require("./utils/pedersen.js");
-const { mimcsponge2 } = require("./utils/mimcsponge.js");
+const { mimcsponge3 } = require("./utils/mimcsponge.js");
 const { mimicMerkleTree } = require("./utils/mimcMerkleTree.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
@@ -18,26 +18,23 @@ async function main() {
   const power = hexToBigint(inputs[1]); // use power instead !!!
   const rand = hexToBigint(inputs[2]);
   const index = hexToBigint(inputs[3]);
-  const terces = reverseBits((secret+rand+index)%21888242871839275222246405745257275088548364400416034343698204186575808495617n,31*8);
+  const dice = await mimcsponge3(secret,rand,index);
+  const terces = reverseBits(dice,31*8);
 
   // 1.5. calculate reward
   const power1=10n;
   const power2=16n;
   const mask = (power<=power1)?((2n**(power1+power2+1n)-1n)<<power)&(2n**(power1+power2+1n)-1n):(((2n**power2-1n)<<(power+power1))|(2n**power1-1n))&(2n**(power1+power2+1n)-1n);
-  const dice = await mimcsponge2(secret,rand+index);
   const maskdice= mask & dice;
   const rew1 = (maskdice &                                       0b1111111111n)?0n:1n ;
   const rew2 = (maskdice &                       0b11111111111111110000000000n)?0n:1n ;
   const rew3 = (dice     & 0b111111111111111111111100000000000000000000000000n)?0n:1n ;
+  const rewardbits = 4*rew3+2*rew2+rew1;
 
   const nullifierHash = await pedersenHash(leBigintToBuffer(terces, 31));
 
   const leaves = inputs.slice(8, inputs.length).map((l) => hexToBigint(l));
-  const tree = await mimicMerkleTree(leaves);
-  //const SecretHashIn = await pedersenHash(leBigintToBuffer(secret, 31));
-  //const leaf = await mimcsponge2(SecretHashIn+power+1n,rand+index);
-  //const merkleProof = tree.proof(leaf);
-  //const merkleIndex = tree.indexOf(leaf);
+  const tree = await mimicMerkleTree(0n,leaves);
   const merkleProof = tree.path(Number(index));
 
   // 4. Format witness input to exactly match circuit expectations
@@ -45,9 +42,7 @@ async function main() {
     // Public inputs
     root: merkleProof.pathRoot,
     nullifierHash: nullifierHash,
-    reward1: rew1,
-    reward2: rew2,
-    reward3: rew3,
+    rewardbits: rewardbits,
     recipient: hexToBigint(inputs[4]),
     relayer: hexToBigint(inputs[5]),
     fee: BigInt(inputs[6]),
@@ -77,7 +72,7 @@ async function main() {
 
   // 6. Return abi encoded witness
   const witness = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["uint256[2]", "uint256[2][2]", "uint256[2]", "uint", "uint", "uint", "uint", "uint"],
+    ["uint256[2]", "uint256[2][2]", "uint256[2]", "uint", "uint", "uint"],
     [
       pA,
       // Swap x coordinates: this is for proof verification with the Solidity precompile for EC Pairings, and not required
@@ -89,9 +84,7 @@ async function main() {
       pC,
       bigintToHex(merkleProof.pathRoot),
       bigintToHex(nullifierHash),
-      bigintToHex(rew1),
-      bigintToHex(rew2),
-      bigintToHex(rew3),
+      bigintToHex(rewardbits)
     ]
   );
 

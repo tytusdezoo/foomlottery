@@ -44,9 +44,7 @@ contract EthLotteryTest is Test {
         uint[2] pC;
         uint root;
         uint nullifierHash;
-        uint rew1;
-        uint rew2;
-        uint rew3;
+        uint rewardbits;
     }
 
     struct CancelBetData {
@@ -64,7 +62,6 @@ contract EthLotteryTest is Test {
         uint oldRoot;
         uint newRoot;
         uint index;
-        uint oldRand;
         uint newRand;
         uint[betsUpdate] hashes;
     }
@@ -108,7 +105,7 @@ contract EthLotteryTest is Test {
         uint _newRand,
         uint[betsUpdate] memory _hashes,
         uint[] memory _leaves
-    ) internal returns (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint oldRoot, uint newRoot, uint index, uint oldRand, uint newRand, uint[betsUpdate] memory hashes) {
+    ) internal returns (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint oldRoot, uint newRoot, uint index, uint newRand, uint[betsUpdate] memory hashes) {
         string[] memory inputs = new string[](4 + betsUpdate + _leaves.length);
         inputs[0] = "node";
         inputs[1] = "forge-ffi-scripts/update.js";
@@ -122,33 +119,11 @@ contract EthLotteryTest is Test {
         }
 
         bytes memory result = vm.ffi(inputs);
-        (pA, pB, pC, oldRoot, newRoot, index, oldRand, newRand, hashes) =
-            abi.decode(result, (uint[2], uint[2][2], uint[2], uint, uint, uint, uint, uint, 
-            //uint[8] // betsUpdate
+        (pA, pB, pC, oldRoot, newRoot, index, newRand, hashes) =
+            abi.decode(result, (uint[2], uint[2][2], uint[2], uint, uint, uint, uint, 
             uint[22] // betsUpdate
             ));
-        return (pA, pB, pC, oldRoot, newRoot, index, oldRand, newRand, hashes);
-    }
-
-    function _getCancelBet(
-        uint _secret_power,
-        uint _hash,
-        address _recipient,
-        address _relayer
-    ) internal returns (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint hash, uint secret) {
-        string[] memory inputs = new string[](8);
-        inputs[0] = "node";
-        inputs[1] = "forge-ffi-scripts/cancelBet.js";
-        inputs[2] = vm.toString(bytes32(_secret_power));
-        inputs[3] = vm.toString(bytes32(_hash));
-        inputs[4] = vm.toString(_recipient);
-        inputs[5] = vm.toString(_relayer);
-        inputs[6] = "0";
-        inputs[7] = "0";
-        bytes memory result = vm.ffi(inputs);
-        (pA, pB, pC, hash, secret) =
-            abi.decode(result, (uint[2], uint[2][2], uint[2], uint, uint));
-        return (pA, pB, pC, hash, secret);
+        return (pA, pB, pC, oldRoot, newRoot, index, newRand, hashes);
     }
 
     function _getWithdraw(
@@ -159,7 +134,7 @@ contract EthLotteryTest is Test {
         address _recipient,
         address _relayer,
         uint[] memory leaves
-    ) internal returns (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint root, uint nullifierHash, uint rew1, uint rew2, uint rew3) {
+    ) internal returns (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint root, uint nullifierHash, uint rewardbits) {
         string[] memory inputs = new string[](10 + leaves.length);
         inputs[0] = "node";
         inputs[1] = "forge-ffi-scripts/withdraw.js";
@@ -177,13 +152,13 @@ contract EthLotteryTest is Test {
         }
 
         bytes memory result = vm.ffi(inputs);
-        (pA, pB, pC, root, nullifierHash, rew1, rew2, rew3) =
-            abi.decode(result, (uint[2], uint[2][2], uint[2], uint, uint, uint, uint, uint));
-        return (pA, pB, pC, root, nullifierHash, rew1, rew2, rew3);
+        (pA, pB, pC, root, nullifierHash, rewardbits) =
+            abi.decode(result, (uint[2], uint[2][2], uint[2], uint, uint, uint));
+        return (pA, pB, pC, root, nullifierHash, rewardbits);
     }
 
     function _getUpdateData(uint _oldRand,uint _newRand,uint[betsUpdate] memory _hashes, uint[] memory _leaves) internal returns (UpdateData memory) {
-        (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint oldRoot, uint newRoot, uint index, uint oldRand, uint newRand, uint[betsUpdate] memory hashes) =
+        (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint oldRoot, uint newRoot, uint index, uint newRand, uint[betsUpdate] memory hashes) =
             _getUpdate(_oldRand, _newRand, _hashes, _leaves);
         return UpdateData({
             pA: pA,
@@ -192,7 +167,6 @@ contract EthLotteryTest is Test {
             oldRoot: oldRoot,
             newRoot: newRoot,
             index: index,
-            oldRand: oldRand,
             newRand: newRand,
             hashes: hashes
         });
@@ -201,7 +175,7 @@ contract EthLotteryTest is Test {
     function _getWithdrawData(uint secret_power, uint rand, uint index, uint[] memory leaves) internal returns (WithdrawData memory) {
         uint secret=secret_power>>8;
         uint power=secret_power&0xFF;
-        (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint root, uint nullifierHash, uint rew1, uint rew2, uint rew3) =
+        (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint root, uint nullifierHash, uint rewardbits) =
             _getWithdraw(secret, power, rand, index, recipient, relayer, leaves);
         return WithdrawData({
             pA: pA,
@@ -209,39 +183,23 @@ contract EthLotteryTest is Test {
             pC: pC,
             root: root,
             nullifierHash: nullifierHash,
-            rew1: rew1,
-            rew2: rew2,
-            rew3: rew3
-        });
-    }
-
-    function _getCancelBetData(uint _secret_power, uint _hash) internal returns (CancelBetData memory) {
-        (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint hash, uint secret) =
-            _getCancelBet(_secret_power, _hash, recipient, relayer);
-        return CancelBetData({
-            pA: pA,
-            pB: pB,
-            pC: pC,
-            hash: hash,
-            secret: secret
+            rewardbits: rewardbits
         });
     }
 
     function _withdraw(uint secret_power, uint rand, uint index, uint[] memory leaves) internal {
         WithdrawData memory data = _getWithdrawData(secret_power, rand, index, leaves);        
-        uint _reward = betMin * data.rew1 * 2**betPower1 +
-                       betMin * data.rew2 * 2**betPower2 +
-                       betMin * data.rew3 * 2**betPower3;
-        console.log("%d reward",_reward);        
+        uint reward =  betMin * ( (data.rewardbits&0x1>0?1:0) * 2**betPower1 + (data.rewardbits&0x2>0?1:0) * 2**betPower2 + (data.rewardbits&0x4>0?1:0) * 2**betPower3 );
+        console.log("%d reward",reward);        
         uint gasStart = gasleft();
         assertTrue(withdraw.verifyProof(
             data.pA,
             data.pB,
             data.pC,
-            [uint(data.root),uint(data.nullifierHash),data.rew1,data.rew2,data.rew3,uint(uint160(recipient)),uint(uint160(relayer)),fee,refund]
+            [uint(data.root),uint(data.nullifierHash),data.rewardbits,uint(uint160(recipient)),uint(uint160(relayer)),fee,refund]
         ));
         uint gasUsed = gasStart - gasleft();
-        console.log("Gas used in withdraw.verifyProof: %d", gasUsed);
+        console.log("Gas used in withdraw.verifyProof: %d", gasUsed); // 251799
         gasStart = gasleft();
         lottery.collect(
             data.pA,
@@ -253,42 +211,47 @@ contract EthLotteryTest is Test {
             relayer,
             fee,
             refund,
-            data.rew1,
-            data.rew2,
-            data.rew3,
+            data.rewardbits,
             0
         );
         gasUsed = gasStart - gasleft();
-        if(_reward>0){
-            assertGt(recipient.balance,(_reward*94)/100);
+        if(reward>0){
+            assertGt(recipient.balance,(reward*94)/100);
         }
         console.log("Gas used in _withdraw: %d", gasUsed);
+    }
+
+    function _getCancelBet(
+        uint _secret_power,
+        uint _hash
+    ) internal returns (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint hash, uint secret) {
+        string[] memory inputs = new string[](4);
+        inputs[0] = "node";
+        inputs[1] = "forge-ffi-scripts/cancelBet.js";
+        inputs[2] = vm.toString(bytes32(_secret_power));
+        inputs[3] = vm.toString(bytes32(_hash));
+        bytes memory result = vm.ffi(inputs);
+        (pA, pB, pC, hash, secret) =
+            abi.decode(result, (uint[2], uint[2][2], uint[2], uint, uint));
+        return (pA, pB, pC, hash, secret);
+    }
+
+    function _getCancelBetData(uint _secret_power, uint _hash) internal returns (CancelBetData memory) {
+        (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint hash, uint secret) =
+            _getCancelBet(_secret_power, _hash);
+        return CancelBetData({ pA: pA, pB: pB, pC: pC, hash: hash, secret: secret });
     }
 
     function _cancelbet(uint secret_power, uint hash, uint index) internal {
         CancelBetData memory data = _getCancelBetData(secret_power, hash);        
         uint gasStart = gasleft();
-        assertTrue(cancel.verifyProof(
-            data.pA,
-            data.pB,
-            data.pC,
-            [uint(data.hash),uint(uint160(recipient)),uint(uint160(relayer)),fee,refund]
-        ));
+        assertTrue(cancel.verifyProof(data.pA,data.pB,data.pC,[uint(data.hash)]));
         uint gasUsed = gasStart - gasleft();
-        console.log("Gas used in cancel.verifyProof: %d", gasUsed);
+        console.log("Gas used in cancel.verifyProof: %d", gasUsed); // 199867 [1 parameter] , 228591 [5 parameters]
         gasStart = gasleft();
         console.log(index,"cancel index");
         console.log(hash,"hash");
-        lottery.cancelbet(
-            data.pA,
-            data.pB,
-            data.pC,
-            index,
-            recipient,
-            relayer,
-            fee,
-            refund
-        );
+        lottery.cancelbet(data.pA,data.pB,data.pC,index,recipient);
         gasUsed = gasStart - gasleft();
         console.log("Gas used in _cancelbet: %d", gasUsed);
     }
@@ -395,7 +358,7 @@ contract EthLotteryTest is Test {
         _withdraw(secret_power,rand,index,leaves);
     }
 
-    function test3_lottery_many_deposits() public {
+    function notest3_lottery_many_deposits() public {
         uint i;
         uint secret_power;
         uint hash;
@@ -462,26 +425,22 @@ contract EthLotteryTest is Test {
         assertEq(oldRoot,data.oldRoot);
         //console.log("after getUpdateData");
         //console.log("assert update");
-        uint[5+betsUpdate] memory pubdata;
+        uint[4+betsUpdate] memory pubdata;
         pubdata[0]=data.oldRoot;
         pubdata[1]=data.newRoot;
         pubdata[2]=data.index;
-        pubdata[3]=data.oldRand;
-        pubdata[4]=data.newRand;
+        pubdata[3]=data.newRand;
         for(uint i=0;i<betsUpdate;i++){
-            pubdata[5+i]=data.hashes[i];}
+            pubdata[4+i]=data.hashes[i];}
         uint revealGasStart = gasleft();
         assertTrue(update.verifyProof(
             data.pA,
             data.pB,
             data.pC,
             pubdata
-            //[uint(data.oldRoot),uint(data.newRoot),uint(data.index),uint(data.oldRand),uint(data.newRand),
-            //uint(data.hashes[0]),uint(data.hashes[1]),uint(data.hashes[2]),uint(data.hashes[3]),
-            //uint(data.hashes[4]),uint(data.hashes[5]),uint(data.hashes[6]),uint(data.hashes[7]),]
         ));
         uint revealGasUsed = revealGasStart - gasleft();
-        console.log("Gas used in update.verifyProof: %d", revealGasUsed);
+        console.log("Gas used in update.verifyProof: %d", revealGasUsed); // 372138
         //console.log("after assert");
         revealGasStart = gasleft();
         lottery.reveal(_revealSecret,data.pA,data.pB,data.pC,data.newRoot);

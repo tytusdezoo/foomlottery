@@ -3,15 +3,17 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test, console} from "forge-std/Test.sol";
 
-interface IWithdraw {
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool);
+interface IWithdraw { // 256299 gas (9sig)
+  //function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool); // 256299 gas
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[7] calldata _pubSignals) external view returns (bool); // 
 }
-interface ICancel {
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[5] calldata _pubSignals) external view returns (bool);
+interface ICancel { // 199867 gas
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[1] calldata _pubSignals) external view returns (bool);
 }
-interface IUpdate {
+interface IUpdate { // 376846 gas (27sig)
   //function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[13] calldata _pubSignals) external view returns (bool);
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[27] calldata _pubSignals) external view returns (bool); // must reflect betsUpdate
+  //function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[27] calldata _pubSignals) external view returns (bool); // 376846 gas 
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[26] calldata _pubSignals) external view returns (bool); // 370022
 }
 
 /**
@@ -104,23 +106,18 @@ contract Lottery {
         wallets[owner] = Wallet(uint112(1),uint112(1),uint16(D.dividendPeriod),uint16(0));
         //periods[0]=Period(0,0); // not needed
         periods[D.dividendPeriod]=Period(1,1);
-        //for (uint i = 0; i < merkleTreeLevels; i++) {
-        //    filledSubtrees[i] = zeros(i);
-        //}
+        // 16660660614175348086322821347366010925591495133565739687589833680199500683712
+        // leaf=0x24d599883f039a5cb553f9ec0e5998d58d8816e823bd556164f72aef0ef7d9c0 mimcsponge([keccak(foom)<<4,0,0])
         for(uint i=0;i<betsMax;i++){
-            // 0x00ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae52 sha256("foom") // maybe shift left <<5
-            // 0x16d18e1425b426e92d3d897958aabf099087b2401bfed53290f5a81fe73c69a5 mimcsponge(sha256("foom"),0);
-            // 0x1ea6d6272525031ddcdeb39d235e3e0d8f028b1949e3a382a5b09329020ffa6b root
-            // 364420650655292332695996153584356179188405000809545824410254109167378673234 foom
-            // 10321134296521385496302399560765474056738943471204729886789548190600722672037 foom+0
-            // 13864160099319117366593650268480669072934664383018640873951428791811347315307 root
-            bets[i]=0x00ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae52; // sha256("foom")
+            // 5830730410484677323135938457349698867014480012952733190564065746678058771744 sha256("foom")<<4
+            bets[i]=0x0ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae520; // sha256("foom")<<4
         }
         for(uint i=0;i<rootsMax;i++){
-            roots[i] = 0x1ea6d6272525031ddcdeb39d235e3e0d8f028b1949e3a382a5b09329020ffa6b;
+            // 16855017158405950531512674278374442951963327874331982618070277997451625577216
+            roots[i] = 0x25439a05239667bccd12fc3bd280a29a02728ed44410446cbd51a27cda333b00;
         }
-        emit LogBetIn(0,0x00ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae52);
-        emit LogBetHash(0,0x00ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae52,0);
+        emit LogBetIn(0,0x0ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae520);
+        emit LogBetHash(0,0x0ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae520,0);
     }
 
 /* lottery functions */
@@ -160,16 +157,14 @@ contract Lottery {
         address _relayer,
         uint _fee,
         uint _refund,
-    	uint _rew1,
-	uint _rew2,
-	uint _rew3,
+        uint _rewardbits,
         uint _invest) payable external nonReentrant {
         require(msg.value == _refund, "Incorrect refund amount received by the contract");
         require(nullifier[_nullifierHash] == 0, "Incorrect nullifier");
         require(isKnownRoot(_root), "Cannot find your merkle root"); // Make sure to use a recent one
-        require(withdraw.verifyProof( _pA, _pB, _pC, [ _root, _nullifierHash, _rew1, _rew2, _rew3, uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
+        require(withdraw.verifyProof( _pA, _pB, _pC, [ _root, _nullifierHash, _rewardbits, uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
         nullifier[_nullifierHash] = 1;
-        uint reward =  betMin * ( _rew1 * 2**betPower1 + _rew2 * 2**betPower2 + _rew3 * 2**betPower3 );
+        uint reward =  betMin * ( (_rewardbits&0x1>0?1:0) * 2**betPower1 + (_rewardbits&0x2>0?1:0) * 2**betPower2 + (_rewardbits&0x4>0?1:0) * 2**betPower3 );
         emit LogWin(uint(_nullifierHash),reward);
         currentBets += uint128(reward);
         collectDividend(generator);
@@ -223,45 +218,20 @@ contract Lottery {
         uint[2][2] calldata _pB,
         uint[2] calldata _pC,
         uint _betIndex,
-        address _recipient,
-        address _relayer,
-        uint _fee,
-        uint _refund) payable external nonReentrant {
-        require(msg.value == _refund, "Incorrect refund amount received by the contract");
+        address _recipient) payable external nonReentrant {
         require(D.nextIndex<=_betIndex && _betIndex-D.nextIndex<D.betsIndex-1, "Bet probably processed");
         rememberHash();
         require(D.commitBlock != 0 || _betIndex-D.nextIndex>=D.commitIndex-1, "Commit in progress"); // do not allow generator to cancel bets after selecting commitBlock for random index
-        //uint betId=_betIndex-D.nextIndex-1;
         uint pos = (D.betsStart+1+(_betIndex-D.nextIndex)) % betsMax;
         uint power1=bets[pos]&0x1f;
-        //console.log(_betIndex,"_betIndex");
-        //console.log(D.nextIndex,"D.nextIndex");
-        //console.log(D.betsStart,"D.betsStart");
-        //console.log(pos,"pos");
-        //console.log(bets[pos]-power1,"bets[pos]-power1");
         require(power1>0);
-        require(cancel.verifyProof( _pA, _pB, _pC, [uint(bets[pos]-power1), uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid cancel proof");
+        require(cancel.verifyProof( _pA, _pB, _pC, [uint(bets[pos]-power1)]), "Invalid cancel proof");
         uint reward=getAmount(power1-1);
         bets[pos]=0x20;
         emit LogCancel(_betIndex);
-        collectDividend(_recipient);
-        /* process withdrawal */
         uint balance = _balance();
-        if(balance < reward) {
-            uint _invest = reward - balance;
-            currentBalance += uint128(_invest);
-            wallets[_recipient].balance += uint112(_invest);
-            reward -= _invest;
-        }
-        require(reward >= _fee, "Insufficient reward");
-        _withdraw(_recipient,reward - _fee);
-        if (_fee > 0) {
-            _withdraw(_relayer,_fee);
-        }
-        if (_refund > 0) {
-          (bool ok,) =_recipient.call{ value: _refund }("");
-          require(ok);
-        }
+        require(balance >= reward,"Not anough funds");
+        _withdraw(_recipient,reward);
     }
 
     /**
@@ -357,14 +327,13 @@ contract Lottery {
                 newhashes[i]=bets[pos];}
             else{
                 newhashes[i]=0;}}
-        uint[5+betsUpdate] memory pubdata;
+        uint[4+betsUpdate] memory pubdata;
         pubdata[0]=uint(roots[D.currentRootIndex]);
         pubdata[1]=uint(_newRoot);
         pubdata[2]=uint(D.nextIndex-1);
-        pubdata[3]=uint(oldRand);
-        pubdata[4]=uint(newRand);
+        pubdata[3]=uint(newRand);
         for(uint i=0;i<betsUpdate;i++){
-            pubdata[5+i]=newhashes[i];}
+            pubdata[4+i]=newhashes[i];}
         require(update.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");
         uint8 move=D.commitIndex-1;
         D.nextIndex+=move;

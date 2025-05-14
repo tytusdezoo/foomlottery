@@ -8,10 +8,10 @@ template Update(numhashes,levels) {
     signal input oldRoot;
     signal input newRoot;
     signal input index;
-    signal input oldRand;
     signal input newRand;
     signal input newhashes[numhashes]; // starts with previous hash
 
+    signal input oldRand;
     signal input pathElements[levels];
 
     component bits[numhashes+1];
@@ -25,9 +25,10 @@ template Update(numhashes,levels) {
         bits[i+1] = Num2Bits(levels+1);
         bits[i+1].in <== index + i + 1;
 
-        mimc[i] = MiMCSponge(2, 220, 1);
+        mimc[i] = MiMCSponge(3, 220, 1);
         mimc[i].ins[0] <== newhashes[i];
-        mimc[i].ins[1] <== i == 0 ? oldRand + index : newRand + index + i;
+        mimc[i].ins[1] <== i == 0 ? oldRand : newRand;
+        mimc[i].ins[2] <== index + i;
         mimc[i].k <== 0;
 
         path[i] = MerkleTreeInsert(levels);
@@ -51,4 +52,4 @@ template Update(numhashes,levels) {
     newRoot === roots[numhashes-1];
 }
 
-component main {public [oldRoot, newRoot, index, oldRand, newRand, newhashes]} = Update(22,32);
+component main {public [oldRoot, newRoot, index, newRand, newhashes]} = Update(22,32);

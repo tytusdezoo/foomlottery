@@ -17,6 +17,10 @@ compile:
 	@echo "Compiling update.circom..."
 	circom circuits/update.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
 
+compile_cancelbet:
+	@echo "Compiling cancelbet.circom..."
+	circom circuits/cancelbet.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
+
 # Powers of tau ceremony
 ptau16:
 	@echo "Performing powers of tau ceremony..."

@@ -16,10 +16,6 @@ async function main() {
   const input = {
     // Public inputs
     inHash: hash,
-    recipient: hexToBigint(inputs[2]),
-    relayer: hexToBigint(inputs[3]),
-    fee: BigInt(inputs[4]),
-    refund: BigInt(inputs[5]),
     // Private inputs
     secret: secret
   };
