@@ -3,10 +3,10 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test, console} from "forge-std/Test.sol";
 
-interface IWithdraw { // 
+interface IWithdraw { // 48439 const
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[7] calldata _pubSignals) external view returns (bool); // 242505 gas
 }
-interface ICancel { //
+interface ICancel { // 686 const
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[1] calldata _pubSignals) external view returns (bool); // 199863 gas
 }
 interface IUpdate2 { // 88799 const
@@ -17,6 +17,9 @@ interface IUpdate6 { // 266335 const
 }
 interface IUpdate22 { // 976479 const
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[26] calldata _pubSignals) external view returns (bool); // 365320 gas
+}
+interface IUpdate45 { // 1997311 const
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[49] calldata _pubSignals) external view returns (bool); //
 }
 
 /**
