@@ -1,1 +1,1 @@
-../circuit_artifacts/update_js/generate_witness.js
+../circuit_artifacts/update22_js/generate_witness.js

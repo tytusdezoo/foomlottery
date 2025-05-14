@@ -6,8 +6,10 @@ import {Test, console} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {WithdrawG16Verifier} from "src/Withdraw.sol";
 import {CancelBetG16Verifier} from "src/CancelBet.sol";
-import {UpdateG16Verifier} from "src/Update.sol";
-import {IWithdraw, ICancel, IUpdate} from "src/Lottery.sol";
+import {Update2G16Verifier} from "src/Update2.sol";
+import {Update6G16Verifier} from "src/Update6.sol";
+import {Update22G16Verifier} from "src/Update22.sol";
+import {IWithdraw, ICancel, IUpdate2, IUpdate6, IUpdate22} from "src/Lottery.sol";
 import {EthLottery} from "src/EthLottery.sol";
 
 contract EthLotteryTest is Test {
@@ -16,7 +18,10 @@ contract EthLotteryTest is Test {
     EthLottery public lottery;
     IWithdraw public withdraw;
     ICancel public cancel;
-    IUpdate public update;
+    IUpdate2 public update2;
+    IUpdate6 public update6;
+    IUpdate22 public update22;
+
 
     uint blocknumber = 1;
     Vm.Log[] public allEntries;
@@ -27,8 +32,7 @@ contract EthLotteryTest is Test {
     uint public constant fee = 0;
     uint public constant refund = 0;
 
-    //uint public constant betsUpdate = 8; // TODO: compute correct value
-    uint public constant betsUpdate = 22; // TODO: compute correct value
+    uint public constant maxUpdate = 22; // TODO: compute correct value
 
     uint public constant betMin = 1; // TODO: compute correct value
     uint public constant betPower1 = 10; // power of the first bet = 1024
@@ -63,17 +67,20 @@ contract EthLotteryTest is Test {
         uint newRoot;
         uint index;
         uint newRand;
-        uint[betsUpdate] hashes;
+        //uint[maxUpdate] hashes;
+        uint[] hashes;
     }
 
     function setUp() public {
         // Deploy Groth16 verifier contracts.
         withdraw = IWithdraw(address(new WithdrawG16Verifier()));
         cancel = ICancel(address(new CancelBetG16Verifier()));
-        update = IUpdate(address(new UpdateG16Verifier()));
+        update2 = IUpdate2(address(new Update2G16Verifier()));
+        update6 = IUpdate6(address(new Update6G16Verifier()));
+        update22 = IUpdate22(address(new Update22G16Verifier()));
         // Deploy lottery contract.
     	vm.recordLogs();
-        lottery = new EthLottery(withdraw, cancel, update, IERC20(address(0)), betMin);
+        lottery = new EthLottery(withdraw, cancel, update2, update6, update22, IERC20(address(0)), betMin);
     }
 
     function _getHash(uint _power) internal returns (uint hash, uint secret_power) {
@@ -101,28 +108,33 @@ contract EthLotteryTest is Test {
     }
 
     function _getUpdate(
+        uint _commitIndex,
         uint _oldRand,
         uint _newRand,
-        uint[betsUpdate] memory _hashes,
+        uint[maxUpdate] memory _hashes,
         uint[] memory _leaves
-    ) internal returns (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint oldRoot, uint newRoot, uint index, uint newRand, uint[betsUpdate] memory hashes) {
-        string[] memory inputs = new string[](4 + betsUpdate + _leaves.length);
+    ) internal returns (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint oldRoot, uint newRoot, uint index, uint newRand, uint[] memory hashes) {
+        string[] memory inputs = new string[](5 + maxUpdate + _leaves.length);
         inputs[0] = "node";
         inputs[1] = "forge-ffi-scripts/update.js";
-        inputs[2] = vm.toString(bytes32(_oldRand));
-        inputs[3] = vm.toString(bytes32(_newRand));
-        for (uint i = 0; i < betsUpdate; i++) {
-            inputs[4 + i] = vm.toString(bytes32(_hashes[i]));
+        inputs[2] = vm.toString(bytes32(_commitIndex));
+        inputs[3] = vm.toString(bytes32(_oldRand));
+        inputs[4] = vm.toString(bytes32(_newRand));
+        for (uint i = 0; i < maxUpdate; i++) {
+            inputs[5 + i] = vm.toString(bytes32(_hashes[i]));
         }
         for (uint i = 0; i < _leaves.length; i++) {
-            inputs[4 + betsUpdate + i] = vm.toString(bytes32(_leaves[i]));
+            inputs[5 + maxUpdate + i] = vm.toString(bytes32(_leaves[i]));
         }
 
+	//console.log("before update");
         bytes memory result = vm.ffi(inputs);
+	//console.log("after update");
         (pA, pB, pC, oldRoot, newRoot, index, newRand, hashes) =
             abi.decode(result, (uint[2], uint[2][2], uint[2], uint, uint, uint, uint, 
-            uint[22] // betsUpdate
+            uint[] // maxUpdate
             ));
+	//console.log("after parse");
         return (pA, pB, pC, oldRoot, newRoot, index, newRand, hashes);
     }
 
@@ -157,9 +169,9 @@ contract EthLotteryTest is Test {
         return (pA, pB, pC, root, nullifierHash, rewardbits);
     }
 
-    function _getUpdateData(uint _oldRand,uint _newRand,uint[betsUpdate] memory _hashes, uint[] memory _leaves) internal returns (UpdateData memory) {
-        (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint oldRoot, uint newRoot, uint index, uint newRand, uint[betsUpdate] memory hashes) =
-            _getUpdate(_oldRand, _newRand, _hashes, _leaves);
+    function _getUpdateData(uint _commitIndex,uint _oldRand,uint _newRand,uint[maxUpdate] memory _hashes, uint[] memory _leaves) internal returns (UpdateData memory) {
+        (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint oldRoot, uint newRoot, uint index, uint newRand, uint[] memory hashes) =
+            _getUpdate(_commitIndex,_oldRand, _newRand, _hashes, _leaves);
         return UpdateData({
             pA: pA,
             pB: pB,
@@ -250,7 +262,7 @@ contract EthLotteryTest is Test {
         console.log("Gas used in cancel.verifyProof: %d", gasUsed); // 199867 [1 parameter] , 228591 [5 parameters]
         gasStart = gasleft();
         console.log(index,"cancel index");
-        console.log(hash,"hash");
+        //console.log(hash,"hash");
         lottery.cancelbet(data.pA,data.pB,data.pC,index,recipient);
         gasUsed = gasStart - gasleft();
         console.log("Gas used in _cancelbet: %d", gasUsed);
@@ -348,7 +360,7 @@ contract EthLotteryTest is Test {
         _cancelbet(secret_power2,hash2,index2);
     }
 
-    function test2_lottery_single_deposit() public {
+    function notest2_lottery_single_deposit() public {
         vm.roll(++blocknumber);
         (uint secret_power,) = _play(10); // hash can be restored later
         console.log("%x ticket", secret_power);
@@ -358,7 +370,7 @@ contract EthLotteryTest is Test {
         _withdraw(secret_power,rand,index,leaves);
     }
 
-    function notest3_lottery_many_deposits() public {
+    function test3_lottery_many_deposits() public {
         uint i;
         uint secret_power;
         uint hash;
@@ -366,23 +378,23 @@ contract EthLotteryTest is Test {
         uint index;
         uint[] memory leaves;
         vm.roll(++blocknumber);
-        for (i = 0; i < 1*betsUpdate+10; i++) {
+        for (i = 0; i < 1*maxUpdate+10; i++) {
             _fake_play(i);}
         vm.roll(++blocknumber);
         _commit_reveal();
         _commit_reveal();
-        for (; i < 2*betsUpdate+10; i++) {
+        for (; i < 2*maxUpdate+10; i++) {
             _fake_play(i);}
         _commit_reveal();
         (secret_power,hash) = _play(10);
-        for (; i < 3*betsUpdate+10; i++) {
+        for (; i < 3*maxUpdate+10; i++) {
             _fake_play(i);}
         _commit_reveal();
         _commit_reveal();
         (rand,index,leaves) = _getLeaves(hash+(secret_power&0x1f)+1);
         _withdraw(secret_power,rand,index,leaves);
         (secret_power,hash) = _play(2);
-        for (; i < 4*betsUpdate+10; i++) {
+        for (; i < 4*maxUpdate+10; i++) {
             _fake_play(i);}
         _commit_reveal();
         _commit_reveal();
@@ -403,7 +415,7 @@ contract EthLotteryTest is Test {
         lottery.rememberHash();
         //console.log("after remember");
         // compute update
-        (uint oldRoot,uint index,uint oldRand,uint commitBlock, uint commitBlockHash,uint[betsUpdate] memory hashes) = lottery.commited(); // could be taken from log
+        (uint oldRoot,uint index,uint oldRand,uint commitBlock, uint commitBlockHash,uint commitIndex,uint[maxUpdate] memory hashes) = lottery.commited(); // could be taken from log
         if(commitBlock==0){
           console.log("no tickets");
           return;}
@@ -418,34 +430,65 @@ contract EthLotteryTest is Test {
         //console.log("lastRand ok");
         //assertEq(hashes[0],leaves[leaves.length-1]); // hashes != leaves !!!
         uint newRand = uint128(uint(keccak256(abi.encodePacked(_revealSecret,commitBlockHash))));
-        //UpdateData memory data = _getUpdateData(oldRand,newRand,uint[betsUpdate](hashes),leaves);        
-        UpdateData memory data = _getUpdateData(oldRand,newRand,hashes,leaves);        
+        //UpdateData memory data = _getUpdateData(oldRand,newRand,uint[maxUpdate](hashes),leaves);        
+        //console.log("update start");
+        UpdateData memory data = _getUpdateData(commitIndex,oldRand,newRand,hashes,leaves);        
         //console.log("update ok");
         //console.log(data.oldRoot,"data.oldRoot");
         assertEq(oldRoot,data.oldRoot);
         //console.log("after getUpdateData");
         //console.log("assert update");
-        uint[4+betsUpdate] memory pubdata;
-        pubdata[0]=data.oldRoot;
-        pubdata[1]=data.newRoot;
-        pubdata[2]=data.index;
-        pubdata[3]=data.newRand;
-        for(uint i=0;i<betsUpdate;i++){
-            pubdata[4+i]=data.hashes[i];}
-        uint revealGasStart = gasleft();
-        assertTrue(update.verifyProof(
-            data.pA,
-            data.pB,
-            data.pC,
-            pubdata
-        ));
-        uint revealGasUsed = revealGasStart - gasleft();
-        console.log("Gas used in update.verifyProof: %d", revealGasUsed); // 372138
-        //console.log("after assert");
-        revealGasStart = gasleft();
-        lottery.reveal(_revealSecret,data.pA,data.pB,data.pC,data.newRoot);
-        revealGasUsed = revealGasStart - gasleft();
-        console.log("Gas used in _reveal: %d", revealGasUsed);
+        if(commitIndex<=2){
+          uint[4+2] memory pubdata;
+          pubdata[0]=data.oldRoot;
+          pubdata[1]=data.newRoot;
+          pubdata[2]=data.index;
+          pubdata[3]=data.newRand;
+          for(uint i=0;i<2;i++){
+              pubdata[4+i]=data.hashes[i];}
+          uint revealGasStart = gasleft();
+          assertTrue(update2.verifyProof( data.pA, data.pB, data.pC, pubdata));
+          uint revealGasUsed = revealGasStart - gasleft();
+          console.log("Gas used in update2.verifyProof: %d", revealGasUsed);
+          //console.log("after assert");
+          revealGasStart = gasleft();
+          lottery.reveal(_revealSecret,data.pA,data.pB,data.pC,data.newRoot,2);
+          revealGasUsed = revealGasStart - gasleft();
+          console.log("Gas used in _reveal2: %d", revealGasUsed);}
+        else if(commitIndex<=6){
+          uint[4+6] memory pubdata;
+          pubdata[0]=data.oldRoot;
+          pubdata[1]=data.newRoot;
+          pubdata[2]=data.index;
+          pubdata[3]=data.newRand;
+          for(uint i=0;i<6;i++){
+              pubdata[4+i]=data.hashes[i];}
+          uint revealGasStart = gasleft();
+          assertTrue(update6.verifyProof( data.pA, data.pB, data.pC, pubdata));
+          uint revealGasUsed = revealGasStart - gasleft();
+          console.log("Gas used in update6.verifyProof: %d", revealGasUsed);
+          //console.log("after assert");
+          revealGasStart = gasleft();
+          lottery.reveal(_revealSecret,data.pA,data.pB,data.pC,data.newRoot,6);
+          revealGasUsed = revealGasStart - gasleft();
+          console.log("Gas used in _reveal6: %d", revealGasUsed);}
+        else{
+          uint[4+22] memory pubdata;
+          pubdata[0]=data.oldRoot;
+          pubdata[1]=data.newRoot;
+          pubdata[2]=data.index;
+          pubdata[3]=data.newRand;
+          for(uint i=0;i<22;i++){
+              pubdata[4+i]=data.hashes[i];}
+          uint revealGasStart = gasleft();
+          assertTrue(update22.verifyProof( data.pA, data.pB, data.pC, pubdata));
+          uint revealGasUsed = revealGasStart - gasleft();
+          console.log("Gas used in update22.verifyProof: %d", revealGasUsed);
+          //console.log("after assert");
+          revealGasStart = gasleft();
+          lottery.reveal(_revealSecret,data.pA,data.pB,data.pC,data.newRoot,22);
+          revealGasUsed = revealGasStart - gasleft();
+          console.log("Gas used in _reveal22: %d", revealGasUsed);}
         vm.roll(++blocknumber);
     }
 

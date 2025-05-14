@@ -7,8 +7,8 @@ import "./Lottery.sol";
  * @title FOOM Lottery in ETH
  */
 contract EthLottery is Lottery {
-    constructor(IWithdraw _Withdraw,ICancel _Cancel,IUpdate _Update,IERC20 _Token,uint _BetMin)
-        Lottery(_Withdraw,_Cancel,_Update,_Token,_BetMin) {}
+    constructor(IWithdraw _Withdraw,ICancel _Cancel,IUpdate2 _Update2,IUpdate6 _Update6,IUpdate22 _Update22,IERC20 _Token,uint _BetMin)
+        Lottery(_Withdraw,_Cancel,_Update2,_Update6,_Update22,_Token,_BetMin) {}
 
     function _balance() internal view override returns (uint) {
         return(address(this).balance);

@@ -9,27 +9,22 @@ const { mimicMerkleTree } = require("./utils/mimcMerkleTree.js");
 const { mimcsponge3 } = require("./utils/mimcsponge.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
-//test: betsUpdate = 8;
-// ./forge-ffi-scripts/update.js 0 1 0x00ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae52 1 2 3 4 5 6 7 0x16d18e1425b426e92d3d897958aabf099087b2401bfed53290f5a81fe73c69a5
-// ./forge-ffi-scripts/update.js 0 0 0x00ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae52 0 0 0 0 0 0 0 0x16d18e1425b426e92d3d897958aabf099087b2401bfed53290f5a81fe73c69a5
-//real	0m14.653s
-//user	1m35.988s
-//sys	0m4.841s
-// ./forge-ffi-scripts/update.js 0 1 0x00ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae52 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 0x16d18e1425b426e92d3d897958aabf099087b2401bfed53290f5a81fe73c69a5
-//real	0m41.248s
-//user	4m23.454s
-//sys	0m14.194s
 
 async function main() {
   const inputs = process.argv.slice(2, process.argv.length);
-  //const betsUpdate = 8;
-  const betsUpdate = 22;
+  const maxUpdate = 22;
 
   // 1. Get nullifier and secret
-  const oldRand = hexToBigint(inputs[0]);
-  const newRand = hexToBigint(inputs[1]);
-  const newHashes = inputs.slice(2, 2+betsUpdate).map((l) => hexToBigint(l));
-  const oldLeaves = inputs.slice(2+betsUpdate, inputs.length).map((l) => hexToBigint(l));
+  const commitIndex = hexToBigint(inputs[0]);
+  let betsUpdate=22;
+  if(commitIndex<=2){
+    betsUpdate=2;}
+  else if (commitIndex<=6){
+    betsUpdate=6;}
+  const oldRand = hexToBigint(inputs[1]);
+  const newRand = hexToBigint(inputs[2]);
+  const newHashes = inputs.slice(3, 3+betsUpdate).map((l) => hexToBigint(l));
+  const oldLeaves = inputs.slice(3+maxUpdate, inputs.length).map((l) => hexToBigint(l));
   let i=1;
   for(;i<betsUpdate;i++){
     if(newHashes[i]==0){
@@ -61,14 +56,14 @@ async function main() {
   // Write input to input.json
   // only for debugging
   BigInt.prototype.toJSON = function () { return this.toString(); };
-  fs.writeFileSync(path.join(__dirname, '../tmp/update_input.json'), JSON.stringify(input, null, 2));
+  fs.writeFileSync(path.join(__dirname, '../tmp/update'+betsUpdate+'_input.json'), JSON.stringify(input, null, 2));
   //console.log(JSON.stringify(input));
 
   // 5. Create groth16 proof for witness
   const { proof } = await snarkjs.groth16.fullProve(
     input,
-    path.join(__dirname, "../circuit_artifacts/update_js/update.wasm"),
-    path.join(__dirname, "../circuit_artifacts/update_final.zkey")
+    path.join(__dirname, "../circuit_artifacts/update"+betsUpdate+"_js/update"+betsUpdate+".wasm"),
+    path.join(__dirname, "../circuit_artifacts/update"+betsUpdate+"_final.zkey")
   );
 
   const pA = proof.pi_a.slice(0, 2);
@@ -77,7 +72,7 @@ async function main() {
 
   // 6. Return abi encoded witness
   const witness = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["uint256[2]", "uint256[2][2]", "uint256[2]", "uint", "uint", "uint", "uint", "uint["+betsUpdate+"]"],
+    ["uint256[2]", "uint256[2][2]", "uint256[2]", "uint", "uint", "uint", "uint", "uint[]"],
     [
       pA,
       // Swap x coordinates: this is for proof verification with the Solidity precompile for EC Pairings, and not required
@@ -105,7 +100,7 @@ async function main() {
     (newRand).toString(),
     ...newHashes.map((x) => x.toString()), // spread the array into individual elements
   ];
-  fs.writeFileSync(path.join(__dirname, '../tmp/update_public.json'), JSON.stringify(zkpublic, null, 2));
+  fs.writeFileSync(path.join(__dirname, '../tmp/update'+betsUpdate+'_public.json'), JSON.stringify(zkpublic, null, 2));
   // only for debugging
   const zkproof = {
     pi_a: [pA[0],pA[1],1],
@@ -114,7 +109,7 @@ async function main() {
     protocol: "groth16",
     curve: "bn128",
   };  
-  fs.writeFileSync(path.join(__dirname, '../tmp/update_proof.json'), JSON.stringify(zkproof, null, 2));
+  fs.writeFileSync(path.join(__dirname, '../tmp/update'+betsUpdate+'_proof.json'), JSON.stringify(zkproof, null, 2));
 
   return witness;
   

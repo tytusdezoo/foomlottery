@@ -52,4 +52,4 @@ template Update(numhashes,levels) {
     newRoot === roots[numhashes-1];
 }
 
-component main {public [oldRoot, newRoot, index, newRand, newhashes]} = Update(22,32);
+// component main {public [oldRoot, newRoot, index, newRand, newhashes]} = Update(22,32);

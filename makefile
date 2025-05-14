@@ -2,7 +2,7 @@
 ARTIFACTS_DIR = circuit_artifacts
 
 # Default target
-all: setup compile gen_withdraw gen_cancelbet gen_update
+all: setup compile gen_withdraw gen_cancelbet gen_update22
 
 # Create necessary directories
 setup:
@@ -14,12 +14,28 @@ compile:
 	circom circuits/withdraw.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
 	@echo "Compiling cancelbet.circom..."
 	circom circuits/cancelbet.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
-	@echo "Compiling update.circom..."
-	circom circuits/update.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
+	@echo "Compiling update2.circom..."
+	circom circuits/update2.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
+	@echo "Compiling update6.circom..."
+	circom circuits/update6.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
+	@echo "Compiling update22.circom..."
+	circom circuits/update22.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
 
 compile_cancelbet:
 	@echo "Compiling cancelbet.circom..."
 	circom circuits/cancelbet.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
+
+compile_update2:
+	@echo "Compiling update2.circom..."
+	circom circuits/update2.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
+
+compile_update6:
+	@echo "Compiling update6.circom..."
+	circom circuits/update6.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
+
+compile_update22:
+	@echo "Compiling update22.circom..."
+	circom circuits/update22.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
 
 # Powers of tau ceremony
 ptau16:
@@ -52,11 +68,25 @@ gen_cancelbet:
 	snarkjs zkey export verificationkey cancelbet_final.zkey cancelbet_verification_key.json
 
 # Generate zkey and update contract
-gen_update:
+gen_update2:
 	cd $(ARTIFACTS_DIR) && \
-	snarkjs groth16 setup update.r1cs pot20_final.ptau update_final.zkey && \
-	snarkjs zkey export solidityverifier update_final.zkey ../src/Update.sol && sed -i 's/Groth16Verifier/UpdateG16Verifier/' ../src/Update.sol && \
-	snarkjs zkey export verificationkey update_final.zkey update_verification_key.json
+	snarkjs groth16 setup update2.r1cs pot20_final.ptau update2_final.zkey && \
+	snarkjs zkey export solidityverifier update2_final.zkey ../src/Update2.sol && sed -i 's/Groth16Verifier/Update2G16Verifier/' ../src/Update2.sol && \
+	snarkjs zkey export verificationkey update2_final.zkey update2_verification_key.json
+
+# Generate zkey and update contract
+gen_update6:
+	cd $(ARTIFACTS_DIR) && \
+	snarkjs groth16 setup update6.r1cs pot20_final.ptau update6_final.zkey && \
+	snarkjs zkey export solidityverifier update6_final.zkey ../src/Update6.sol && sed -i 's/Groth16Verifier/Update6G16Verifier/' ../src/Update6.sol && \
+	snarkjs zkey export verificationkey update6_final.zkey update6_verification_key.json
+
+# Generate zkey and update contract
+gen_update22:
+	cd $(ARTIFACTS_DIR) && \
+	snarkjs groth16 setup update22.r1cs pot20_final.ptau update22_final.zkey && \
+	snarkjs zkey export solidityverifier update22_final.zkey ../src/Update22.sol && sed -i 's/Groth16Verifier/Update22G16Verifier/' ../src/Update22.sol && \
+	snarkjs zkey export verificationkey update22_final.zkey update22_verification_key.json
 
 # Clean circuit_artifacts
 clean:

@@ -29,7 +29,7 @@ async function main() {
   const rew1 = (maskdice &                                       0b1111111111n)?0n:1n ;
   const rew2 = (maskdice &                       0b11111111111111110000000000n)?0n:1n ;
   const rew3 = (dice     & 0b111111111111111111111100000000000000000000000000n)?0n:1n ;
-  const rewardbits = 4*rew3+2*rew2+rew1;
+  const rewardbits = 4n*rew3+2n*rew2+rew1;
 
   const nullifierHash = await pedersenHash(leBigintToBuffer(terces, 31));
 

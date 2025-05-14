@@ -3,17 +3,20 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test, console} from "forge-std/Test.sol";
 
-interface IWithdraw { // 256299 gas (9sig)
-  //function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool); // 256299 gas
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[7] calldata _pubSignals) external view returns (bool); // 
+interface IWithdraw { // 
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[7] calldata _pubSignals) external view returns (bool); // 242505 gas
 }
-interface ICancel { // 199867 gas
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[1] calldata _pubSignals) external view returns (bool);
+interface ICancel { //
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[1] calldata _pubSignals) external view returns (bool); // 199863 gas
 }
-interface IUpdate { // 376846 gas (27sig)
-  //function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[13] calldata _pubSignals) external view returns (bool);
-  //function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[27] calldata _pubSignals) external view returns (bool); // 376846 gas 
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[26] calldata _pubSignals) external view returns (bool); // 370022
+interface IUpdate2 { // 88799 const
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[6] calldata _pubSignals) external view returns (bool); // 233460 gas
+}
+interface IUpdate6 { // 266335 const
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[10] calldata _pubSignals) external view returns (bool); // 260732 gas
+}
+interface IUpdate22 { // 976479 const
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[26] calldata _pubSignals) external view returns (bool); // 365320 gas
 }
 
 /**
@@ -23,7 +26,9 @@ contract Lottery {
     IERC20 public immutable token; // FOOM token
     IWithdraw public immutable withdraw;
     ICancel public immutable cancel;
-    IUpdate public immutable update;
+    IUpdate2 public immutable update2;
+    IUpdate6 public immutable update6;
+    IUpdate22 public immutable update22;
 
     uint public constant FIELD_SIZE = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
     uint public constant merkleTreeLevels = 32 ; // number of Merkle Tree levels
@@ -33,8 +38,7 @@ contract Lottery {
     uint public constant betPower2 = 16; // power of the second bet = 65536
     uint public constant betPower3 = 22; // power of the third bet = 4194304
     uint public constant betsMax = 48; //128; // maximum number of bets in queue, max 8bit
-    uint public constant betsUpdate = 22; // maximum number of bets in queue to insert
-    //uint public constant betsUpdate = 8; // maximum number of bets in queue to insert
+    uint public constant maxUpdate = 22; // maximum number of bets in queue to insert
     uint public constant dividendFeePerCent = 4; // 4% of dividends go to the shareholders (wall)
     uint public constant generatorFeePerCent = 1; // 1% of dividends go to the generator
     uint public constant maxBalance = 2**108; // maximum balance of a user and maximum size of bets in period
@@ -85,11 +89,13 @@ contract Lottery {
     mapping(uint => uint) public roots;
 
     // constructor
-    constructor(IWithdraw _Withdraw,ICancel _Cancel,IUpdate _Update,IERC20 _Token,uint _BetMin) {
+    constructor(IWithdraw _Withdraw,ICancel _Cancel,IUpdate2 _Update2,IUpdate6 _Update6,IUpdate22 _Update22,IERC20 _Token,uint _BetMin) {
         require(merkleTreeLevels<=32,"Tree too large");
         withdraw = _Withdraw;
         cancel = _Cancel;
-        update = _Update;
+        update2 = _Update2;
+        update6 = _Update6;
+        update22 = _Update22;
         token = _Token;
         betMin = _BetMin;
         owner = msg.sender;
@@ -266,7 +272,7 @@ contract Lottery {
         require(commitHash == _open, "Commit hash already set");
         require(D.commitBlock == 0, "Commit block already set");
         D.commitBlock = uint64(block.number);
-        D.commitIndex = uint8(D.betsIndex<betsUpdate?D.betsIndex:betsUpdate);
+        D.commitIndex = uint8(D.betsIndex<maxUpdate?D.betsIndex:maxUpdate);
         commitHash = _commitHash;
         commitBlockHash = _open;
         //TODO, log commit
@@ -290,17 +296,16 @@ contract Lottery {
     /**
      * @dev remember commitBlockHash
      */
-    function commited() view public returns (uint,uint,uint,uint,uint,uint[betsUpdate] memory newhashes) {
+    function commited() view public returns (uint,uint,uint,uint,uint,uint,uint[maxUpdate] memory newhashes) {
         uint oldRoot=roots[D.currentRootIndex];
         uint index=D.nextIndex-1;
-        //uint[betsUpdate] memory newhashes;
-        for(uint i = 0;i < betsUpdate; i++){
+        for(uint i = 0;i < maxUpdate; i++){
             uint pos = (D.betsStart+i) % betsMax;
             if(i<D.commitIndex){
                 newhashes[i]=bets[pos];}
             else{
                 newhashes[i]=0;}}
-        return(oldRoot,index,oldRand,D.commitBlock,commitBlockHash,newhashes);
+        return(oldRoot,index,oldRand,D.commitBlock,commitBlockHash,uint(D.commitIndex),newhashes);
     }
 
     /**
@@ -311,31 +316,72 @@ contract Lottery {
         uint[2] calldata _pA,
         uint[2][2] calldata _pB,
         uint[2] calldata _pC,
-        uint _newRoot) external {
+        uint _newRoot,
+        uint _betsUpdate) external {
         require(uint(keccak256(abi.encodePacked(_revealSecret))) == commitHash, "Invalid reveal secret");
         require(D.commitIndex > 1, "Nothing to commit");
         require(D.commitBlock != 0, "Commit not set");
         rememberHash();
         require(commitBlockHash > _closed, "Commit block hash not found");
         uint newRand = uint128(uint(keccak256(abi.encodePacked(_revealSecret,commitBlockHash))));
-        uint[betsUpdate] memory newhashes;
-        for(uint i=0;i < betsUpdate; i++){
-            if(i<D.commitIndex){
-                uint pos = (D.betsStart+i) % betsMax;
-                if(i>0){
-                    emit LogBetHash(D.nextIndex-1+i,bets[pos],newRand);}
-                newhashes[i]=bets[pos];}
-            else{
-                newhashes[i]=0;}}
-        uint[4+betsUpdate] memory pubdata;
-        pubdata[0]=uint(roots[D.currentRootIndex]);
-        pubdata[1]=uint(_newRoot);
-        pubdata[2]=uint(D.nextIndex-1);
-        pubdata[3]=uint(newRand);
-        for(uint i=0;i<betsUpdate;i++){
-            pubdata[4+i]=newhashes[i];}
-        require(update.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");
         uint8 move=D.commitIndex-1;
+        require(move<=_betsUpdate,"Update size too small");
+        if(_betsUpdate==2){
+            uint[2] memory newhashes;
+            for(uint i=0;i < 2; i++){
+                if(i<D.commitIndex){
+                    uint pos = (D.betsStart+i) % betsMax;
+                    if(i>0){
+                        emit LogBetHash(D.nextIndex-1+i,bets[pos],newRand);}
+                    newhashes[i]=bets[pos];}
+                else{
+                    newhashes[i]=0;}}
+            uint[4+2] memory pubdata;
+            pubdata[0]=uint(roots[D.currentRootIndex]);
+            pubdata[1]=uint(_newRoot);
+            pubdata[2]=uint(D.nextIndex-1);
+            pubdata[3]=uint(newRand);
+            for(uint i=0;i<2;i++){
+                pubdata[4+i]=newhashes[i];}
+            require(update2.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
+        else if(_betsUpdate==6){
+            uint[6] memory newhashes;
+            for(uint i=0;i < 6; i++){
+                if(i<D.commitIndex){
+                    uint pos = (D.betsStart+i) % betsMax;
+                    if(i>0){
+                        emit LogBetHash(D.nextIndex-1+i,bets[pos],newRand);}
+                    newhashes[i]=bets[pos];}
+                else{
+                    newhashes[i]=0;}}
+            uint[4+6] memory pubdata;
+            pubdata[0]=uint(roots[D.currentRootIndex]);
+            pubdata[1]=uint(_newRoot);
+            pubdata[2]=uint(D.nextIndex-1);
+            pubdata[3]=uint(newRand);
+            for(uint i=0;i<6;i++){
+                pubdata[4+i]=newhashes[i];}
+            require(update6.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
+        else if(_betsUpdate==22){
+            uint[22] memory newhashes;
+            for(uint i=0;i < 22; i++){
+                if(i<D.commitIndex){
+                    uint pos = (D.betsStart+i) % betsMax;
+                    if(i>0){
+                        emit LogBetHash(D.nextIndex-1+i,bets[pos],newRand);}
+                    newhashes[i]=bets[pos];}
+                else{
+                    newhashes[i]=0;}}
+            uint[4+22] memory pubdata;
+            pubdata[0]=uint(roots[D.currentRootIndex]);
+            pubdata[1]=uint(_newRoot);
+            pubdata[2]=uint(D.nextIndex-1);
+            pubdata[3]=uint(newRand);
+            for(uint i=0;i<22;i++){
+                pubdata[4+i]=newhashes[i];}
+            require(update22.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
+        else{
+            revert("Illegal update size");}
         D.nextIndex+=move;
         D.betsStart =(D.betsStart+move) % uint8(betsMax);
         D.betsIndex-=move;
@@ -346,6 +392,7 @@ contract Lottery {
         oldRand=uint128(newRand);
         D.currentRootIndex = uint8((D.currentRootIndex + 1) % rootsMax);
         roots[D.currentRootIndex] = _newRoot;
+        emit LogUpdate(newRand,_newRoot,uint(D.nextIndex));
     }
 
 /* investment functions */
@@ -595,9 +642,9 @@ contract Lottery {
     // events
     event LogBetIn(uint indexed index,uint indexed newHash);
     event LogBetHash(uint indexed index,uint indexed newHash,uint indexed newRand);
+    event LogUpdate(uint indexed newRand,uint indexed _newRoot,uint indexed nextIndex);
     event LogCancel(uint indexed index);
     event LogWin(uint indexed nullifierHash, uint indexed reward);
-    event LogTreeHash(uint indexed level,uint indexed index,uint indexed levelHash);
     event LogClose(address indexed owner);
     event LogResetCommit(address indexed owner);
     event LogWithdraw(address indexed owner);
