@@ -297,7 +297,7 @@ contract EthLotteryTest is Test {
         (rand,index) = _getRandIndex(hash+(secret_power&0x1f)+1);
         _withdraw(secret_power,rand,index);
         (secret_power,hash) = _play(2);
-        for (; i < 100; i++) {
+        for (; i < 130; i++) {
             _fake_play(i);}
         _commit_reveal();
         _commit_reveal();
