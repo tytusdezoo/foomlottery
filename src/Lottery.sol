@@ -41,7 +41,7 @@ contract Lottery {
     uint public constant betPower1 = 10; // power of the first bet = 1024
     uint public constant betPower2 = 16; // power of the second bet = 65536
     uint public constant betPower3 = 22; // power of the third bet = 4194304
-    uint public constant betsMax = 128 //128; // maximum number of bets in queue, max 8bit
+    uint public constant betsMax = 128; //128; // maximum number of bets in queue, max 8bit
     uint public constant maxUpdate = 44; // maximum number of bets in queue to insert
     uint public constant dividendFeePerCent = 4; // 4% of dividends go to the shareholders (wall)
     uint public constant generatorFeePerCent = 1; // 1% of dividends go to the generator
