@@ -4,4 +4,4 @@ include "./lib/mimcsponge.circom"; // NEW
 include "./merkletree.circom";
 include "./update.circom";
 
-component main {public [oldRoot, newRoot, index, newRand, newhashes]} = Update(22,32);
+component main {public [oldRoot, newRoot, index, newRand, newhashes]} = Update(5,32);

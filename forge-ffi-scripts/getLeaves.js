@@ -8,16 +8,10 @@ const { mimcsponge3 } = require("./utils/mimcsponge.js");
 
 async function main() {
   const inputs = process.argv.slice(2, process.argv.length);
-
   const index = hexToBigint(inputs[0]);
-  const hash = hexToBigint(inputs[1]);
-  const rand = hexToBigint(inputs[2]);
-  const leaf = await mimcsponge3(hash,rand,index);
-
-  const res = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["uint"],
-    [bigintToHex(leaf)]
-  );
+  const newRand = hexToBigint(inputs[1]);
+  const newLeaves = await Promise.all(inputs.slice(2,inputs.length).map(async (h,j) => await mimcsponge3(h,newRand,index+BigInt(j))));
+  const res = ethers.AbiCoder.defaultAbiCoder().encode( ["uint[]"], [newLeaves.map((x) => bigintToHex(x))]);
   return res;
 }
 

@@ -7,8 +7,8 @@ import "./Lottery.sol";
  * @title FOOM Lottery
  */
 contract FoomLottery is Lottery {
-    constructor(IWithdraw _Withdraw,ICancel _Cancel,IUpdate2 _Update2,IUpdate6 _Update6,IUpdate22 _Update22,IERC20 _Token,uint _BetMin)
-        Lottery(_Withdraw,_Cancel,_Update2,_Update6,_Update22,_Token,_BetMin) {}
+    constructor(IWithdraw _Withdraw,ICancel _Cancel,IUpdate1 _Update1,IUpdate5 _Update5,IUpdate21 _Update21,IUpdate44 _Update44,IERC20 _Token,uint _BetMin)
+        Lottery(_Withdraw,_Cancel,_Update1,_Update5,_Update21,_Update44,_Token,_BetMin) {}
 
     function _balance() internal view override returns (uint) {
         return(token.balanceOf(address(this)));

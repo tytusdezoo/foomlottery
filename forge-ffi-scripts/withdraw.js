@@ -15,7 +15,7 @@ async function main() {
   const inputs = process.argv.slice(2, process.argv.length);
 
   const secret = hexToBigint(inputs[0]);
-  const power = hexToBigint(inputs[1]); // use power instead !!!
+  const power = hexToBigint(inputs[1]);
   const rand = hexToBigint(inputs[2]);
   const index = hexToBigint(inputs[3]);
   const dice = await mimcsponge3(secret,rand,index);
@@ -72,7 +72,7 @@ async function main() {
 
   // 6. Return abi encoded witness
   const witness = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["uint256[2]", "uint256[2][2]", "uint256[2]", "uint", "uint", "uint"],
+    ["uint256[2]", "uint256[2][2]", "uint256[2]", "uint[3]"],
     [
       pA,
       // Swap x coordinates: this is for proof verification with the Solidity precompile for EC Pairings, and not required
@@ -82,9 +82,7 @@ async function main() {
         [pB[1][1], pB[1][0]],
       ],
       pC,
-      bigintToHex(merkleProof.pathRoot),
-      bigintToHex(nullifierHash),
-      bigintToHex(rewardbits)
+      [bigintToHex(merkleProof.pathRoot),bigintToHex(nullifierHash),bigintToHex(rewardbits)]
     ]
   );
 
