@@ -9,12 +9,13 @@ const { mimicMerkleTree } = require("./utils/mimcMerkleTree.js");
 const { mimcsponge3 } = require("./utils/mimcsponge.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
+// ./forge-ffi-scripts/update.js 0x0000000000000000000000000000000000000000000000000000000000000001 0x000000000000000000000000000000009691a9866228f0e680fe3c605b14a165 0x0000000000000000000000000000000000000000000000000000000000000000 0x24d599883f039a5cb553f9ec0e5998d58d8816e823bd556164f72aef0ef7d9c0
 
 async function main() {
   const inputs = process.argv.slice(2, process.argv.length);
 
   // 1. Get nullifier and secret
-  const hashesLength = hexToBigint(inputs[0]);
+  const hashesLength = parseInt(inputs[0]);
   const newRand = hexToBigint(inputs[1]);
   const newHashes = inputs.slice(2, 2+hashesLength).map((l) => hexToBigint(l));
   const oldLeaves = inputs.slice(2+hashesLength, inputs.length).map((l) => hexToBigint(l));
@@ -60,7 +61,7 @@ async function main() {
 
   // 6. Return abi encoded witness
   const witness = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["uint256[2]", "uint256[2][2]", "uint256[2]", "uint["+(4+hashesLength)+"]"],
+    ["uint256[2]", "uint256[2][2]", "uint256[2]", "uint[]"],
     [
       pA,
       // Swap x coordinates: this is for proof verification with the Solidity precompile for EC Pairings, and not required

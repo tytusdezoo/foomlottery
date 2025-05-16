@@ -4,7 +4,7 @@ ARTIFACTS_DIR = circuit_artifacts
 export NODE_OPTIONS := --max-old-space-size=4096
 
 # Default target
-all: setup compile gen_withdraw gen_cancelbet gen_update1 gen_update5
+all: setup compile gen_withdraw gen_cancelbet gen_update1 gen_update5 gen_update21 gen_update44
 
 # Create necessary directories
 setup:
@@ -79,21 +79,21 @@ gen_cancelbet:
 gen_update1:
 	cd $(ARTIFACTS_DIR) && \
 	snarkjs groth16 setup update1.r1cs pot20_final.ptau update1_final.zkey && \
-	snarkjs zkey export solidityverifier update1_final.zkey ../src/Update2.sol && sed -i 's/Groth16Verifier/Update2G16Verifier/' ../src/Update2.sol && \
+	snarkjs zkey export solidityverifier update1_final.zkey ../src/Update1.sol && sed -i 's/Groth16Verifier/Update1G16Verifier/' ../src/Update1.sol && \
 	snarkjs zkey export verificationkey update1_final.zkey update1_verification_key.json
 
 # Generate zkey and update contract
 gen_update5:
 	cd $(ARTIFACTS_DIR) && \
 	snarkjs groth16 setup update5.r1cs pot20_final.ptau update5_final.zkey && \
-	snarkjs zkey export solidityverifier update5_final.zkey ../src/Update6.sol && sed -i 's/Groth16Verifier/Update6G16Verifier/' ../src/Update6.sol && \
+	snarkjs zkey export solidityverifier update5_final.zkey ../src/Update5.sol && sed -i 's/Groth16Verifier/Update5G16Verifier/' ../src/Update5.sol && \
 	snarkjs zkey export verificationkey update5_final.zkey update5_verification_key.json
 
 # Generate zkey and update contract
 gen_update21:
 	cd $(ARTIFACTS_DIR) && \
 	snarkjs groth16 setup update21.r1cs pot20_final.ptau update21_final.zkey && \
-	snarkjs zkey export solidityverifier update21_final.zkey ../src/Update22.sol && sed -i 's/Groth16Verifier/Update22G16Verifier/' ../src/Update22.sol && \
+	snarkjs zkey export solidityverifier update21_final.zkey ../src/Update21.sol && sed -i 's/Groth16Verifier/Update21G16Verifier/' ../src/Update21.sol && \
 	snarkjs zkey export verificationkey update21_final.zkey update21_verification_key.json
 
 # Generate zkey and update contract

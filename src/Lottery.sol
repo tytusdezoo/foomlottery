@@ -9,16 +9,16 @@ interface IWithdraw { // 48439 const
 interface ICancel { // 686 const
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[1] calldata _pubSignals) external view returns (bool); // 199863 gas
 }
-interface IUpdate1 { // 88799 const
+interface IUpdate1 { // 86817 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[5] calldata _pubSignals) external view returns (bool); // 233460 gas
 }
-interface IUpdate5 { // 266335 const
+interface IUpdate5 { // 264353 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool); // 260732 gas
 }
-interface IUpdate21 { // 976479 const
+interface IUpdate21 { // 974497 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[25] calldata _pubSignals) external view returns (bool); // 365320 gas
 }
-interface IUpdate44 { // 1997311 const
+interface IUpdate44 { // 1995329 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[48] calldata _pubSignals) external view returns (bool); //
 }
 
@@ -278,7 +278,7 @@ contract Lottery {
         D.commitIndex = uint8(D.betsIndex<maxUpdate?D.betsIndex:maxUpdate);
         commitHash = _commitHash;
         commitBlockHash = _open;
-        emit LogCommit(nextIndex,D.commitIndex,commitHash);
+        emit LogCommit(D.nextIndex,D.commitIndex,commitHash);
     }
 
     /**
@@ -309,7 +309,7 @@ contract Lottery {
         rememberHash();
         require(commitBlockHash > _closed, "Commit block hash not found");
         uint newRand = uint128(uint(keccak256(abi.encodePacked(_revealSecret,commitBlockHash))));
-        if(D.commitIndex<=1){
+        if(D.commitIndex==1){
             uint[4+1] memory pubdata;
             pubdata[0]=uint(roots[D.currentRootIndex]);
             pubdata[1]=uint(_newRoot);
@@ -324,7 +324,7 @@ contract Lottery {
                     pubdata[4+i]=bets[pos];}
                 else{
                     pubdata[4+i]=0;}}
-            require(update2.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
+            require(update1.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else if(D.commitIndex<=5){
             uint[4+5] memory pubdata;
             pubdata[0]=uint(roots[D.currentRootIndex]);
@@ -340,7 +340,7 @@ contract Lottery {
                     pubdata[4+i]=bets[pos];}
                 else{
                     pubdata[4+i]=0;}}
-            require(update6.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
+            require(update5.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else if(D.commitIndex<=21){
             uint[4+21] memory pubdata;
             pubdata[0]=uint(roots[D.currentRootIndex]);
@@ -356,7 +356,7 @@ contract Lottery {
                     pubdata[4+i]=bets[pos];}
                 else{
                     pubdata[4+i]=0;}}
-            require(update22.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
+            require(update21.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else{
             uint[4+44] memory pubdata;
             pubdata[0]=uint(roots[D.currentRootIndex]);
@@ -372,7 +372,7 @@ contract Lottery {
                     pubdata[4+i]=bets[pos];}
                 else{
                     pubdata[4+i]=0;}}
-            require(update45.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
+            require(update44.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         D.nextIndex+=D.commitIndex;
         D.betsStart =(D.betsStart+D.commitIndex) % uint8(betsMax);
         D.betsIndex-=D.commitIndex;

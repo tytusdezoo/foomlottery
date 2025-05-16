@@ -10,6 +10,7 @@ const { mimicMerkleTree } = require("./utils/mimcMerkleTree.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 // forge-ffi-scripts/withdraw.js 0x00713bf224fe30b7dd98a71c9fbedd2256b6baa7f7352625b2d20a8d57ed573b 0x000000000000000000000000000000000000000000000000000000000000000a 0x000000000000000000000000000000009c9066d48f17e8c6b1a65301e91a2e36 0x0000000000000000000000000000000000000000000000000000000000000001 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 0x0000000000000000000000000000000000000000 0 0 0x16d18e1425b426e92d3d897958aabf099087b2401bfed53290f5a81fe73c69a5 0x10be442a30c17aeae384745acc09e61e2ec2d14f7d374d98f6bab9c5d7e38071
+// forge-ffi-scripts/withdraw.js 0x00b225be7a0f73c1b6ab458591e5471c8466f79a40d2779bbf3858e852307cd9 0x000000000000000000000000000000000000000000000000000000000000000a 0x000000000000000000000000000000004748e124b54e1f960bd8dae41c86d838 0x0000000000000000000000000000000000000000000000000000000000000001 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 0x0000000000000000000000000000000000000000 0 0 0x24d599883f039a5cb553f9ec0e5998d58d8816e823bd556164f72aef0ef7d9c0 0x1d3ed3224eb0ff27c22f6b8f3ab2f14a3fd6baf8b4d96dccd0b7d7725d00765e
 
 async function main() {
   const inputs = process.argv.slice(2, process.argv.length);
@@ -45,8 +46,8 @@ async function main() {
     rewardbits: rewardbits,
     recipient: hexToBigint(inputs[4]),
     relayer: hexToBigint(inputs[5]),
-    fee: BigInt(inputs[6]),
-    refund: BigInt(inputs[7]),
+    fee: hexToBigint(inputs[6]),
+    refund: hexToBigint(inputs[7]),
 
     // Private inputs
     secret: secret,
@@ -72,7 +73,7 @@ async function main() {
 
   // 6. Return abi encoded witness
   const witness = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["uint256[2]", "uint256[2][2]", "uint256[2]", "uint[3]"],
+    ["uint256[2]", "uint256[2][2]", "uint256[2]", "uint[7]"],
     [
       pA,
       // Swap x coordinates: this is for proof verification with the Solidity precompile for EC Pairings, and not required
@@ -82,7 +83,15 @@ async function main() {
         [pB[1][1], pB[1][0]],
       ],
       pC,
-      [bigintToHex(merkleProof.pathRoot),bigintToHex(nullifierHash),bigintToHex(rewardbits)]
+      [
+      bigintToHex(merkleProof.pathRoot),
+      bigintToHex(nullifierHash),
+      bigintToHex(rewardbits),
+      inputs[4],
+      inputs[5],
+      inputs[6],
+      inputs[7]
+      ]
     ]
   );
 
