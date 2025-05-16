@@ -279,13 +279,15 @@ contract EthLotteryTest is Test {
         uint rand;
         uint index;
         vm.roll(++blocknumber);
-        for (i = 0; i < 10; i++) {
+        for (i = 0; i < 3; i++) {
             _fake_play(i);}
         vm.roll(++blocknumber);
         _commit_reveal();
-        _commit_reveal();
+        (uint secret_power2,uint hash2) = _play(4); // hash can be restored later
         for (; i < 20; i++) {
             _fake_play(i);}
+        (,uint index2) = _getRandIndex(hash2+(secret_power2&0x1f)+1);
+        _cancelbet(secret_power2,hash2,index2);
         _commit_reveal();
         (secret_power,hash) = _play(10);
         for (; i < 60; i++) {
@@ -295,8 +297,9 @@ contract EthLotteryTest is Test {
         (rand,index) = _getRandIndex(hash+(secret_power&0x1f)+1);
         _withdraw(secret_power,rand,index);
         (secret_power,hash) = _play(2);
-        for (; i < 130; i++) {
+        for (; i < 100; i++) {
             _fake_play(i);}
+        _commit_reveal();
         _commit_reveal();
         _commit_reveal();
         (rand,index) = _getRandIndex(hash+(secret_power&0x1f)+1);
