@@ -19,7 +19,7 @@ interface IUpdate21 { // 974497 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[25] calldata _pubSignals) external view returns (bool); // 364897 g
 }
 interface IUpdate44 { // 1995329 c
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[48] calldata _pubSignals) external view returns (bool); // 523583 g
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[48] calldata _pubSignals) external view returns (bool); // 519083 g
 }
 
 /**
@@ -117,7 +117,7 @@ contract Lottery {
         periods[D.dividendPeriod]=Period(1,1);
         // 16660660614175348086322821347366010925591495133565739687589833680199500683712
         // leaf=0x24d599883f039a5cb553f9ec0e5998d58d8816e823bd556164f72aef0ef7d9c0 mimcsponge([keccak(foom)<<4,0,0])
-        for(uint i=0;i<betsMax;i++){
+        for(uint i=0;i<betsMax;i++){ // no use gaspump
             // 5830730410484677323135938457349698867014480012952733190564065746678058771744 sha256("foom")<<4
             bets[i]=0x0ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae520; // sha256("foom")<<4
         }
@@ -141,7 +141,7 @@ contract Lottery {
     /**
      * @dev Play in lottery
      */
-    function play(uint _secrethash,uint _power) payable external {
+    function play(uint _secrethash,uint _power) payable external { // unchecked {
         require(0<_secrethash && _secrethash < FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
         require(D.betsIndex < betsMax && D.nextIndex + D.betsIndex < 2 ** merkleTreeLevels - 1, "No more bets allowed");
         require(_power >= 0 && _power<=betPower2, "Invalid bet amount");
@@ -151,7 +151,7 @@ contract Lottery {
         bets[pos] = newHash;
         emit LogBetIn(D.nextIndex+D.betsIndex,newHash);
         D.betsIndex++;
-    }
+    } // }
 
     /**
      * @dev collect the reward
@@ -182,30 +182,31 @@ contract Lottery {
         wallets[generator].balance += uint112(generatorReward);
         collectDividend(_recipient);
         reward = reward * (100 - dividendFeePerCent - generatorFeePerCent) / 100;
+        uint balance = _balance();
+        require(reward >= _fee, "Insufficient reward");
+        require(balance >= _fee, "Insufficient balance");
         if(_invest>0 && wallets[_recipient].balance < maxBalance) {
-            if(_invest > reward) {
-                _invest = reward;
+            if(_invest > reward - _fee) {
+                _invest = reward - _fee;
             }
             currentBalance += uint128(_invest);
             wallets[_recipient].balance += uint112(_invest);
             reward -= _invest;
         }
         /* process withdrawal */
-        if(betMin * 2**betPower2 < reward) { // limit max withdrawal
+        if(betMin * 2**betPower2 < reward ) { // limit max withdrawal
             _invest = reward - (betMin * 2**betPower2);
             currentBalance += uint128(_invest);
             wallets[_recipient].balance += uint112(_invest);
             wallets[_recipient].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // wait 1 period for more funds
             reward -= _invest;
         }
-        uint balance = _balance();
         if(balance < reward) {
             _invest = reward - balance;
             currentBalance += uint128(_invest);
             wallets[_recipient].balance += uint112(_invest);
             reward -= _invest;
         }
-        require(reward >= _fee, "Insufficient reward");
         if (reward - _fee > 0) {
             _withdraw(_recipient,reward - _fee);
         }
@@ -299,7 +300,7 @@ contract Lottery {
     /**
      * @dev reveal the generator secret
      */
-    function reveal(
+    function reveal( // unchecked {
         uint _revealSecret,
         uint[2] calldata _pA,
         uint[2][2] calldata _pB,
@@ -315,15 +316,12 @@ contract Lottery {
             pubdata[1]=uint(_newRoot);
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
-            for(uint i=0;i < 1; i++){
-                if(i<D.commitIndex){
-                    uint pos = (D.betsStart+i) % betsMax;
-                    uint power=bets[pos]&0x1f;
-                    if(power>0){
-                        currentBets+=uint128(getAmount(power-1));}
-                    pubdata[4+i]=bets[pos];}
-                else{
-                    pubdata[4+i]=0;}}
+            uint pos = (D.betsStart) % betsMax;
+            uint power=bets[pos]&0x1f;
+            pubdata[4]=bets[pos];
+            //bets[pos]=0; // use gaspump
+            if(power>0){
+                currentBets+=uint128(getAmount(power-1));}
             require(update1.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else if(D.commitIndex<=5){
             uint[4+5] memory pubdata;
@@ -331,15 +329,13 @@ contract Lottery {
             pubdata[1]=uint(_newRoot);
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
-            for(uint i=0;i < 5; i++){
-                if(i<D.commitIndex){
-                    uint pos = (D.betsStart+i) % betsMax;
-                    uint power=bets[pos]&0x1f;
-                    if(power>0){
-                        currentBets+=uint128(getAmount(power-1));}
-                    pubdata[4+i]=bets[pos];}
-                else{
-                    pubdata[4+i]=0;}}
+            for(uint i=0;i < D.commitIndex; i++){
+                uint pos = (D.betsStart+i) % betsMax;
+                uint power=bets[pos]&0x1f;
+                pubdata[4+i]=bets[pos];
+                //bets[pos]=0; // use gaspump
+                if(power>0){
+                    currentBets+=uint128(getAmount(power-1));}}
             require(update5.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else if(D.commitIndex<=21){
             uint[4+21] memory pubdata;
@@ -347,15 +343,13 @@ contract Lottery {
             pubdata[1]=uint(_newRoot);
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
-            for(uint i=0;i < 21; i++){
-                if(i<D.commitIndex){
-                    uint pos = (D.betsStart+i) % betsMax;
-                    uint power=bets[pos]&0x1f;
-                    if(power>0){
-                        currentBets+=uint128(getAmount(power-1));}
-                    pubdata[4+i]=bets[pos];}
-                else{
-                    pubdata[4+i]=0;}}
+            for(uint i=0;i < D.commitIndex; i++){
+                uint pos = (D.betsStart+i) % betsMax;
+                uint power=bets[pos]&0x1f;
+                pubdata[4+i]=bets[pos];
+                //bets[pos]=0; // use gaspump
+                if(power>0){
+                    currentBets+=uint128(getAmount(power-1));}}
             require(update21.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else{
             uint[4+44] memory pubdata;
@@ -363,15 +357,13 @@ contract Lottery {
             pubdata[1]=uint(_newRoot);
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
-            for(uint i=0;i < 44; i++){
-                if(i<D.commitIndex){
-                    uint pos = (D.betsStart+i) % betsMax;
-                    uint power=bets[pos]&0x1f;
-                    if(power>0){
-                        currentBets+=uint128(getAmount(power-1));}
-                    pubdata[4+i]=bets[pos];}
-                else{
-                    pubdata[4+i]=0;}}
+            for(uint i=0;i < 44 && i<D.commitIndex; i++){
+                uint pos = (D.betsStart+i) % betsMax;
+                uint power=bets[pos]&0x1f;
+                pubdata[4+i]=bets[pos];
+                //bets[pos]=0; // use gaspump
+                if(power>0){
+                    currentBets+=uint128(getAmount(power-1));}}
             require(update44.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         D.nextIndex+=D.commitIndex;
         D.betsStart =(D.betsStart+D.commitIndex) % uint8(betsMax);
@@ -383,7 +375,7 @@ contract Lottery {
         D.currentRootIndex = uint8((D.currentRootIndex + 1) % rootsMax);
         roots[D.currentRootIndex] = _newRoot;
         emit LogUpdate(uint(D.nextIndex),newRand,_newRoot);
-    }
+    } // }
 
 /* investment functions */
 
@@ -464,7 +456,7 @@ contract Lottery {
     function _withdraw(address _who,uint _amount) internal virtual {
     }
 
-    function exec(address _who,bytes[] memory _data) payable external onlyOwner {
+    function exec(address _who,bytes[] calldata _data) payable external onlyOwner {
         (bool ok,) =_who.call{ value: msg.value }(abi.encode(_data));
         require(ok);
     }
@@ -485,7 +477,6 @@ contract Lottery {
     function resetcommit() payable external onlyOwner {
         uint betsum=betSum();
         _deposit(betsum);
-        //require(amount >= betsum, "transfer too low");
         D.commitIndex = 0;
         D.commitBlock = 0;
         commitHash = _open;
