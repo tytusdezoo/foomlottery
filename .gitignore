@@ -25,3 +25,7 @@ oldtest/
 
 # failes to upload
 tmp/
+
+# why yarn ?
+yarn.lock
+package-lock.json

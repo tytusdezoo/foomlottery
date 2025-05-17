@@ -60,6 +60,14 @@ ptau20:
 	snarkjs powersoftau contribute pot20_0000.ptau pot20_0001.ptau --name="First contribution" -v && \
 	snarkjs powersoftau prepare phase2 pot20_0001.ptau pot20_final.ptau -v
 
+ptau22:
+	@echo "Performing powers of tau ceremony..."
+	cd $(ARTIFACTS_DIR) && \
+	snarkjs powersoftau new bn128 22 pot22_0000.ptau -v && \
+	snarkjs powersoftau contribute pot22_0000.ptau pot22_0001.ptau --name="First contribution" -v && \
+	snarkjs powersoftau prepare phase2 pot22_0001.ptau pot22_final.ptau -v
+
+
 
 # Generate zkey and withdraw contract
 gen_withdraw:
