@@ -46,7 +46,7 @@ contract Lottery {
     uint public constant dividendFeePerCent = 4; // 4% of dividends go to the shareholders (wall)
     uint public constant generatorFeePerCent = 1; // 1% of dividends go to the generator
     uint public constant maxBalance = 2**108; // maximum balance of a user and maximum size of bets in period
-    uint public constant rootsMax = 32;
+    //uint public constant rootsMax = 32;
     uint private constant _open = 1;
     uint private constant _closed = 2;
 
@@ -59,7 +59,7 @@ contract Lottery {
         uint8 betsStart; // index of last commited bet
         uint8 betsIndex; // index of the next slot in bet queue (>=1)
         uint8 commitIndex; // number of bets to insert into tree + 1 (>=1)
-        uint8 currentRootIndex;
+        //uint8 currentRootIndex; // now all roots saved
         uint8 status;
     }
     Data public D;
@@ -67,6 +67,7 @@ contract Lottery {
     uint128 public currentBets = 1; // total bet volume in current period
     uint128 public currentShares = 1; // sum of funds eligible for dividend in current period
     //uint128 public oldRand =0; // 
+    uint public lastRoot; // current tree root
     uint public commitHash; //
     uint public commitBlockHash; //
     address public owner;
@@ -117,14 +118,15 @@ contract Lottery {
         periods[D.dividendPeriod]=Period(1,1);
         // 16660660614175348086322821347366010925591495133565739687589833680199500683712
         // leaf=0x24d599883f039a5cb553f9ec0e5998d58d8816e823bd556164f72aef0ef7d9c0 mimcsponge([keccak(foom)<<4,0,0])
-        for(uint i=0;i<betsMax;i++){ // no use gaspump
+        for(uint i=0;i<betsMax;i++){ // no more gaspump
             // 5830730410484677323135938457349698867014480012952733190564065746678058771744 sha256("foom")<<4
             bets[i]=0x0ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae520; // sha256("foom")<<4
         }
-        for(uint i=0;i<rootsMax;i++){
-            // 16855017158405950531512674278374442951963327874331982618070277997451625577216
-            roots[i] = 0x25439a05239667bccd12fc3bd280a29a02728ed44410446cbd51a27cda333b00;
-        }
+        lastRoot=0x25439a05239667bccd12fc3bd280a29a02728ed44410446cbd51a27cda333b00;
+        //for(uint i=0;i<rootsMax;i++){
+        //    // 16855017158405950531512674278374442951963327874331982618070277997451625577216
+        //    roots[i] = 0x25439a05239667bccd12fc3bd280a29a02728ed44410446cbd51a27cda333b00;
+        //}
         emit LogBetIn(0,0x0ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae520);
         //emit LogBetHash(0,0x0ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae520,0);
     }
@@ -170,7 +172,8 @@ contract Lottery {
         uint _invest) payable external nonReentrant {
         require(msg.value == _refund, "Incorrect refund amount received by the contract");
         require(nullifier[_nullifierHash] == 0, "Incorrect nullifier");
-        require(isKnownRoot(_root), "Cannot find your merkle root"); // Make sure to use a recent one
+        //require(isKnownRoot(_root), "Cannot find your merkle root"); // Make sure to use a recent one
+        require(roots[_root]>0, "Cannot find your merkle root");
         require(withdraw.verifyProof( _pA, _pB, _pC, [ _root, _nullifierHash, _rewardbits, uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
         nullifier[_nullifierHash] = 1;
         uint reward =  betMin * ( (_rewardbits&0x1>0?1:0) * 2**betPower1 + (_rewardbits&0x2>0?1:0) * 2**betPower2 + (_rewardbits&0x4>0?1:0) * 2**betPower3 );
@@ -246,7 +249,6 @@ contract Lottery {
 
     /**
      * @dev Whether the root is present in the root history
-     */
     function isKnownRoot(uint _root) public view returns (bool) {
         if (_root == 0) {
             return false;
@@ -264,6 +266,7 @@ contract Lottery {
         } while (i != _currentRootIndex);
         return false;
     }
+     */
 
 /* random number generator functions */
 
@@ -312,20 +315,20 @@ contract Lottery {
         uint newRand = uint128(uint(keccak256(abi.encodePacked(_revealSecret,commitBlockHash))));
         if(D.commitIndex==1){
             uint[4+1] memory pubdata;
-            pubdata[0]=uint(roots[D.currentRootIndex]);
+            pubdata[0]=lastRoot;//uint(roots[D.currentRootIndex]);
             pubdata[1]=uint(_newRoot);
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
             uint pos = (D.betsStart) % betsMax;
             uint power=bets[pos]&0x1f;
             pubdata[4]=bets[pos];
-            //bets[pos]=0; // use gaspump
+            //bets[pos]=0; // no more gaspump
             if(power>0){
                 currentBets+=uint128(getAmount(power-1));}
             require(update1.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else if(D.commitIndex<=5){
             uint[4+5] memory pubdata;
-            pubdata[0]=uint(roots[D.currentRootIndex]);
+            pubdata[0]=lastRoot;//uint(roots[D.currentRootIndex]);
             pubdata[1]=uint(_newRoot);
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
@@ -333,13 +336,13 @@ contract Lottery {
                 uint pos = (D.betsStart+i) % betsMax;
                 uint power=bets[pos]&0x1f;
                 pubdata[4+i]=bets[pos];
-                //bets[pos]=0; // use gaspump
+                //bets[pos]=0; // no more gaspump
                 if(power>0){
                     currentBets+=uint128(getAmount(power-1));}}
             require(update5.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else if(D.commitIndex<=21){
             uint[4+21] memory pubdata;
-            pubdata[0]=uint(roots[D.currentRootIndex]);
+            pubdata[0]=lastRoot;//uint(roots[D.currentRootIndex]);
             pubdata[1]=uint(_newRoot);
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
@@ -347,13 +350,13 @@ contract Lottery {
                 uint pos = (D.betsStart+i) % betsMax;
                 uint power=bets[pos]&0x1f;
                 pubdata[4+i]=bets[pos];
-                //bets[pos]=0; // use gaspump
+                //bets[pos]=0; // no more gaspump
                 if(power>0){
                     currentBets+=uint128(getAmount(power-1));}}
             require(update21.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else{
             uint[4+44] memory pubdata;
-            pubdata[0]=uint(roots[D.currentRootIndex]);
+            pubdata[0]=lastRoot;//uint(roots[D.currentRootIndex]);
             pubdata[1]=uint(_newRoot);
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
@@ -361,7 +364,7 @@ contract Lottery {
                 uint pos = (D.betsStart+i) % betsMax;
                 uint power=bets[pos]&0x1f;
                 pubdata[4+i]=bets[pos];
-                //bets[pos]=0; // use gaspump
+                //bets[pos]=0; // no more gaspump
                 if(power>0){
                     currentBets+=uint128(getAmount(power-1));}}
             require(update44.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
@@ -372,8 +375,10 @@ contract Lottery {
         D.commitBlock = 0;
         commitHash = _open;
         commitBlockHash = _open;
-        D.currentRootIndex = uint8((D.currentRootIndex + 1) % rootsMax);
-        roots[D.currentRootIndex] = _newRoot;
+        roots[_newRoot]=D.nextIndex;
+        lastRoot=_newRoot;
+        //D.currentRootIndex = uint8((D.currentRootIndex + 1) % rootsMax);
+        //roots[D.currentRootIndex] = _newRoot;
         emit LogUpdate(uint(D.nextIndex),newRand,_newRoot);
     } // }
 
@@ -425,7 +430,7 @@ contract Lottery {
 
     function payOut() public nonReentrant {
         collectDividend(msg.sender);
-        require(D.dividendPeriod <= wallets[msg.sender].nextWithdrawPeriod, "Wait till the next dividend period");
+        require(D.dividendPeriod >= wallets[msg.sender].nextWithdrawPeriod, "Wait till the next dividend period");
         uint _amount = wallets[msg.sender].balance;
         if(betMin * 2**betPower2 < _amount) { // limit max withdrawal
             _amount = betMin * 2**betPower2;
@@ -605,11 +610,18 @@ contract Lottery {
     }
 
     /**
-     * @dev Returns the last root
+     * @dev Show dividend Period
      */
+    function dividendPeriod() public view returns (uint) {
+        return uint(D.dividendPeriod);
+    }
+
+    /**
+     * @dev Returns the last root
     function getLastRoot() public view returns (uint) {
         return roots[D.currentRootIndex];
     }
+    */
 
     // events
     event LogBetIn(uint indexed index,uint indexed newHash);
