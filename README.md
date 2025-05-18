@@ -1,7 +1,5 @@
 # Foom Lottery V2
 
-Tornado Cash is a non-custodial Ethereum and ERC20 privacy solution based on zkSNARKs.
-
 This repository re-builds Tornado Cash for **educational purposes** as a [Foundry](https://book.getfoundry.sh/) project, and uses the latest versions of Circom ([circomlib](https://github.com/iden3/circomlib) and [circomlibjs](https://github.com/iden3/circomlibjs)) and [snarkJS](https://github.com/iden3/snarkjs) to generate proofs.
 
 The [original-repository](https://github.com/tornadocash/tornado-core) is built with older versions of tools, and it is difficult to use it as educational reference material to understand the latest Solidity <-> Circom workflow for writing smart contracts with ZK-SNARK capabilities.
@@ -9,10 +7,6 @@ The [original-repository](https://github.com/tornadocash/tornado-core) is built 
 ## Installation
 
 Clone this repository
-
-```bash
-git clone https://github.com/nkrishang/tornado-cash-rebuilt.git
-```
 
 Install dependencies:
 
