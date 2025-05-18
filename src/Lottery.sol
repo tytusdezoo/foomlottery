@@ -376,7 +376,7 @@ contract Lottery {
                 if(power>0){
                     newBets+=uint128(getAmount(power-1));}}
             require(update44.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
-        currentBets+=newBets;
+        currentBets+=uint128(newBets);
         D.nextIndex+=D.commitIndex;
         D.betsStart =(D.betsStart+D.commitIndex) % uint8(betsMax);
         D.betsIndex-=D.commitIndex;

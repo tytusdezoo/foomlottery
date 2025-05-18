@@ -261,7 +261,7 @@ contract EthLotteryTest is Test {
     function view_status() view public {
         uint ballot=address(lottery).balance;
         console.log("lottery: %d (%d,%d)",ballot,block.number,lottery.dividendPeriod());
-        uint[3] = who=[me,a1,a2];
+        address[3] memory who=[me,a1,a2];
         for(uint i=0;i<3;i++){
             uint balance=who[i].balance;
             uint wallet=lottery.walletBalanceOf(who[i]);
