@@ -2,12 +2,12 @@ pragma circom 2.2.0;
 
 include "./lib/bitify.circom";
 include "./lib/pedersen.circom";
-include "./lib/mimcsponge.circom"; // NEW
+include "./lib/mimcsponge.circom";
 include "./merkletree.circom";
 
 template CommitmentHasher() {
     signal input secret;
-    signal input nullifier; // NEW
+    signal input nullifier;
     signal output secretHash;
     signal output nullifierHash;
 
@@ -37,8 +37,8 @@ template Withdraw(levels,power1,power2,power3) {
     signal input refund;   // not taking part in any computations
     
     signal input secret;
-    signal input power; // NEW
-    signal input rand; // NEW
+    signal input power;
+    signal input rand;
     signal input pathIndex;
     signal input pathElements[levels];
 
@@ -51,10 +51,9 @@ template Withdraw(levels,power1,power2,power3) {
 
     component hasher = CommitmentHasher();
     hasher.secret <== secret;
-    hasher.nullifier <== mimc1.outs[0]; // NEW
+    hasher.nullifier <== mimc1.outs[0];
     hasher.nullifierHash === nullifierHash;
 
-    // test legal hash
     component hasherBits = Num2Bits(256);
     hasherBits.in <== hasher.secretHash;
     hasherBits.out[0] === 0;
@@ -63,34 +62,32 @@ template Withdraw(levels,power1,power2,power3) {
     hasherBits.out[3] === 0;
     hasherBits.out[4] === 0;
 
-    // compute mask TODO, remove later !!!
-    component eq[power2+1];
-    signal isequal[power2+1];
+    // compute mask
+    component eq[power3+1];
     signal mask;
-    mask <-- (power<=power1)?((2**(power1+power2+1)-1)<<power)&(2**(power1+power2+1)-1):(((2**power2-1)<<(power+power1))|(2**power1-1))&(2**(power1+power2+1)-1);
-    //var mask = (power<=power1)?((2**(power1+power2+1)-1)<<power)&(2**(power1+power2+1)-1):(((2**power2-1)<<(power+power1))|(2**power1-1))&(2**(power1+power2+1)-1);
+    mask <-- (power<=power1)?(((2 **(power1+power2+power3+1 )-1 )<<(power              ))                         )&(2 **(power1+power2+power3+1 )-1 ) :
+            ((power<=power2)?(((2 **(       power2+power3+1 )-1 )<<(power+power1       ))|(2 **(power1       )-1 ))&(2 **(power1+power2+power3+1 )-1 ) :
+                             (((2 **(              power3+1 )-1 )<<(power+power1+power2))|(2 **(power1+power2)-1 ))&(2 **(power1+power2+power3+1 )-1 ));
     var sum = 0;
-    for(var i = 0; i <= power2; i++) {
+    var maskcheck = 0;
+    for(var i = 0; i <= power3; i++) {
+        var imask=
+             (    i<=power1)?(((2 **(power1+power2+power3+1 )-1 )<<(    i              ))                         )&(2 **(power1+power2+power3+1 )-1 ) :
+            ((    i<=power2)?(((2 **(       power2+power3+1 )-1 )<<(    i+power1       ))|(2 **(power1       )-1 ))&(2 **(power1+power2+power3+1 )-1 ) :
+                             (((2 **(              power3+1 )-1 )<<(    i+power1+power2))|(2 **(power1+power2)-1 ))&(2 **(power1+power2+power3+1 )-1 ));
         eq[i] = IsEqual();
         eq[i].in[0] <== i;
         eq[i].in[1] <== power;
-        isequal[i] <== eq[i].out * mask;
         sum += eq[i].out;
-        if(i<=power1){
-            var val=((2**(power1+power2+1)-1)<<i)&(2**(power1+power2+1)-1);
-            isequal[i] === eq[i].out * val;
-        }
-        else{
-            var val=(((2**power2-1)<<(i+power1))|(2**power1-1))&(2**(power1+power2+1)-1);
-            isequal[i] === eq[i].out * val;
-        }
+        maskcheck += eq[i].out * imask;
     }
     sum === 1;
+    mask === maskcheck;
 
     // evaluate lottery
-    signal test[power1+power2];
+    signal test[power1+power2+power3];
     component lottoBits = Num2Bits(256);
-    component maskBits = Num2Bits(power1+power2+1);
+    component maskBits = Num2Bits(power1+power2+power3+1);
     component rewardBits = Num2Bits(3);
     lottoBits.in <== mimc1.outs[0];
     maskBits.in <== mask;
@@ -104,18 +101,16 @@ template Withdraw(levels,power1,power2,power3) {
         test[j] <== lottoBits.out[j] * maskBits.out[j];
         test[j] * rewardBits.out[1] === 0;
     }
-    for ( j=j ; j < power1+power2+power3; j++) { // no more mask
-        lottoBits.out[j]*rewardBits.out[2] === 0;
+    for ( j=j ; j < power1+power2+power3; j++) {
+        test[j] <== lottoBits.out[j] * maskBits.out[j];
+        test[j] * rewardBits.out[2] === 0;
     }
 
-    // NEW calculate new leaf hash
     component mimc2 = MiMCSponge(3, 220, 1);
     mimc2.ins[0] <== hasher.secretHash + power + 1;
     mimc2.ins[1] <== rand;
     mimc2.ins[2] <== pathIndex;
     mimc2.k <== 0;
-
-    // NEW BLOCK END
 
     component bits[2];
     bits[0] = Num2Bits(levels);
