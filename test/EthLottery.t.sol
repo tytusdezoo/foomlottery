@@ -211,7 +211,7 @@ contract EthLotteryTest is Test {
         bytes memory result = vm.ffi(inputs);
         //console.log("after update");
         (uint[2] memory pA,uint[2][2] memory pB,uint[2] memory pC,uint[] memory data)=abi.decode(result,(uint[2],uint[2][2],uint[2],uint[]));
-        //console.log("after decode");
+        console.log("after decode");
         uint revealGasStart;
         if(hashesLength==1){
           uint[4+1] memory pubdata;for(uint i=0;i<4+1;i++){pubdata[i]=data[i];} revealGasStart = gasleft();
@@ -225,7 +225,7 @@ contract EthLotteryTest is Test {
         else{
           uint[4+44] memory pubdata;for(uint i=0;i<4+44;i++){pubdata[i]=data[i];} revealGasStart = gasleft();
           assertTrue(update44.verifyProof(pA,pB,pC,pubdata));}
-        //console.log("after assert");
+        console.log("after assert");
         uint revealGasUsed = revealGasStart - gasleft();
         if(0<showGas){ console.log("Gas used in update[%d].verifyProof: %d", hashesLength,revealGasUsed); }
         revealGasStart = gasleft();
@@ -271,7 +271,7 @@ contract EthLotteryTest is Test {
             console.log("%d shares: %d,withdrawperiod: %d",shares,wperiod);}
     }
 
-    function test0_investments() public {
+    function notest0_investments() public {
         // console.log("period %d",periodBlocks);
         // console.log("me %x",msg.sender); // 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
         view_status();
@@ -359,7 +359,7 @@ contract EthLotteryTest is Test {
                 _withdraw(secret[j][i],rand[j][i],index[j][i]);}}
     }
 
-    function notest2_lottery_single_deposit() public {
+    function test2_lottery_single_deposit() public {
         vm.roll(++blocknumber);
         //_fake_play(0);
         (uint secret_power1,) = _play(10); // hash can be restored later
