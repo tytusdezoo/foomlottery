@@ -16,7 +16,7 @@ interface IUpdate5 { // 264353 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool); // 254252 g
 }
 interface IUpdate11 { // 530657 c
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool); // g
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[15] calldata _pubSignals) external view returns (bool); // g
 }
 interface IUpdate21 { // 974497 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[25] calldata _pubSignals) external view returns (bool); // 364897 g
@@ -25,7 +25,10 @@ interface IUpdate44 { // 1995329 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[48] calldata _pubSignals) external view returns (bool); // 519083 g
 }
 interface IUpdate89 { // 3992609 c
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[48] calldata _pubSignals) external view returns (bool); // g
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[93] calldata _pubSignals) external view returns (bool); // g
+}
+interface IUpdate179 { // 7987169 c
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[183] calldata _pubSignals) external view returns (bool); // g
 }
 
 
@@ -48,7 +51,7 @@ contract Lottery {
     uint public constant betPower1 = 10; // power of the first bet = 1024
     uint public constant betPower2 = 16; // power of the second bet = 65536
     uint public constant betPower3 = 22; // power of the third bet = 4194304
-    uint public constant betsMax = 128; //128; // maximum number of bets in queue, max 8bit
+    uint public constant betsMax = 250; // maximum number of bets in queue, max 8bit
     uint public constant maxUpdate = 44; // maximum number of bets in queue to insert
     uint public constant dividendFeePerCent = 4; // 4% of dividends go to the shareholders (wall)
     uint public constant generatorFeePerCent = 1; // 1% of dividends go to the generator
@@ -156,7 +159,7 @@ contract Lottery {
         require(_power >= 0 && _power<=betPower3, "Invalid bet amount");
         _deposit(getAmount(_power));
         uint newHash = _secrethash + _power + 1;
-        uint pos = (D.betsStart + D.betsIndex) % betsMax;
+        uint pos = (uint(D.betsStart) + uint(D.betsIndex)) % betsMax;
         bets[pos] = newHash;
         emit LogBetIn(D.nextIndex+D.betsIndex,newHash);
         D.betsIndex++;
@@ -242,7 +245,7 @@ contract Lottery {
         require(D.nextIndex<=_betIndex && _betIndex-D.nextIndex<D.betsIndex, "Bet probably processed");
         rememberHash();
         require(D.commitBlock != 0 || _betIndex-D.nextIndex>=D.commitIndex, "Commit in progress"); // do not allow generator to cancel bets after selecting commitBlock for random index
-        uint pos = (D.betsStart+(_betIndex-D.nextIndex)) % betsMax;
+        uint pos = (uint(D.betsStart)+(_betIndex-D.nextIndex)) % betsMax;
         uint power1=bets[pos]&0x1f;
         require(power1>0);
         require(cancel.verifyProof( _pA, _pB, _pC, [uint(bets[pos]-power1)]), "Invalid cancel proof");
@@ -327,7 +330,7 @@ contract Lottery {
             pubdata[1]=uint(_newRoot);
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
-            uint pos = (D.betsStart) % betsMax;
+            uint pos = D.betsStart;
             uint power=bets[pos]&0x1f;
             pubdata[4]=bets[pos];
             //bets[pos]=0; // no more gaspump
@@ -341,7 +344,7 @@ contract Lottery {
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
             for(uint i=0;i < D.commitIndex; i++){
-                uint pos = (D.betsStart+i) % betsMax;
+                uint pos = (uint(D.betsStart)+i) % betsMax;
                 uint power=bets[pos]&0x1f;
                 pubdata[4+i]=bets[pos];
                 //bets[pos]=0; // no more gaspump
@@ -355,7 +358,7 @@ contract Lottery {
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
             for(uint i=0;i < D.commitIndex; i++){
-                uint pos = (D.betsStart+i) % betsMax;
+                uint pos = (uint(D.betsStart)+i) % betsMax;
                 uint power=bets[pos]&0x1f;
                 pubdata[4+i]=bets[pos];
                 //bets[pos]=0; // no more gaspump
@@ -369,7 +372,7 @@ contract Lottery {
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
             for(uint i=0;i < 44 && i<D.commitIndex; i++){
-                uint pos = (D.betsStart+i) % betsMax;
+                uint pos = (uint(D.betsStart)+i) % betsMax;
                 uint power=bets[pos]&0x1f;
                 pubdata[4+i]=bets[pos];
                 //bets[pos]=0; // no more gaspump
@@ -378,7 +381,7 @@ contract Lottery {
             require(update44.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         currentBets+=uint128(newBets);
         D.nextIndex+=D.commitIndex;
-        D.betsStart =(D.betsStart+D.commitIndex) % uint8(betsMax);
+        D.betsStart =uint8((uint(D.betsStart)+uint(D.commitIndex)) % betsMax);
         D.betsIndex-=D.commitIndex;
         D.commitIndex = 0;
         D.commitBlock = 0;
@@ -482,7 +485,7 @@ contract Lottery {
     function betSum() view public returns (uint){
         uint betsum=0;
         for(uint i=0;i<D.commitIndex;i++){
-            uint pos = (D.betsStart+i) % betsMax;
+            uint pos = (uint(D.betsStart)+i) % betsMax;
             uint power=bets[pos]&0x1f;
             if(power>0){
                 betsum+=getAmount(power-1);}}
