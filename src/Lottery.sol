@@ -146,7 +146,7 @@ contract Lottery {
     function play(uint _secrethash,uint _power) payable external { // unchecked {
         require(0<_secrethash && _secrethash < FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
         require(D.betsIndex < betsMax && D.nextIndex + D.betsIndex < 2 ** merkleTreeLevels - 1, "No more bets allowed");
-        require(_power >= 0 && _power<=betPower2, "Invalid bet amount");
+        require(_power >= 0 && _power<=betPower3, "Invalid bet amount");
         _deposit(getAmount(_power));
         uint newHash = _secrethash + _power + 1;
         uint pos = (D.betsStart + D.betsIndex) % betsMax;
@@ -197,17 +197,18 @@ contract Lottery {
             reward -= _invest;
         }
         /* process withdrawal */
-        if(betMin * 2**betPower2 < reward ) { // limit max withdrawal
+        /*if(betMin * 2**betPower2 < reward ) { // limit max withdrawal
             _invest = reward - (betMin * 2**betPower2);
             currentBalance += uint128(_invest);
             wallets[_recipient].balance += uint112(_invest);
             wallets[_recipient].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // wait 1 period for more funds
             reward -= _invest;
-        }
+        }*/
         if(balance < reward) {
-            _invest = reward - balance;
+            _invest = reward - balance/2;
             currentBalance += uint128(_invest);
             wallets[_recipient].balance += uint112(_invest);
+            wallets[_recipient].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // wait 1 period for more funds
             reward -= _invest;
         }
         if (reward - _fee > 0) {
@@ -432,13 +433,13 @@ contract Lottery {
         collectDividend(msg.sender);
         require(D.dividendPeriod >= wallets[msg.sender].nextWithdrawPeriod, "Wait till the next dividend period");
         uint _amount = wallets[msg.sender].balance;
-        if(betMin * 2**betPower2 < _amount) { // limit max withdrawal
+        /*if(betMin * 2**betPower2 < _amount) { // limit max withdrawal
             _amount = betMin * 2**betPower2;
             wallets[msg.sender].nextWithdrawPeriod = uint16(D.dividendPeriod + 1);
-        }
+        }*/
         uint balance = _balance();
         if(_amount > balance) {
-            _amount = balance;
+            _amount = balance/2;
             wallets[msg.sender].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // wait 1 period for more funds
         }
         wallets[msg.sender].balance -= uint112(_amount);

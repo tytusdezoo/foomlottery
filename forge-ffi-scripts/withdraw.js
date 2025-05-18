@@ -25,11 +25,14 @@ async function main() {
   // 1.5. calculate reward
   const power1=10n;
   const power2=16n;
-  const mask = (power<=power1)?((2n**(power1+power2+1n)-1n)<<power)&(2n**(power1+power2+1n)-1n):(((2n**power2-1n)<<(power+power1))|(2n**power1-1n))&(2n**(power1+power2+1n)-1n);
+  const power3=22n;
+  const mask = (power<=power1)?(((2n**(power1+power2+power3+1n)-1n)<<(power              ))                         )&(2n**(power1+power2+power3+1n)-1n) :
+              ((power<=power2)?(((2n**(       power2+power3+1n)-1n)<<(power+power1       ))|(2n**(power1       )-1n))&(2n**(power1+power2+power3+1n)-1n) :
+			       (((2n**(              power3+1n)-1n)<<(power+power1+power2))|(2n**(power1+power2)-1n))&(2n**(power1+power2+power3+1n)-1n));
   const maskdice= mask & dice;
   const rew1 = (maskdice &                                       0b1111111111n)?0n:1n ;
   const rew2 = (maskdice &                       0b11111111111111110000000000n)?0n:1n ;
-  const rew3 = (dice     & 0b111111111111111111111100000000000000000000000000n)?0n:1n ;
+  const rew3 = (maskdice & 0b111111111111111111111100000000000000000000000000n)?0n:1n ;
   const rewardbits = 4n*rew3+2n*rew2+rew1;
 
   const nullifierHash = await pedersenHash(leBigintToBuffer(terces, 31));

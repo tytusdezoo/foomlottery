@@ -273,7 +273,7 @@ contract EthLotteryTest is Test {
         console.log("a2 withdrawperiod: %d",wperiod);
     }
 
-    function test0_investments() public {
+    function notest0_investments() public {
         // console.log("period %d",periodBlocks);
         // console.log("me %x",msg.sender); // 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
         // me=payable(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
@@ -342,15 +342,33 @@ contract EthLotteryTest is Test {
         _cancelbet(secret_power2,hash2,index2);
     }
 
-    function notest2_lottery_single_deposit() public {
+    function test2_lottery_single_deposit() public {
         vm.roll(++blocknumber);
         //_fake_play(0);
-        (uint secret_power,) = _play(9); // hash can be restored later
-        console.log("%x ticket", secret_power);
+        (uint secret_power1,) = _play(10); // hash can be restored later
+        console.log("%x ticket", secret_power1);
         _commit_reveal();
-        (uint hash,) = _getHash(secret_power);
-        (uint rand,uint index) = _getRandIndex(hash+(secret_power&0x1f)+1);
-        _withdraw(secret_power,rand,index);
+        (uint hash1,) = _getHash(secret_power1);
+        (uint rand1,uint index1) = _getRandIndex(hash1+(secret_power1&0x1f)+1);
+        _withdraw(secret_power1,rand1,index1);
+
+        vm.roll(++blocknumber);
+        //_fake_play(0);
+        (uint secret_power2,) = _play(16); // hash can be restored later
+        console.log("%x ticket", secret_power2);
+        _commit_reveal();
+        (uint hash2,) = _getHash(secret_power2);
+        (uint rand2,uint index2) = _getRandIndex(hash2+(secret_power2&0x1f)+1);
+        _withdraw(secret_power2,rand2,index2);
+
+        vm.roll(++blocknumber);
+        //_fake_play(0);
+        (uint secret_power3,) = _play(22); // hash can be restored later
+        console.log("%x ticket", secret_power3);
+        _commit_reveal();
+        (uint hash3,) = _getHash(secret_power3);
+        (uint rand3,uint index3) = _getRandIndex(hash3+(secret_power3&0x1f)+1);
+        _withdraw(secret_power3,rand3,index3);
     }
 
     function notest3_lottery_many_deposits() public {

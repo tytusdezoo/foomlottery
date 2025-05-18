@@ -25,6 +25,10 @@ compile:
 	@echo "Compiling update44.circom..."
 	circom circuits/update44.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
 
+compile_withdraw:
+	@echo "Compiling withdraw.circom..."
+	circom circuits/withdraw.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
+
 compile_cancelbet:
 	@echo "Compiling cancelbet.circom..."
 	circom circuits/cancelbet.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
