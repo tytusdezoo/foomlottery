@@ -167,7 +167,7 @@ gen_update179:
 
 move:
 	cd $(ARTIFACTS_DIR) && \
-        mv cancelbet_final.zkey update21_final.zkey update89_final.zkey update1799_final.zkey update11_final.zkey update44_final.zkey withdraw_final.zkey update1_final.zkey update5_final.zkey cancelbet_js/cancelbet.wasm update44_js/update44.wasm update11_js/update11.wasm update5_js/update5.wasm update1_js/update1.wasm update179_js/update179.wasm update179_js/update179.wasm update21_js/update21.wasm withdraw_js/withdraw.wasm ../groth16/
+        mv cancelbet_final.zkey update21_final.zkey update89_final.zkey update179_final.zkey update11_final.zkey update44_final.zkey withdraw_final.zkey update1_final.zkey update5_final.zkey cancelbet_js/cancelbet.wasm update44_js/update44.wasm update11_js/update11.wasm update5_js/update5.wasm update1_js/update1.wasm update179_js/update179.wasm update179_js/update179.wasm update21_js/update21.wasm withdraw_js/withdraw.wasm ../groth16/
 
 # Clean circuit_artifacts
 clean:
