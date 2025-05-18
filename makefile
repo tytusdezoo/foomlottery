@@ -3,7 +3,11 @@ ARTIFACTS_DIR = circuit_artifacts
 export NODE_OPTIONS := --max-old-space-size=8192
 
 # Default target
+<<<<<<< HEAD
 all: setup compile gen_withdraw gen_cancelbet gen_update1 gen_update5 gen_update11 gen_update21 gen_update44 gen_update89 move
+=======
+all: setup compile gen_withdraw gen_cancelbet gen_update1 gen_update5 gen_update11 gen_update21 gen_update44 gen_update89
+>>>>>>> b203dd768de5ccc63fe3ba120dbc5599a538afa8
 
 # Create necessary directories
 setup:
