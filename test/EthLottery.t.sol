@@ -31,6 +31,7 @@ contract EthLotteryTest is Test {
 
     // Test vars
     address public constant relayer = payable(address(0x0));
+    address public me=payable(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
     address public a1=payable(address(0x1));
     address public a2=payable(address(0x2));
     address public recipient = a1;
@@ -260,24 +261,19 @@ contract EthLotteryTest is Test {
     function view_status() view public {
         uint ballot=address(lottery).balance;
         console.log("lottery: %d (%d,%d)",ballot,block.number,lottery.dividendPeriod());
-        uint balance=a1.balance;
-        uint wallet=lottery.walletBalanceOf(a1);
-        uint shares=lottery.walletSharesOf(a1);
-        uint wperiod=lottery.walletWithdrawPeriodOf(a1);
-        console.log("a1 balance: %d,wallet: %d,shares: %d",balance,wallet,shares);
-        console.log("a1 withdrawperiod: %d",wperiod);
-        balance=a2.balance;
-        wallet=lottery.walletBalanceOf(a2);
-        shares=lottery.walletSharesOf(a2);
-        wperiod=lottery.walletWithdrawPeriodOf(a2);
-        console.log("a2 balance: %d,wallet: %d,shares: %d",balance,wallet,shares);
-        console.log("a2 withdrawperiod: %d",wperiod);
+        uint[3] = who=[me,a1,a2];
+        for(uint i=0;i<3;i++){
+            uint balance=who[i].balance;
+            uint wallet=lottery.walletBalanceOf(who[i]);
+            uint shares=lottery.walletSharesOf(who[i]);
+            uint wperiod=lottery.walletWithdrawPeriodOf(who[i]);
+            console.log("%d balance: %d,wallet: %d",balance,wallet);
+            console.log("%d shares: %d,withdrawperiod: %d",shares,wperiod);}
     }
 
-    function notest0_investments() public {
+    function test0_investments() public {
         // console.log("period %d",periodBlocks);
         // console.log("me %x",msg.sender); // 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
-        // me=payable(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
         view_status();
         showGas=0;
         uint i=0;
@@ -291,7 +287,7 @@ contract EthLotteryTest is Test {
         (secret_power,hash) = _play(10);
         _commit_reveal();
         (rand,index) = _getRandIndex(hash+(secret_power&0x1f)+1);
-        invest = 500;
+        invest = 100;
         recipient=a1;
         _withdraw(secret_power,rand,index);
         view_status(); // p1

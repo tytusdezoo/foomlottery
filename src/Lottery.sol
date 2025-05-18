@@ -221,7 +221,7 @@ contract Lottery {
             if(_relayer!=address(0)){
                 _withdraw(_relayer,_fee);}
             else{
-                _withdraw(msg.sender,_fee);}}
+                _withdraw(msg.sender,_fee);}
         }
         if (_refund > 0) {
           (bool ok,) =_recipient.call{ value: uint(_refund) }("");
