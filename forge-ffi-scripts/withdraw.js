@@ -66,8 +66,8 @@ async function main() {
   // 5. Create groth16 proof for witness
   const { proof } = await snarkjs.groth16.fullProve(
     input,
-    path.join(__dirname, "../circuit_artifacts/withdraw_js/withdraw.wasm"),
-    path.join(__dirname, "../circuit_artifacts/withdraw_final.zkey")
+    path.join(__dirname, "../groth16/withdraw.wasm"),
+    path.join(__dirname, "../groth16/withdraw_final.zkey")
   );
 
   const pA = proof.pi_a.slice(0, 2);

@@ -15,12 +15,19 @@ interface IUpdate1 { // 86817 c
 interface IUpdate5 { // 264353 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool); // 254252 g
 }
+interface IUpdate11 { // 530657 c
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool); // g
+}
 interface IUpdate21 { // 974497 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[25] calldata _pubSignals) external view returns (bool); // 364897 g
 }
 interface IUpdate44 { // 1995329 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[48] calldata _pubSignals) external view returns (bool); // 519083 g
 }
+interface IUpdate89 { // 3992609 c
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[48] calldata _pubSignals) external view returns (bool); // g
+}
+
 
 /**
  * @title FOOM Lottery
@@ -170,8 +177,8 @@ contract Lottery {
         uint _refund,
         uint _rewardbits,
         uint _invest) payable external nonReentrant {
-        require(msg.value == _refund, "Incorrect refund amount received by the contract");
         require(nullifier[_nullifierHash] == 0, "Incorrect nullifier");
+        require(msg.value == _refund, "Incorrect refund amount received by the contract");
         //require(isKnownRoot(_root), "Cannot find your merkle root"); // Make sure to use a recent one
         require(roots[_root]>0, "Cannot find your merkle root");
         require(withdraw.verifyProof( _pA, _pB, _pC, [ _root, _nullifierHash, _rewardbits, uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
@@ -179,10 +186,6 @@ contract Lottery {
         uint reward =  betMin * ( (_rewardbits&0x1>0?1:0) * 2**betPower1 + (_rewardbits&0x2>0?1:0) * 2**betPower2 + (_rewardbits&0x4>0?1:0) * 2**betPower3 );
         emit LogWin(uint(_nullifierHash),reward);
         //currentBets += uint128(reward);
-        collectDividend(generator);
-        uint generatorReward = reward * generatorFeePerCent / 100;
-        currentBalance += uint128(generatorReward);
-        wallets[generator].balance += uint112(generatorReward);
         collectDividend(_recipient);
         reward = reward * (100 - dividendFeePerCent - generatorFeePerCent) / 100;
         uint balance = _balance();
@@ -215,7 +218,10 @@ contract Lottery {
             _withdraw(_recipient,reward - _fee);
         }
         if (_fee > 0) {
-            _withdraw(_relayer,_fee);
+            if(_relayer!=address(0)){
+                _withdraw(_relayer,_fee);}
+            else{
+                _withdraw(msg.sender,_fee);}
         }
         if (_refund > 0) {
           (bool ok,) =_recipient.call{ value: uint(_refund) }("");
@@ -314,6 +320,7 @@ contract Lottery {
         rememberHash();
         require(commitBlockHash > _closed, "Commit block hash not found");
         uint newRand = uint128(uint(keccak256(abi.encodePacked(_revealSecret,commitBlockHash))));
+        uint newBets = 0;
         if(D.commitIndex==1){
             uint[4+1] memory pubdata;
             pubdata[0]=lastRoot;//uint(roots[D.currentRootIndex]);
@@ -325,7 +332,7 @@ contract Lottery {
             pubdata[4]=bets[pos];
             //bets[pos]=0; // no more gaspump
             if(power>0){
-                currentBets+=uint128(getAmount(power-1));}
+                newBets+=uint128(getAmount(power-1));}
             require(update1.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else if(D.commitIndex<=5){
             uint[4+5] memory pubdata;
@@ -339,7 +346,7 @@ contract Lottery {
                 pubdata[4+i]=bets[pos];
                 //bets[pos]=0; // no more gaspump
                 if(power>0){
-                    currentBets+=uint128(getAmount(power-1));}}
+                    newBets+=uint128(getAmount(power-1));}}
             require(update5.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else if(D.commitIndex<=21){
             uint[4+21] memory pubdata;
@@ -353,7 +360,7 @@ contract Lottery {
                 pubdata[4+i]=bets[pos];
                 //bets[pos]=0; // no more gaspump
                 if(power>0){
-                    currentBets+=uint128(getAmount(power-1));}}
+                    newBets+=uint128(getAmount(power-1));}}
             require(update21.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else{
             uint[4+44] memory pubdata;
@@ -367,8 +374,9 @@ contract Lottery {
                 pubdata[4+i]=bets[pos];
                 //bets[pos]=0; // no more gaspump
                 if(power>0){
-                    currentBets+=uint128(getAmount(power-1));}}
+                    newBets+=uint128(getAmount(power-1));}}
             require(update44.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
+        currentBets+=uint128(newBets);
         D.nextIndex+=D.commitIndex;
         D.betsStart =(D.betsStart+D.commitIndex) % uint8(betsMax);
         D.betsIndex-=D.commitIndex;
@@ -380,6 +388,10 @@ contract Lottery {
         lastRoot=_newRoot;
         //D.currentRootIndex = uint8((D.currentRootIndex + 1) % rootsMax);
         //roots[D.currentRootIndex] = _newRoot;
+        collectDividend(generator);
+        uint generatorReward = newBets * generatorFeePerCent / 100;
+        currentBalance += uint128(generatorReward);
+        wallets[generator].balance += uint112(generatorReward);
         emit LogUpdate(uint(D.nextIndex),newRand,_newRoot);
     } // }
 

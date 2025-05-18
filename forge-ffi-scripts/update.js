@@ -51,8 +51,8 @@ async function main() {
   // 5. Create groth16 proof for witness
   const { proof } = await snarkjs.groth16.fullProve(
     input,
-    path.join(__dirname, "../circuit_artifacts/update"+hashesLength+"_js/update"+hashesLength+".wasm"),
-    path.join(__dirname, "../circuit_artifacts/update"+hashesLength+"_final.zkey")
+    path.join(__dirname, "../groth16/update"+hashesLength+".wasm"),
+    path.join(__dirname, "../groth16/update"+hashesLength+"_final.zkey")
   );
 
   const pA = proof.pi_a.slice(0, 2);

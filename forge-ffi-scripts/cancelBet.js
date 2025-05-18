@@ -17,8 +17,8 @@ async function main() {
   };
   const { proof } = await snarkjs.groth16.fullProve(
     input,
-    path.join(__dirname, "../circuit_artifacts/cancelbet_js/cancelbet.wasm"),
-    path.join(__dirname, "../circuit_artifacts/cancelbet_final.zkey")
+    path.join(__dirname, "../groth16/cancelbet.wasm"),
+    path.join(__dirname, "../groth16/cancelbet_final.zkey")
   );
   const pA = proof.pi_a.slice(0, 2);
   const pB = proof.pi_b.slice(0, 2);

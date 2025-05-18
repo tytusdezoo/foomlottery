@@ -31,6 +31,7 @@ contract EthLotteryTest is Test {
 
     // Test vars
     address public constant relayer = payable(address(0x0));
+    address public me=payable(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
     address public a1=payable(address(0x1));
     address public a2=payable(address(0x2));
     address public recipient = a1;
@@ -38,7 +39,7 @@ contract EthLotteryTest is Test {
     uint public refund = 0;
     uint public invest = 0;
     uint public showGas = 1;
-    uint constant testsize=4; // test size
+    uint constant testsize=5; // test size
 
     uint public constant betMin = 1; //0.001 ether; // TODO: compute correct value
     uint public constant betPower1 = 10; // power of the first bet = 1024
@@ -210,7 +211,7 @@ contract EthLotteryTest is Test {
         bytes memory result = vm.ffi(inputs);
         //console.log("after update");
         (uint[2] memory pA,uint[2][2] memory pB,uint[2] memory pC,uint[] memory data)=abi.decode(result,(uint[2],uint[2][2],uint[2],uint[]));
-        //console.log("after decode");
+        console.log("after decode");
         uint revealGasStart;
         if(hashesLength==1){
           uint[4+1] memory pubdata;for(uint i=0;i<4+1;i++){pubdata[i]=data[i];} revealGasStart = gasleft();
@@ -224,7 +225,7 @@ contract EthLotteryTest is Test {
         else{
           uint[4+44] memory pubdata;for(uint i=0;i<4+44;i++){pubdata[i]=data[i];} revealGasStart = gasleft();
           assertTrue(update44.verifyProof(pA,pB,pC,pubdata));}
-        //console.log("after assert");
+        console.log("after assert");
         uint revealGasUsed = revealGasStart - gasleft();
         if(0<showGas){ console.log("Gas used in update[%d].verifyProof: %d", hashesLength,revealGasUsed); }
         revealGasStart = gasleft();
@@ -260,24 +261,19 @@ contract EthLotteryTest is Test {
     function view_status() view public {
         uint ballot=address(lottery).balance;
         console.log("lottery: %d (%d,%d)",ballot,block.number,lottery.dividendPeriod());
-        uint balance=a1.balance;
-        uint wallet=lottery.walletBalanceOf(a1);
-        uint shares=lottery.walletSharesOf(a1);
-        uint wperiod=lottery.walletWithdrawPeriodOf(a1);
-        console.log("a1 balance: %d,wallet: %d,shares: %d",balance,wallet,shares);
-        console.log("a1 withdrawperiod: %d",wperiod);
-        balance=a2.balance;
-        wallet=lottery.walletBalanceOf(a2);
-        shares=lottery.walletSharesOf(a2);
-        wperiod=lottery.walletWithdrawPeriodOf(a2);
-        console.log("a2 balance: %d,wallet: %d,shares: %d",balance,wallet,shares);
-        console.log("a2 withdrawperiod: %d",wperiod);
+        address[3] memory who=[me,a1,a2];
+        for(uint i=0;i<3;i++){
+            uint balance=who[i].balance;
+            uint wallet=lottery.walletBalanceOf(who[i]);
+            uint shares=lottery.walletSharesOf(who[i]);
+            uint wperiod=lottery.walletWithdrawPeriodOf(who[i]);
+            console.log("%d balance: %d,wallet: %d",balance,wallet);
+            console.log("%d shares: %d,withdrawperiod: %d",shares,wperiod);}
     }
 
     function notest0_investments() public {
         // console.log("period %d",periodBlocks);
         // console.log("me %x",msg.sender); // 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
-        // me=payable(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
         view_status();
         showGas=0;
         uint i=0;
@@ -291,7 +287,7 @@ contract EthLotteryTest is Test {
         (secret_power,hash) = _play(10);
         _commit_reveal();
         (rand,index) = _getRandIndex(hash+(secret_power&0x1f)+1);
-        invest = 500;
+        invest = 100;
         recipient=a1;
         _withdraw(secret_power,rand,index);
         view_status(); // p1
@@ -332,7 +328,7 @@ contract EthLotteryTest is Test {
 
     }
 
-    function notest1_lottery_cancel() public {
+    function test1_lottery_cancel() public {
         vm.roll(++blocknumber);
         _fake_play(0);
         (uint secret_power,) = _play(10); // hash can be restored later
@@ -343,11 +339,11 @@ contract EthLotteryTest is Test {
         _cancelbet(secret_power2,hash2,index2);
     }
 
-    function test5_ods() public {
-        uint[3+1][testsize] memory secret;
-        uint[3+1][testsize] memory hash;
-        uint[3+1][testsize] memory rand;
-        uint[3+1][testsize] memory index;
+    function notest5_ods() public {
+        uint[testsize][3] memory secret; // reverse order of dimensions in solidity :-)
+        uint[testsize][3] memory hash;
+        uint[testsize][3] memory rand;
+        uint[testsize][3] memory index;
         uint i;
         uint j;
         showGas=0;

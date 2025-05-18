@@ -29,3 +29,7 @@ tmp/
 # why yarn ?
 yarn.lock
 package-lock.json
+
+# too lagre?
+groth16/update44_final.zkey
+groth16/update89_final.zkey
