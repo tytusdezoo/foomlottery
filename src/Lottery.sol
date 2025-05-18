@@ -15,12 +15,19 @@ interface IUpdate1 { // 86817 c
 interface IUpdate5 { // 264353 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool); // 254252 g
 }
+interface IUpdate11 { // 530657 c
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool); // g
+}
 interface IUpdate21 { // 974497 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[25] calldata _pubSignals) external view returns (bool); // 364897 g
 }
 interface IUpdate44 { // 1995329 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[48] calldata _pubSignals) external view returns (bool); // 519083 g
 }
+interface IUpdate89 { // 3992609 c
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[48] calldata _pubSignals) external view returns (bool); // g
+}
+
 
 /**
  * @title FOOM Lottery

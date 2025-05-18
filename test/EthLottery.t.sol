@@ -38,7 +38,7 @@ contract EthLotteryTest is Test {
     uint public refund = 0;
     uint public invest = 0;
     uint public showGas = 1;
-    uint constant testsize=4; // test size
+    uint constant testsize=10; // test size
 
     uint public constant betMin = 1; //0.001 ether; // TODO: compute correct value
     uint public constant betPower1 = 10; // power of the first bet = 1024
