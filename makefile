@@ -46,6 +46,13 @@ compile_update44:
 	circom circuits/update44.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
 
 # Powers of tau ceremony
+ptau10:
+	@echo "Performing powers of tau ceremony..."
+	cd $(ARTIFACTS_DIR) && \
+	snarkjs powersoftau new bn128 10 pot10_0000.ptau -v && \
+	snarkjs powersoftau contribute pot10_0000.ptau pot10_0001.ptau --name="First contribution" -v && \
+	snarkjs powersoftau prepare phase2 pot10_0001.ptau pot10_final.ptau -v
+
 ptau16:
 	@echo "Performing powers of tau ceremony..."
 	cd $(ARTIFACTS_DIR) && \
@@ -66,6 +73,13 @@ ptau22:
 	snarkjs powersoftau new bn128 22 pot22_0000.ptau -v && \
 	snarkjs powersoftau contribute pot22_0000.ptau pot22_0001.ptau --name="First contribution" -v && \
 	snarkjs powersoftau prepare phase2 pot22_0001.ptau pot22_final.ptau -v
+
+ptau23:
+	@echo "Performing powers of tau ceremony..."
+	cd $(ARTIFACTS_DIR) && \
+	snarkjs powersoftau new bn128 23 pot23_0000.ptau -v && \
+	snarkjs powersoftau contribute pot23_0000.ptau pot23_0001.ptau --name="First contribution" -v && \
+	snarkjs powersoftau prepare phase2 pot23_0001.ptau pot23_final.ptau -v
 
 
 
