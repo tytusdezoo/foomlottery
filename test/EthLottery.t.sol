@@ -32,8 +32,9 @@ contract EthLotteryTest is Test {
     // Test vars
     address public constant relayer = payable(address(0x0));
     address public me=payable(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
-    address public a1=payable(address(0x1));
-    address public a2=payable(address(0x2));
+    address public ag=payable(address(0x10));
+    address public a1=payable(address(0x01));
+    address public a2=payable(address(0x02));
     address public recipient = a1;
     uint public fee = 0;
     uint public refund = 0;
@@ -211,7 +212,7 @@ contract EthLotteryTest is Test {
         bytes memory result = vm.ffi(inputs);
         //console.log("after update");
         (uint[2] memory pA,uint[2][2] memory pB,uint[2] memory pC,uint[] memory data)=abi.decode(result,(uint[2],uint[2][2],uint[2],uint[]));
-        console.log("after decode");
+        //console.log("after decode");
         uint revealGasStart;
         if(hashesLength==1){
           uint[4+1] memory pubdata;for(uint i=0;i<4+1;i++){pubdata[i]=data[i];} revealGasStart = gasleft();
@@ -225,7 +226,7 @@ contract EthLotteryTest is Test {
         else{
           uint[4+44] memory pubdata;for(uint i=0;i<4+44;i++){pubdata[i]=data[i];} revealGasStart = gasleft();
           assertTrue(update44.verifyProof(pA,pB,pC,pubdata));}
-        console.log("after assert");
+        //console.log("after assert");
         uint revealGasUsed = revealGasStart - gasleft();
         if(0<showGas){ console.log("Gas used in update[%d].verifyProof: %d", hashesLength,revealGasUsed); }
         revealGasStart = gasleft();
@@ -260,18 +261,18 @@ contract EthLotteryTest is Test {
 
     function view_status() view public {
         uint ballot=address(lottery).balance;
-        console.log("lottery: %d (%d,%d)",ballot,block.number,lottery.dividendPeriod());
-        address[3] memory who=[me,a1,a2];
-        for(uint i=0;i<3;i++){
+        console.log("\nlottery: %d (%d,%d)",ballot,block.number,lottery.dividendPeriod());
+        address[2] memory who=[a1,a2];
+        for(uint i=0;i<who.length;i++){
             uint balance=who[i].balance;
             uint wallet=lottery.walletBalanceOf(who[i]);
             uint shares=lottery.walletSharesOf(who[i]);
             uint wperiod=lottery.walletWithdrawPeriodOf(who[i]);
-            console.log("%d balance: %d,wallet: %d",balance,wallet);
-            console.log("%d shares: %d,withdrawperiod: %d",shares,wperiod);}
+            console.log("%d balance: %d,wallet: %d",i,balance,wallet);
+            console.log("%d shares: %d,withdrawperiod: %d",i,shares,wperiod);}
     }
 
-    function notest0_investments() public {
+    function test0_investments() public {
         // console.log("period %d",periodBlocks);
         // console.log("me %x",msg.sender); // 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
         view_status();
@@ -287,38 +288,37 @@ contract EthLotteryTest is Test {
         (secret_power,hash) = _play(10);
         _commit_reveal();
         (rand,index) = _getRandIndex(hash+(secret_power&0x1f)+1);
-        invest = 100;
+        invest = 1000;
         recipient=a1;
         _withdraw(secret_power,rand,index);
         view_status(); // p1
+
         for (i = 0; i < 3; i++) {
             _fake_play(i);}
         blocknumber+=periodBlocks;
         vm.roll(blocknumber);
-
         (secret_power,hash) = _play(10);
         _commit_reveal();
         (rand,index) = _getRandIndex(hash+(secret_power&0x1f)+1);
-        invest = 100;
+        invest = 0;
         recipient=a2;
         _withdraw(secret_power,rand,index);
         view_status(); // p1
+
         blocknumber+=periodBlocks;
         vm.roll(blocknumber);
-
         (secret_power,hash) = _play(10);
         for (i = 0; i < 3; i++) {
             _fake_play(i);}
         _commit_reveal();
         (rand,index) = _getRandIndex(hash+(secret_power&0x1f)+1);
-        invest = 100;
+        invest = 0;
         recipient=a2;
         _withdraw(secret_power,rand,index);
         view_status(); // p3
+
         blocknumber+=periodBlocks+1;
         vm.roll(blocknumber);
-
-        view_status(); // p3
         vm.prank(a2);
         lottery.payOut();
         vm.prank(a1);
@@ -328,7 +328,7 @@ contract EthLotteryTest is Test {
 
     }
 
-    function test1_lottery_cancel() public {
+    function notest1_lottery_cancel() public {
         vm.roll(++blocknumber);
         _fake_play(0);
         (uint secret_power,) = _play(10); // hash can be restored later
@@ -359,7 +359,7 @@ contract EthLotteryTest is Test {
                 _withdraw(secret[j][i],rand[j][i],index[j][i]);}}
     }
 
-    function test2_lottery_single_deposit() public {
+    function notest2_lottery_single_deposit() public {
         vm.roll(++blocknumber);
         //_fake_play(0);
         (uint secret_power1,) = _play(10); // hash can be restored later

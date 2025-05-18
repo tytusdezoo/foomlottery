@@ -52,7 +52,7 @@ contract Lottery {
     uint public constant betPower2 = 16; // power of the second bet = 65536
     uint public constant betPower3 = 22; // power of the third bet = 4194304
     uint public constant betsMax = 250; // maximum number of bets in queue, max 8bit
-    uint public constant maxUpdate = 44; // maximum number of bets in queue to insert
+    uint public constant maxUpdate = 179; // maximum number of bets in queue to insert
     uint public constant dividendFeePerCent = 4; // 4% of dividends go to the shareholders (wall)
     uint public constant generatorFeePerCent = 1; // 1% of dividends go to the generator
     uint public constant maxBalance = 2**108; // maximum balance of a user and maximum size of bets in period
@@ -69,14 +69,12 @@ contract Lottery {
         uint8 betsStart; // index of last commited bet
         uint8 betsIndex; // index of the next slot in bet queue (>=1)
         uint8 commitIndex; // number of bets to insert into tree + 1 (>=1)
-        //uint8 currentRootIndex; // now all roots saved
         uint8 status;
     }
     Data public D;
     uint128 public currentBalance = 1; // sum of funds in wallets
     uint128 public currentBets = 1; // total bet volume in current period
     uint128 public currentShares = 1; // sum of funds eligible for dividend in current period
-    //uint128 public oldRand =0; // 
     uint public lastRoot; // current tree root
     uint public commitHash; //
     uint public commitBlockHash; //
@@ -257,27 +255,6 @@ contract Lottery {
         _withdraw(_recipient,reward);
     }
 
-    /**
-     * @dev Whether the root is present in the root history
-    function isKnownRoot(uint _root) public view returns (bool) {
-        if (_root == 0) {
-            return false;
-        }
-        uint _currentRootIndex = D.currentRootIndex;
-        uint i = _currentRootIndex;
-        do {
-            if (_root == roots[i]) {
-                return true;
-            }
-            if (i == 0) {
-                i = rootsMax;
-            }
-            i--;
-        } while (i != _currentRootIndex);
-        return false;
-    }
-     */
-
 /* random number generator functions */
 
     /**
@@ -326,7 +303,7 @@ contract Lottery {
         uint newBets = 0;
         if(D.commitIndex==1){
             uint[4+1] memory pubdata;
-            pubdata[0]=lastRoot;//uint(roots[D.currentRootIndex]);
+            pubdata[0]=lastRoot;
             pubdata[1]=uint(_newRoot);
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
@@ -339,7 +316,7 @@ contract Lottery {
             require(update1.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else if(D.commitIndex<=5){
             uint[4+5] memory pubdata;
-            pubdata[0]=lastRoot;//uint(roots[D.currentRootIndex]);
+            pubdata[0]=lastRoot;
             pubdata[1]=uint(_newRoot);
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
@@ -353,7 +330,7 @@ contract Lottery {
             require(update5.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else if(D.commitIndex<=21){
             uint[4+21] memory pubdata;
-            pubdata[0]=lastRoot;//uint(roots[D.currentRootIndex]);
+            pubdata[0]=lastRoot;
             pubdata[1]=uint(_newRoot);
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
@@ -367,7 +344,7 @@ contract Lottery {
             require(update21.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else{
             uint[4+44] memory pubdata;
-            pubdata[0]=lastRoot;//uint(roots[D.currentRootIndex]);
+            pubdata[0]=lastRoot;
             pubdata[1]=uint(_newRoot);
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
@@ -389,8 +366,6 @@ contract Lottery {
         commitBlockHash = _open;
         roots[_newRoot]=D.nextIndex;
         lastRoot=_newRoot;
-        //D.currentRootIndex = uint8((D.currentRootIndex + 1) % rootsMax);
-        //roots[D.currentRootIndex] = _newRoot;
         collectDividend(generator);
         uint generatorReward = newBets * generatorFeePerCent / 100;
         currentBalance += uint128(generatorReward);
@@ -631,13 +606,6 @@ contract Lottery {
     function dividendPeriod() public view returns (uint) {
         return uint(D.dividendPeriod);
     }
-
-    /**
-     * @dev Returns the last root
-    function getLastRoot() public view returns (uint) {
-        return roots[D.currentRootIndex];
-    }
-    */
 
     // events
     event LogBetIn(uint indexed index,uint indexed newHash);
