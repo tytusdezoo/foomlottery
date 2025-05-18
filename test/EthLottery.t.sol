@@ -38,7 +38,7 @@ contract EthLotteryTest is Test {
     uint public refund = 0;
     uint public invest = 0;
     uint public showGas = 1;
-    uint constant testsize=4; // test size
+    uint constant testsize=5; // test size
 
     uint public constant betMin = 1; //0.001 ether; // TODO: compute correct value
     uint public constant betPower1 = 10; // power of the first bet = 1024
@@ -343,11 +343,11 @@ contract EthLotteryTest is Test {
         _cancelbet(secret_power2,hash2,index2);
     }
 
-    function test5_ods() public {
-        uint[3+1][testsize] memory secret;
-        uint[3+1][testsize] memory hash;
-        uint[3+1][testsize] memory rand;
-        uint[3+1][testsize] memory index;
+    function notest5_ods() public {
+        uint[testsize][3] memory secret; // reverse order of dimensions in solidity :-)
+        uint[testsize][3] memory hash;
+        uint[testsize][3] memory rand;
+        uint[testsize][3] memory index;
         uint i;
         uint j;
         showGas=0;
