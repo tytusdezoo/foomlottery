@@ -1,9 +1,9 @@
 # Variables
 ARTIFACTS_DIR = circuit_artifacts
-export NODE_OPTIONS := --max-old-space-size=8192
+export NODE_OPTIONS := --max-old-space-size=16000
 
 # Default target
-all: setup compile gen_withdraw gen_cancelbet gen_update1 gen_update5 gen_update11 gen_update21 gen_update44 gen_update89 move
+all: setup compile gen_withdraw gen_cancelbet gen_update1 gen_update5 gen_update11 gen_update21 gen_update44 gen_update89 gen_update179 move
 
 # Create necessary directories
 setup:
@@ -27,6 +27,8 @@ compile:
 	circom circuits/update44.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
 	@echo "Compiling update89.circom..."
 	circom circuits/update89.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
+	@echo "Compiling update179.circom..."
+	circom circuits/update179.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
 
 compile_withdraw:
 	@echo "Compiling withdraw.circom..."
@@ -156,9 +158,16 @@ gen_update89:
 	snarkjs zkey export solidityverifier update89_final.zkey ../src/Update89.sol && sed -i 's/Groth16Verifier/Update89G16Verifier/' ../src/Update89.sol && \
 	snarkjs zkey export verificationkey update89_final.zkey update89_verification_key.json
 
+# Generate zkey and update contract
+gen_update179:
+	cd $(ARTIFACTS_DIR) && \
+	snarkjs groth16 setup update179.r1cs pot23_final.ptau update179_final.zkey && \
+	snarkjs zkey export solidityverifier update179_final.zkey ../src/Update179.sol && sed -i 's/Groth16Verifier/Update179G16Verifier/' ../src/Update179.sol && \
+	snarkjs zkey export verificationkey update179_final.zkey update179_verification_key.json
+
 move:
 	cd $(ARTIFACTS_DIR) && \
-        mv cancelbet_final.zkey update21_final.zkey update89_final.zkey update11_final.zkey update44_final.zkey withdraw_final.zkey update1_final.zkey update5_final.zkey cancelbet_js/cancelbet.wasm update44_js/update44.wasm update11_js/update11.wasm update5_js/update5.wasm update1_js/update1.wasm update89_js/update89.wasm update21_js/update21.wasm withdraw_js/withdraw.wasm ../groth16/
+        mv cancelbet_final.zkey update21_final.zkey update89_final.zkey update1799_final.zkey update11_final.zkey update44_final.zkey withdraw_final.zkey update1_final.zkey update5_final.zkey cancelbet_js/cancelbet.wasm update44_js/update44.wasm update11_js/update11.wasm update5_js/update5.wasm update1_js/update1.wasm update179_js/update179.wasm update179_js/update179.wasm update21_js/update21.wasm withdraw_js/withdraw.wasm ../groth16/
 
 # Clean circuit_artifacts
 clean:
