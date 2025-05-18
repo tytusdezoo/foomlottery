@@ -38,6 +38,7 @@ contract EthLotteryTest is Test {
     uint public refund = 0;
     uint public invest = 0;
     uint public showGas = 1;
+    uint constant testsize=4; // test size
 
     uint public constant betMin = 1; //0.001 ether; // TODO: compute correct value
     uint public constant betPower1 = 10; // power of the first bet = 1024
@@ -342,7 +343,27 @@ contract EthLotteryTest is Test {
         _cancelbet(secret_power2,hash2,index2);
     }
 
-    function test2_lottery_single_deposit() public {
+    function test5_ods() public {
+        uint[3+1][testsize] memory secret;
+        uint[3+1][testsize] memory hash;
+        uint[3+1][testsize] memory rand;
+        uint[3+1][testsize] memory index;
+        uint i;
+        uint j;
+        showGas=0;
+        for(j=0;j<3;j++){
+            for(i=0;i<testsize;i++){
+                vm.roll(++blocknumber);
+                (secret[j][i],hash[j][i]) = _play(9+j*6);}} // hash can be restored later
+        _commit_reveal();
+        for(j=0;j<3;j++){
+            console.log("test: %d, num %d",j,testsize);
+            for(i=0;i<testsize;i++){
+                (rand[j][i],index[j][i]) = _getRandIndex(hash[j][i]+(secret[j][i]&0x1f)+1);
+                _withdraw(secret[j][i],rand[j][i],index[j][i]);}}
+    }
+
+    function notest2_lottery_single_deposit() public {
         vm.roll(++blocknumber);
         //_fake_play(0);
         (uint secret_power1,) = _play(10); // hash can be restored later
