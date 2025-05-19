@@ -276,13 +276,14 @@ contract Lottery {
     /**
      * @dev commit the generator secret
      */
-    function commit(uint _commitHash) external onlyGenerator {
+    function commit(uint _commitHash,uint _maxUpdate) external onlyGenerator {
         require(D.betsIndex >0 , "No bets");
         require(_commitHash > _closed, "Commit hash already set");
         require(commitHash == _open, "Commit hash already set");
         require(D.commitBlock == 0, "Commit block already set");
+        require(_maxUpdate<=maxUpdate, "Commit size too large");
         D.commitBlock = uint64(block.number);
-        D.commitIndex = uint8(D.betsIndex<maxUpdate?D.betsIndex:maxUpdate);
+        D.commitIndex = uint8(D.betsIndex<_maxUpdate?D.betsIndex:_maxUpdate);
         commitHash = _commitHash;
         commitBlockHash = _open;
         emit LogCommit(D.nextIndex,D.commitIndex,commitHash);
