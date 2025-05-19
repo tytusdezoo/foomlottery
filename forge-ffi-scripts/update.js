@@ -53,8 +53,8 @@ async function main() {
 
   // console.log current working directory
   let stdout = execSync("cd "+__dirname+"/../groth16 && "+
-    "./update"+hashesLength+" update"+hashesLength+"_input.json update"+hashesLength+"_output.wnts && "+
-    "./prover update"+hashesLength+"_final.zkey update"+hashesLength+"_output.wnts update"+hashesLength+"_proof.json "+
+    "./update"+hashesLength+" update"+hashesLength+"_input.json update"+hashesLength+"_output.wtns && "+
+    "./prover update"+hashesLength+"_final.zkey update"+hashesLength+"_output.wtns update"+hashesLength+"_proof.json "+
     "update"+hashesLength+"_public.json && "+
     "sed -i 's/}.*/}/g' update"+hashesLength+"_proof.json && "+
     "sed -i 's/].*/]/g' update"+hashesLength+"_public.json" );
