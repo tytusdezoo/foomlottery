@@ -102,6 +102,7 @@ contract EthLotteryTest is Test {
                 inputs[1] = "forge-ffi-scripts/getLeaves.js";
                 //inputs[2] = vm.toString(bytes32(oldIndex));
                 inputs[2] = vm.toString(oldIndex);
+                //console.log("index: ",inputs[2]);
                 inputs[3] = vm.toString(bytes32(newRand));
                 for (uint j = 0; j < hashesLength; j++) {
                     inputs[4+j] = vm.toString(bytes32(allLeaves[oldIndex+j].topics[2]));}
@@ -232,11 +233,11 @@ contract EthLotteryTest is Test {
                 inputs[4 + i] = vm.toString(bytes32(0));}}
         for (uint i = 0; i < oldIndex; i++){
             inputs[4 + hashesLength + i] = vm.toString(bytes32(allLeaves[i].topics[1]));}
-        console.log("before update");
+        //console.log("before update");
         bytes memory result = vm.ffi(inputs);
-        console.log("after update");
+        //console.log("after update");
         (uint[2] memory pA,uint[2][2] memory pB,uint[2] memory pC,uint[] memory data)=abi.decode(result,(uint[2],uint[2][2],uint[2],uint[]));
-        console.log("after decode");
+        //console.log("after decode");
         uint revealGasStart;
         if(hashesLength==1){
           uint[4+1] memory pubdata;for(uint i=0;i<4+1;i++){pubdata[i]=data[i];} revealGasStart = gasleft();
@@ -264,7 +265,7 @@ contract EthLotteryTest is Test {
           assertTrue(update179.verifyProof(pA,pB,pC,pubdata));}
         else{
           revert("bad commitSize");}
-        console.log("after assert");
+        //console.log("after assert");
         uint revealGasUsed = revealGasStart - gasleft();
         if(0<showGas){ console.log("Gas used in update[%d].verifyProof: %d", hashesLength,revealGasUsed); }
         revealGasStart = gasleft();
@@ -273,6 +274,7 @@ contract EthLotteryTest is Test {
         if(0<showGas){ console.log("Gas used in _reveal[%d]: %d", hashesLength,revealGasUsed); }
         vm.roll(++blocknumber);
         commitIndex=0;
+        _getLogs();
     }
 
     function _getRandIndex(uint hash_power_1) internal returns (uint,uint) {
@@ -397,7 +399,7 @@ contract EthLotteryTest is Test {
                 _withdraw(secret[j][i],rand[j][i],index[j][i]);}}
     }
 
-    function test2_lottery_single_deposit() public {
+    function notest2_lottery_single_deposit() public {
         vm.roll(++blocknumber);
         //_fake_play(0);
         (uint secret_power1,) = _play(10); // hash can be restored later
@@ -426,7 +428,7 @@ contract EthLotteryTest is Test {
         _withdraw(secret_power3,rand3,index3);
     }
 
-    function notest179_updates() public {
+    function test179_updates() public {
         uint[2] memory sizes=[uint(180),uint(180)];
         for(uint j=0;j<2;j++){
           for(uint i=0;i<sizes[j];i++){

@@ -11,6 +11,8 @@ const { mimicMerkleTree } = require("./utils/mimcMerkleTree.js");
 // const zero08 = hexToBigint("0x0e5c230fa94b937789a1980f91b9de6233a7d0315f037c7d4917cba089e0042a"); needed in withdraw
 // const zero16 = hexToBigint("0x255da7d5316310ad81de31bfd5b8272b30ce70c742685ac9696446f618399317"); needed in withdraw
 
+// forge-ffi-scripts/getLeaves.js 1 0x0000000000000000000000000000000007a723530a3ee4727fca6baed148b971 0x1d4a9174860dc2bb70074560843307f625509fa9c8bc88677425d0b0b05c364b
+
 function touchfile(path) {
   try {
     openSync(path, 'r');
@@ -41,7 +43,6 @@ async function computeRoot(path) {
     //TODO: fix the file
   }
   const tree = await mimicMerkleTree(0n,hashes,8);
-  //console.log(tree.root.toString());
   return tree.root;
 }
 
@@ -66,17 +67,17 @@ async function appendtofile(pathlast,text,hash) {
   if(hash) {
     const root = await computeRoot("www/"+path1+"/"+path2+"/"+path3+".csv");
     const file = openSync("www/"+path1+"/"+path2+"/index.csv", "a");
-    writeFileSync(file, sprintfjs.sprintf("0x%02x,%s\n",path3,root.toString()));
+    writeFileSync(file, sprintfjs.sprintf("0x%02x,%s\n",path3,bigintToHex(root)));
     closeSync(file);
     if(path3=="ff"){
       const root = await computeRoot("www/"+path1+"/"+path2+"/index.csv");
       const file = openSync("www/"+path1+"/index.csv", "a");
-      writeFileSync(file, sprintfjs.sprintf("0x%02x,%s\n",path2,root.toString()));
+      writeFileSync(file, sprintfjs.sprintf("0x%02x,%s\n",path2,bigintToHex(root)));
       closeSync(file);
       if(path2=="ff"){
         const root = await computeRoot("www/"+path1+"/index.csv");
         const file = openSync("www/index.csv", "a");
-        writeFileSync(file, sprintfjs.sprintf("0x%02x,%s\n",path1,root.toString()));
+        writeFileSync(file, sprintfjs.sprintf("0x%02x,%s\n",path1,bigintToHex(root)));
         closeSync(file);
       }
     }
@@ -113,7 +114,7 @@ async function main() {
       text='';
       pathlast=pathnew;
     }
-    text+=sprintfjs.sprintf("0x%x,%s,%s,%s\n",index+i,bigintToHex(newLeaves[i]),inputs[2+i],inputs[1]);
+    text+=sprintfjs.sprintf("0x%x,%s,%s,%s\n",(index+i)&0xFF,bigintToHex(newLeaves[i]),inputs[2+i],inputs[1]);
   }
   await appendtofile(pathlast,text,(index+i)&0xff==0?true:false);
 
