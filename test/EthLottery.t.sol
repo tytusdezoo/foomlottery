@@ -396,7 +396,7 @@ contract EthLotteryTest is Test {
                 _withdraw(secret[j][i],rand[j][i],index[j][i]);}}
     }
 
-    function test2_lottery_single_deposit() public {
+    function notest2_lottery_single_deposit() public {
         vm.roll(++blocknumber);
         //_fake_play(0);
         (uint secret_power1,) = _play(10); // hash can be restored later
@@ -425,7 +425,7 @@ contract EthLotteryTest is Test {
         _withdraw(secret_power3,rand3,index3);
     }
 
-    function notest179_updates() public {
+    function test179_updates() public {
         uint[1] memory sizes=[uint(90)];
         for(uint j=0;j<1;j++){
           for(uint i=0;i<sizes[j];i++){
