@@ -10,6 +10,8 @@ const { mimicMerkleTree } = require("./utils/mimcMerkleTree.js");
 const circomlibjs = require("circomlibjs");
 ////////////////////////////// MAIN ///////////////////////////////////////////
 // ./forge-ffi-scripts/update.js 0x0000000000000000000000000000000000000000000000000000000000000001 0x000000000000000000000000000000009691a9866228f0e680fe3c605b14a165 0x0000000000000000000000000000000000000000000000000000000000000000 0x24d599883f039a5cb553f9ec0e5998d58d8816e823bd556164f72aef0ef7d9c0
+// forge-ffi-scripts/update.js 1 0x0000000000000000000000000000000007a723530a3ee4727fca6baed148b971 0x26f89aa76d0adcac0bf2c4631dc404ca4056f72d91119df55aea4f9e1f5831ab 0x24d599883f039a5cb553f9ec0e5998d58d8816e823bd556164f72aef0ef7d9c0
+
 
 async function main() {
   const inputs = process.argv.slice(2, process.argv.length);
@@ -26,9 +28,7 @@ async function main() {
   for(;i<hashesLength;i++){
     if(newHashes[i]==0){
       break;}}
-  
   const newLeaves = newHashes.slice(0, i).map((h,j) => leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([h,newRand,BigInt(oldLeaves.length)+BigInt(j)]))));
-
   tree.bulkInsert(newLeaves);
   const newProof = tree.path(oldLeaves.length-1+newLeaves.length)
 
