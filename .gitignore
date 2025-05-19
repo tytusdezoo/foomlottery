@@ -32,3 +32,4 @@ groth16/update21_final.zkey
 groth16/update44_final.zkey
 groth16/update89_final.zkey
 groth16/update179_final.zkey
+groth16/*.wtns
