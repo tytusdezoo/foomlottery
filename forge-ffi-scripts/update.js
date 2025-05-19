@@ -1,5 +1,6 @@
 #!/usr/bin/node
 
+const { execSync } = require('child_process');
 const fs = require("fs");
 const path = require("path");
 const snarkjs = require("snarkjs");
@@ -49,6 +50,8 @@ async function main() {
   fs.writeFileSync(path.join(__dirname, '../tmp/update'+hashesLength+'_input.json'), JSON.stringify(input, null, 2));
   //console.log(JSON.stringify(input));
 
+//... continue ...
+//let stdout = execSync(path.join(__dirname, '../tmp/update'+hashesLength+'_input.json'));
 // ./update179 input.json output.wtns && ./prover update89_final.zkey output.wtns proof.json public.json
 
   // 5. Create groth16 proof for witness
