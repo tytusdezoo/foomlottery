@@ -18,12 +18,7 @@ docs/
 /circuit_artifacts
 /circuits/lib
 
-# Test
-forge-ffi-scripts/testMimc.js
-forge-ffi-scripts/mimc123.js
-oldtest/
-
-# failes to upload
+# 
 tmp/
 
 # why yarn ?

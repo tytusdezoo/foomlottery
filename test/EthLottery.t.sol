@@ -14,7 +14,7 @@ import {Update21G16Verifier} from "src/Update21.sol";
 import {Update44G16Verifier} from "src/Update44.sol";
 import {Update89G16Verifier} from "src/Update89.sol";
 import {Update179G16Verifier} from "src/Update179.sol";
-import {IWithdraw, ICancel, IUpdate1, IUpdate5, IUpdate21, IUpdate44} from "src/Lottery.sol";
+import {IWithdraw, ICancel, IUpdate1, IUpdate3, IUpdate5, IUpdate11, IUpdate21, IUpdate44, IUpdate89, IUpdate179} from "src/Lottery.sol";
 import {EthLottery} from "src/EthLottery.sol";
 
 contract EthLotteryTest is Test {
@@ -24,9 +24,13 @@ contract EthLotteryTest is Test {
     IWithdraw public withdraw;
     ICancel public cancel;
     IUpdate1 public update1;
+    IUpdate3 public update3;
     IUpdate5 public update5;
+    IUpdate11 public update11;
     IUpdate21 public update21;
     IUpdate44 public update44;
+    IUpdate89 public update89;
+    IUpdate179 public update179;
 
     uint blocknumber = 1;
     uint oldIndex = 0;
@@ -62,13 +66,17 @@ contract EthLotteryTest is Test {
         withdraw = IWithdraw(address(new WithdrawG16Verifier()));
         cancel = ICancel(address(new CancelBetG16Verifier()));
         update1 = IUpdate1(address(new Update1G16Verifier()));
+        update3 = IUpdate3(address(new Update3G16Verifier()));
         update5 = IUpdate5(address(new Update5G16Verifier()));
+        update11 = IUpdate11(address(new Update11G16Verifier()));
         update21 = IUpdate21(address(new Update21G16Verifier()));
         update44 = IUpdate44(address(new Update44G16Verifier()));
+        update89 = IUpdate89(address(new Update89G16Verifier()));
+        update179 = IUpdate179(address(new Update179G16Verifier()));
         // Deploy lottery contract.
         vm.roll(++blocknumber);
     	vm.recordLogs();
-        lottery = new EthLottery(withdraw, cancel, update1, update5, update21, update44, IERC20(address(0)), betMin);
+        lottery = new EthLottery(withdraw, cancel, update1, update3, update5, update11, update21, update44, update89,update179, IERC20(address(0)), betMin);
     }
 
     function _getLogs() internal {

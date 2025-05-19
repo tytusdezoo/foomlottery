@@ -1,9 +1,8 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Test, console} from "forge-std/Test.sol";
 
-interface IWithdraw { // 48439 c
+interface IWithdraw { // 48439 constraints
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[7] calldata _pubSignals) external view returns (bool); // 240419 gas
 }
 interface ICancel { // 686 c
@@ -43,9 +42,13 @@ contract Lottery {
     IWithdraw public immutable withdraw;
     ICancel public immutable cancel;
     IUpdate1 public immutable update1;
+    IUpdate3 public immutable update3;
     IUpdate5 public immutable update5;
+    IUpdate11 public immutable update11;
     IUpdate21 public immutable update21;
     IUpdate44 public immutable update44;
+    IUpdate89 public immutable update89;
+    IUpdate179 public immutable update179;
 
     uint public constant FIELD_SIZE = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
     uint public constant merkleTreeLevels = 32 ; // number of Merkle Tree levels
@@ -104,13 +107,28 @@ contract Lottery {
     mapping(uint => uint) public roots;
 
     // constructor
-    constructor(IWithdraw _Withdraw,ICancel _Cancel,IUpdate1 _Update1,IUpdate5 _Update5,IUpdate21 _Update21,IUpdate44 _Update44,IERC20 _Token,uint _BetMin) {
+    constructor(IWithdraw _Withdraw,
+                ICancel _Cancel,
+                IUpdate1 _Update1,
+                IUpdate3 _Update3,
+                IUpdate5 _Update5,
+                IUpdate11 _Update11,
+                IUpdate21 _Update21,
+                IUpdate44 _Update44,
+                IUpdate89 _Update89,
+                IUpdate179 _Update179,
+                IERC20 _Token,
+                uint _BetMin) {
         withdraw = _Withdraw;
         cancel = _Cancel;
         update1 = _Update1;
+        update3 = _Update3;
         update5 = _Update5;
+        update11 = _Update11;
         update21 = _Update21;
         update44 = _Update44;
+        update89 = _Update89;
+        update179 = _Update179;
         token = _Token;
         betMin = _BetMin;
         owner = msg.sender;
@@ -119,13 +137,9 @@ contract Lottery {
         D.dividendPeriod = uint32(1);
         D.status = uint8(_open);
         D.nextIndex = uint32(1);
-        //D.betsStart = uint8(0);
-        //D.betsIndex = uint8(0);
-        //D.commitIndex = uint8(0);
         commitHash = _open;
         commitBlockHash = _open;
         wallets[owner] = Wallet(uint112(1),uint112(1),uint16(D.dividendPeriod),uint16(0));
-        //periods[0]=Period(0,0); // not needed
         periods[D.dividendPeriod]=Period(1,1);
         // 16660660614175348086322821347366010925591495133565739687589833680199500683712
         // leaf=0x24d599883f039a5cb553f9ec0e5998d58d8816e823bd556164f72aef0ef7d9c0 mimcsponge([keccak(foom)<<4,0,0])
@@ -182,11 +196,10 @@ contract Lottery {
         uint _rewardbits,
         uint _invest) payable external nonReentrant {
         require(nullifier[_nullifierHash] == 0, "Incorrect nullifier");
+        nullifier[_nullifierHash] = 1;
         require(msg.value == _refund, "Incorrect refund amount received by the contract");
-        //require(isKnownRoot(_root), "Cannot find your merkle root"); // Make sure to use a recent one
         require(roots[_root]>0, "Cannot find your merkle root");
         require(withdraw.verifyProof( _pA, _pB, _pC, [ _root, _nullifierHash, _rewardbits, uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
-        nullifier[_nullifierHash] = 1;
         uint reward =  betMin * ( (_rewardbits&0x1>0?1:0) * 2**betPower1 + (_rewardbits&0x2>0?1:0) * 2**betPower2 + (_rewardbits&0x4>0?1:0) * 2**betPower3 );
         emit LogWin(uint(_nullifierHash),reward);
         //currentBets += uint128(reward);
@@ -291,6 +304,15 @@ contract Lottery {
     }
 
     /**
+     * @dev reveal the generator secret without updating the tree
+     */
+    function secret(uint _revealSecret) public {
+        rememberHash();
+        require(uint(keccak256(abi.encodePacked(_revealSecret))) == commitHash, "Invalid reveal secret");
+        emit LogSecret(lastRoot,_revealSecret);
+    }
+
+    /**
      * @dev reveal the generator secret
      */
     function reveal( // unchecked {
@@ -369,10 +391,10 @@ contract Lottery {
         commitBlockHash = _open;
         roots[_newRoot]=D.nextIndex;
         lastRoot=_newRoot;
-        collectDividend(generator);
+        collectDividend(msg.sender);
         uint generatorReward = newBets * generatorFeePerCent / 100;
         currentBalance += uint128(generatorReward);
-        wallets[generator].balance += uint112(generatorReward);
+        wallets[msg.sender].balance += uint112(generatorReward);
         emit LogUpdate(uint(D.nextIndex),newRand,_newRoot);
     } // }
 
@@ -612,15 +634,15 @@ contract Lottery {
 
     // events
     event LogBetIn(uint indexed index,uint indexed newHash);
-    //event LogBetHash(uint indexed index,uint indexed newHash,uint indexed newRand);
-    event LogCommit(uint indexed index,uint indexed commitIndex,uint indexed commitHash);
-    event LogUpdate(uint indexed index,uint indexed newRand,uint indexed newRoot);
     event LogCancel(uint indexed index);
+    event LogCommit(uint indexed index,uint indexed commitIndex,uint indexed commitHash);
+    event LogSecret(uint indexed lastRoot,uint indexed revealSecret);
+    event LogUpdate(uint indexed index,uint indexed newRand,uint indexed newRoot);
     event LogWin(uint indexed nullifierHash, uint indexed reward);
-    event LogClose(address indexed owner);
-    event LogResetCommit(address indexed owner);
     event LogWithdraw(address indexed owner);
+    event LogClose(address indexed owner);
     event LogReopen(address indexed owner);
+    event LogResetCommit(address indexed owner);
     event LogChangeOwner(address indexed owner, address indexed newOwner);
     event LogChangeGenerator(address indexed owner, address indexed newGenerator);
 }
