@@ -427,8 +427,8 @@ contract EthLotteryTest is Test {
     }
 
     function notest179_updates() public {
-        uint[1] memory sizes=[uint(90)];
-        for(uint j=0;j<1;j++){
+        uint[2] memory sizes=[uint(180),uint(180)];
+        for(uint j=0;j<2;j++){
           for(uint i=0;i<sizes[j];i++){
             _fake_play(j*8+i);}
           uint start = vm.unixTime();
