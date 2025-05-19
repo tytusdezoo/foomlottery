@@ -53,3 +53,7 @@ apt-get install nlohmann-json3-dev
 apt-get install libgmp3-dev
 apt-get install gcc-multilib
 apt-get install nasm
+
+install:
+rapidsnark
+and place in groth16/

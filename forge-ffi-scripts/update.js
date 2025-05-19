@@ -5,16 +5,16 @@ const fs = require("fs");
 const path = require("path");
 const snarkjs = require("snarkjs");
 const { ethers } = require("ethers");
-const { hexToBigint, bigintToHex, leBigintToBuffer, reverseBits, } = require("./utils/bigint.js");
+const { hexToBigint, bigintToHex, leBufferToBigint } = require("./utils/bigint.js");
 const { mimicMerkleTree } = require("./utils/mimcMerkleTree.js");
-const { mimcsponge3 } = require("./utils/mimcsponge.js");
-
+const circomlibjs = require("circomlibjs");
 ////////////////////////////// MAIN ///////////////////////////////////////////
 // ./forge-ffi-scripts/update.js 0x0000000000000000000000000000000000000000000000000000000000000001 0x000000000000000000000000000000009691a9866228f0e680fe3c605b14a165 0x0000000000000000000000000000000000000000000000000000000000000000 0x24d599883f039a5cb553f9ec0e5998d58d8816e823bd556164f72aef0ef7d9c0
 
 async function main() {
   const inputs = process.argv.slice(2, process.argv.length);
-  
+  const mimcsponge = await circomlibjs.buildMimcSponge();
+
   // 1. Get nullifier and secret
   const hashesLength = parseInt(inputs[0]);
   const newRand = hexToBigint(inputs[1]);
@@ -26,8 +26,9 @@ async function main() {
   for(;i<hashesLength;i++){
     if(newHashes[i]==0){
       break;}}
-  // TODO: will fail for 100 hashes !!!, need to do this in sync mode
-  const newLeaves = await Promise.all(newHashes.slice(0, i).map(async (h,j) => await mimcsponge3(h,newRand,BigInt(oldLeaves.length)+BigInt(j))));
+  
+  const newLeaves = newHashes.slice(0, i).map((h,j) => leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([h,newRand,BigInt(oldLeaves.length)+BigInt(j)]))));
+
   tree.bulkInsert(newLeaves);
   const newProof = tree.path(oldLeaves.length-1+newLeaves.length)
 
@@ -53,7 +54,10 @@ async function main() {
   // console.log current working directory
   let stdout = execSync("cd "+__dirname+"/../groth16 && "+
     "./update"+hashesLength+" update"+hashesLength+"_input.json update"+hashesLength+"_output.wnts && "+
-    "./prover update"+hashesLength+"_final.zkey update"+hashesLength+"_output.wnts update"+hashesLength+"_proof.json update"+hashesLength+"_public.json");
+    "./prover update"+hashesLength+"_final.zkey update"+hashesLength+"_output.wnts update"+hashesLength+"_proof.json "+
+    "update"+hashesLength+"_public.json && "+
+    "sed -i 's/}.*/}/g' update"+hashesLength+"_proof.json && "+
+    "sed -i 's/].*/]/g' update"+hashesLength+"_public.json" );
   // read proof.json and parse to json object
   const proof = JSON.parse(fs.readFileSync(path.join(__dirname, '../groth16/update'+hashesLength+'_proof.json'), 'utf8'));
 
@@ -89,27 +93,6 @@ async function main() {
       ]
     ]
   );
-  /*
-  // 4. Format witness input to exactly match circuit expectations
-  // only for debugging
-  const zkpublic = [
-    (oldProof.pathRoot).toString(),
-    (newProof.pathRoot).toString(),
-    (oldLeaves.length-1).toString(),
-    (newRand).toString(),
-    ...newHashes.map((x) => x.toString()), // spread the array into individual elements
-  ];
-  fs.writeFileSync(path.join(__dirname, '../tmp/update'+hashesLength+'_public.json'), JSON.stringify(zkpublic, null, 2));
-  // only for debugging
-  const zkproof = {
-    pi_a: [pA[0],pA[1],1],
-    pi_b: [[pB[0][0],pB[0][1]],[pB[1][0],pB[1][1]],[1,0]],
-    pi_c: [pC[0],pC[1],1],
-    protocol: "groth16",
-    curve: "bn128",
-  };  
-  fs.writeFileSync(path.join(__dirname, '../tmp/update'+hashesLength+'_proof.json'), JSON.stringify(zkproof, null, 2));
-  */
 
   return witness;
   

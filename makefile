@@ -16,21 +16,21 @@ compile:
 	@echo "Compiling cancelbet.circom..."
 	circom circuits/cancelbet.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
 	@echo "Compiling update1.circom..."
-	circom circuits/update1.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update1_cpp && make all
+	circom circuits/update1.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update1_cpp && make all && mv update1 update1.dat ../../groth16/
 	@echo "Compiling update3.circom..."
-	circom circuits/update3.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update3_cpp && make all
+	circom circuits/update3.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update3_cpp && make all && mv update3 update3.dat ../../groth16/
 	@echo "Compiling update5.circom..."
-	circom circuits/update5.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update5_cpp && make all
+	circom circuits/update5.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update5_cpp && make all && mv update5 update5.dat ../../groth16/
 	@echo "Compiling update11.circom..."
-	circom circuits/update11.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update11_cpp && make all
+	circom circuits/update11.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update11_cpp && make all && mv update11 update11.dat ../../groth16/
 	@echo "Compiling update21.circom..."
-	circom circuits/update21.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update21_cpp && make all
+	circom circuits/update21.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update21_cpp && make all && mv update21 update21.dat ../../groth16/
 	@echo "Compiling update44.circom..."
-	circom circuits/update44.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update44_cpp && make all
+	circom circuits/update44.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update44_cpp && make all && mv update44 update44.dat ../../groth16/
 	@echo "Compiling update89.circom..."
-	circom circuits/update89.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update89_cpp && make all
+	circom circuits/update89.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update89_cpp && make all && mv update89 update89.dat ../../groth16/
 	@echo "Compiling update179.circom..."
-	circom circuits/update179.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update179_cpp && make all
+	circom circuits/update179.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update179_cpp && make all && mv update179 update179.dat ../../groth16/
 
 compile_withdraw:
 	@echo "Compiling withdraw.circom..."
@@ -42,35 +42,35 @@ compile_cancelbet:
 
 compile_update1:
 	@echo "Compiling update1.circom..."
-	circom circuits/update1.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update1_cpp && make all
+	circom circuits/update1.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update1_cpp && make all && mv update1 update1.dat ../../groth16/
 
 compile_update3:
 	@echo "Compiling update3.circom..."
-	circom circuits/update3.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update3_cpp && make all
+	circom circuits/update3.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update3_cpp && make all && mv update3 update3.dat ../../groth16/
 
 compile_update5:
 	@echo "Compiling update5.circom..."
-	circom circuits/update5.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update5_cpp && make all
+	circom circuits/update5.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update5_cpp && make all && mv update5 update5.dat ../../groth16/
 
 compile_update11:
 	@echo "Compiling update11.circom..."
-	circom circuits/update11.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update11_cpp && make all
+	circom circuits/update11.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update11_cpp && make all && mv update11 update11.dat ../../groth16/
 
 compile_update21:
 	@echo "Compiling update21.circom..."
-	circom circuits/update21.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update21_cpp && make all
+	circom circuits/update21.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update21_cpp && make all && mv update21 update21.dat ../../groth16/
 
 compile_update44:
 	@echo "Compiling update44.circom..."
-	circom circuits/update44.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update44_cpp && make all
+	circom circuits/update44.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update44_cpp && make all && mv update44 update44.dat ../../groth16/
 
 compile_update89:
 	@echo "Compiling update89.circom..."
-	circom circuits/update89.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update89_cpp && make all
+	circom circuits/update89.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update89_cpp && make all && mv update89 update89.dat ../../groth16/
 
 compile_update179:
 	@echo "Compiling update179.circom..."
-	circom circuits/update179.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update179_cpp && make all
+	circom circuits/update179.circom --r1cs --wasm --sym --O2 -c -o $(ARTIFACTS_DIR) && cd $(ARTIFACTS_DIR)/update179_cpp && make all && mv update179 update179.dat ../../groth16/
 
 # Powers of tau ceremony
 ptau10:
