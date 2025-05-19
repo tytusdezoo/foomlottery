@@ -7,9 +7,13 @@ import {Vm} from "forge-std/Vm.sol";
 import {WithdrawG16Verifier} from "src/Withdraw.sol";
 import {CancelBetG16Verifier} from "src/CancelBet.sol";
 import {Update1G16Verifier} from "src/Update1.sol";
+import {Update3G16Verifier} from "src/Update3.sol";
 import {Update5G16Verifier} from "src/Update5.sol";
+import {Update11G16Verifier} from "src/Update11.sol";
 import {Update21G16Verifier} from "src/Update21.sol";
 import {Update44G16Verifier} from "src/Update44.sol";
+import {Update89G16Verifier} from "src/Update89.sol";
+import {Update179G16Verifier} from "src/Update179.sol";
 import {IWithdraw, ICancel, IUpdate1, IUpdate5, IUpdate21, IUpdate44} from "src/Lottery.sol";
 import {EthLottery} from "src/EthLottery.sol";
 

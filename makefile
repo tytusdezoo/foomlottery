@@ -3,7 +3,7 @@ ARTIFACTS_DIR = circuit_artifacts
 export NODE_OPTIONS := --max-old-space-size=16000
 
 # Default target
-all: setup compile gen_withdraw gen_cancelbet gen_update1 gen_update5 gen_update11 gen_update21 gen_update44 gen_update89 gen_update179 move
+all: setup compile gen_withdraw gen_cancelbet gen_update1 gen_update3 gen_update5 gen_update11 gen_update21 gen_update44 gen_update89 gen_update179 move
 
 # Create necessary directories
 setup:
@@ -17,6 +17,8 @@ compile:
 	circom circuits/cancelbet.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
 	@echo "Compiling update1.circom..."
 	circom circuits/update1.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
+	@echo "Compiling update3.circom..."
+	circom circuits/update3.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
 	@echo "Compiling update5.circom..."
 	circom circuits/update5.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
 	@echo "Compiling update11.circom..."
@@ -41,6 +43,10 @@ compile_cancelbet:
 compile_update1:
 	@echo "Compiling update1.circom..."
 	circom circuits/update1.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
+
+compile_update3:
+	@echo "Compiling update3.circom..."
+	circom circuits/update3.circom --r1cs --wasm --sym --O2 -o $(ARTIFACTS_DIR)
 
 compile_update5:
 	@echo "Compiling update5.circom..."
@@ -124,6 +130,13 @@ gen_update1:
 	snarkjs zkey export verificationkey update1_final.zkey update1_verification_key.json
 
 # Generate zkey and update contract
+gen_update3:
+	cd $(ARTIFACTS_DIR) && \
+	snarkjs groth16 setup update3.r1cs pot22_final.ptau update3_final.zkey && \
+	snarkjs zkey export solidityverifier update3_final.zkey ../src/Update3.sol && sed -i 's/Groth16Verifier/Update3G16Verifier/' ../src/Update3.sol && \
+	snarkjs zkey export verificationkey update3_final.zkey update3_verification_key.json
+
+# Generate zkey and update contract
 gen_update5:
 	cd $(ARTIFACTS_DIR) && \
 	snarkjs groth16 setup update5.r1cs pot22_final.ptau update5_final.zkey && \
@@ -167,7 +180,7 @@ gen_update179:
 
 move:
 	cd $(ARTIFACTS_DIR) && \
-        mv cancelbet_final.zkey update21_final.zkey update89_final.zkey update179_final.zkey update11_final.zkey update44_final.zkey withdraw_final.zkey update1_final.zkey update5_final.zkey cancelbet_js/cancelbet.wasm update44_js/update44.wasm update11_js/update11.wasm update5_js/update5.wasm update1_js/update1.wasm update179_js/update179.wasm update179_js/update179.wasm update21_js/update21.wasm withdraw_js/withdraw.wasm ../groth16/
+        mv cancelbet_final.zkey update21_final.zkey update89_final.zkey update179_final.zkey update11_final.zkey update44_final.zkey withdraw_final.zkey update1_final.zkey update3_final.zkey update5_final.zkey cancelbet_js/cancelbet.wasm update44_js/update44.wasm update11_js/update11.wasm update3_js/update3.wasm update5_js/update5.wasm update1_js/update1.wasm update179_js/update179.wasm update179_js/update179.wasm update21_js/update21.wasm withdraw_js/withdraw.wasm ../groth16/
 
 # Clean circuit_artifacts
 clean:

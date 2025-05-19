@@ -12,6 +12,9 @@ interface ICancel { // 686 c
 interface IUpdate1 { // 86817 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[5] calldata _pubSignals) external view returns (bool); // 226598 g
 }
+interface IUpdate3 { // 175585 c
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[7] calldata _pubSignals) external view returns (bool); // g
+}
 interface IUpdate5 { // 264353 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool); // 254252 g
 }
