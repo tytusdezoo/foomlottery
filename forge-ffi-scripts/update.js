@@ -14,7 +14,7 @@ const { mimcsponge3 } = require("./utils/mimcsponge.js");
 
 async function main() {
   const inputs = process.argv.slice(2, process.argv.length);
-
+  
   // 1. Get nullifier and secret
   const hashesLength = parseInt(inputs[0]);
   const newRand = hexToBigint(inputs[1]);
@@ -47,19 +47,22 @@ async function main() {
   // Write input to input.json
   // only for debugging
   BigInt.prototype.toJSON = function () { return this.toString(); };
-  fs.writeFileSync(path.join(__dirname, '../tmp/update'+hashesLength+'_input.json'), JSON.stringify(input, null, 2));
+  fs.writeFileSync(path.join(__dirname, '../groth16/update'+hashesLength+'_input.json'), JSON.stringify(input, null, 2));
   //console.log(JSON.stringify(input));
 
-//... continue ...
-//let stdout = execSync(path.join(__dirname, '../tmp/update'+hashesLength+'_input.json'));
-// ./update179 input.json output.wtns && ./prover update89_final.zkey output.wtns proof.json public.json
+  // console.log current working directory
+  let stdout = execSync("cd "+__dirname+"/../groth16 && "+
+    "./update"+hashesLength+" update"+hashesLength+"_input.json update"+hashesLength+"_output.wnts && "+
+    "./prover update"+hashesLength+"_final.zkey update"+hashesLength+"_output.wnts update"+hashesLength+"_proof.json update"+hashesLength+"_public.json");
+  // read proof.json and parse to json object
+  const proof = JSON.parse(fs.readFileSync(path.join(__dirname, '../groth16/update'+hashesLength+'_proof.json'), 'utf8'));
 
   // 5. Create groth16 proof for witness
-  const { proof } = await snarkjs.groth16.fullProve(
+  /*const { proof } = await snarkjs.groth16.fullProve(
     input,
     path.join(__dirname, "../groth16/update"+hashesLength+".wasm"),
     path.join(__dirname, "../groth16/update"+hashesLength+"_final.zkey")
-  );
+  );*/
 
   const pA = proof.pi_a.slice(0, 2);
   const pB = proof.pi_b.slice(0, 2);
@@ -86,6 +89,7 @@ async function main() {
       ]
     ]
   );
+  /*
   // 4. Format witness input to exactly match circuit expectations
   // only for debugging
   const zkpublic = [
@@ -105,6 +109,7 @@ async function main() {
     curve: "bn128",
   };  
   fs.writeFileSync(path.join(__dirname, '../tmp/update'+hashesLength+'_proof.json'), JSON.stringify(zkproof, null, 2));
+  */
 
   return witness;
   
