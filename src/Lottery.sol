@@ -8,33 +8,32 @@ interface IWithdraw { // 48439 constraints
 interface ICancel { // 686 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[1] calldata _pubSignals) external view returns (bool); // 198961 g
 }
-interface IUpdate1 { // 86817 c
+interface IUpdate1 { // 86817 c (3s)
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[5] calldata _pubSignals) external view returns (bool); // 222057 g
 }
-interface IUpdate3 { // 175585 c
+interface IUpdate3 { // 175585 c (6s)
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[7] calldata _pubSignals) external view returns (bool); // 235470 g
 }
-interface IUpdate5 { // 264353 c
+interface IUpdate5 { // 264353 c (9s)
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool); // 248887 g
 }
-interface IUpdate11 { // 530657 c
+interface IUpdate11 { // 530657 c (16s)
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[15] calldata _pubSignals) external view returns (bool); // 289131 g
 }
-interface IUpdate21 { // 974497 c
+interface IUpdate21 { // 974497 c (24s)
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[25] calldata _pubSignals) external view returns (bool); // 356104 g
 }
-interface IUpdate44 { // 1995329 c
+interface IUpdate44 { // 1995329 c (340GvRAM+15GRAM,49s)
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[48] calldata _pubSignals) external view returns (bool); // 510074 g
 }
-interface IUpdate89 { // 3992609 c
+interface IUpdate89 { // 3992609 c (380GvRAM+29GRAM,96s)
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[93] calldata _pubSignals) external view returns (bool); // 811439 g
 }
 /* too large to compute easily
-interface IUpdate179 { // 7987169 c // could not allocate memmory :-(
+interface IUpdate179 { // 7987169 c (1TvRAM needed)// could not allocate memmory :-(
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[183] calldata _pubSignals) external view returns (bool); // g
 }
 */
-
 
 /**
  * @title FOOM Lottery
