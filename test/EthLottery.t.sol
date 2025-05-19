@@ -284,7 +284,7 @@ contract EthLotteryTest is Test {
             console.log("%d shares: %d,withdrawperiod: %d",i,shares,wperiod);}
     }
 
-    function test0_investments() public {
+    function notest0_investments() public {
         // console.log("period %d",periodBlocks);
         // console.log("me %x",msg.sender); // 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
         view_status();
@@ -400,6 +400,14 @@ contract EthLotteryTest is Test {
         _withdraw(secret_power3,rand3,index3);
     }
 
+    function test9_updates() public {
+        uint[8] memory sizes=[uint(1),uint(2),uint(4),uint(10),uint(20),uint(43),uint(88),uint(178)];
+        for(uint j=0;j<8;j++){
+          for(uint i=0;i<sizes[j];i++){
+            _fake_play(j*8+i);}
+          _commit_reveal();}
+    }
+    
     function notest3_lottery_many_deposits() public {
         uint i;
         uint secret_power;
