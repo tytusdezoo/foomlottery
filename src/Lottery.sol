@@ -9,29 +9,31 @@ interface ICancel { // 686 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[1] calldata _pubSignals) external view returns (bool); // 198961 g
 }
 interface IUpdate1 { // 86817 c
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[5] calldata _pubSignals) external view returns (bool); // 226598 g
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[5] calldata _pubSignals) external view returns (bool); // 222057 g
 }
 interface IUpdate3 { // 175585 c
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[7] calldata _pubSignals) external view returns (bool); // g
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[7] calldata _pubSignals) external view returns (bool); // 235470 g
 }
 interface IUpdate5 { // 264353 c
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool); // 254252 g
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool); // 248887 g
 }
 interface IUpdate11 { // 530657 c
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[15] calldata _pubSignals) external view returns (bool); // g
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[15] calldata _pubSignals) external view returns (bool); // 289131 g
 }
 interface IUpdate21 { // 974497 c
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[25] calldata _pubSignals) external view returns (bool); // 364897 g
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[25] calldata _pubSignals) external view returns (bool); // 356104 g
 }
 interface IUpdate44 { // 1995329 c
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[48] calldata _pubSignals) external view returns (bool); // 519083 g
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[48] calldata _pubSignals) external view returns (bool); // 510074 g
 }
 interface IUpdate89 { // 3992609 c
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[93] calldata _pubSignals) external view returns (bool); // g
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[93] calldata _pubSignals) external view returns (bool); // 811439 g
 }
-interface IUpdate179 { // 7987169 c
+/* too large to compute easily
+interface IUpdate179 { // 7987169 c // could not allocate memmory :-(
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[183] calldata _pubSignals) external view returns (bool); // g
 }
+*/
 
 
 /**
@@ -48,7 +50,7 @@ contract Lottery {
     IUpdate21 public immutable update21;
     IUpdate44 public immutable update44;
     IUpdate89 public immutable update89;
-    IUpdate179 public immutable update179;
+    //IUpdate179 public immutable update179;
 
     uint public constant FIELD_SIZE = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
     uint public constant merkleTreeLevels = 32 ; // number of Merkle Tree levels
@@ -57,12 +59,11 @@ contract Lottery {
     uint public constant betPower1 = 10; // power of the first bet = 1024
     uint public constant betPower2 = 16; // power of the second bet = 65536
     uint public constant betPower3 = 22; // power of the third bet = 4194304
-    uint public constant betsMax = 250; // maximum number of bets in queue, max 8bit
-    uint public constant maxUpdate = 179; // maximum number of bets in queue to insert
-    uint public constant dividendFeePerCent = 4; // 4% of dividends go to the shareholders (wall)
+    uint public constant betsMax = 128; // maximum number of bets in queue, max 8bit
+    uint public constant maxUpdate = 89; // maximum number of bets in queue to insert
+    uint public constant dividendFeePerCent = 4; // 4% of dividends go to the shareholders
     uint public constant generatorFeePerCent = 1; // 1% of dividends go to the generator
     uint public constant maxBalance = 2**108; // maximum balance of a user and maximum size of bets in period
-    //uint public constant rootsMax = 32;
     uint private constant _open = 1;
     uint private constant _closed = 2;
 
@@ -116,7 +117,7 @@ contract Lottery {
                 IUpdate21 _Update21,
                 IUpdate44 _Update44,
                 IUpdate89 _Update89,
-                IUpdate179 _Update179,
+                //IUpdate179 _Update179,
                 IERC20 _Token,
                 uint _BetMin) {
         withdraw = _Withdraw;
@@ -128,7 +129,7 @@ contract Lottery {
         update21 = _Update21;
         update44 = _Update44;
         update89 = _Update89;
-        update179 = _Update179;
+        //update179 = _Update179;
         token = _Token;
         betMin = _BetMin;
         owner = msg.sender;
@@ -339,13 +340,27 @@ contract Lottery {
             if(power>0){
                 newBets+=uint128(getAmount(power-1));}
             require(update1.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
+        else if(D.commitIndex<=3){
+            uint[4+3] memory pubdata;
+            pubdata[0]=lastRoot;
+            pubdata[1]=uint(_newRoot);
+            pubdata[2]=uint(D.nextIndex-1);
+            pubdata[3]=uint(newRand);
+            for(uint i=0;i<D.commitIndex; i++){
+                uint pos = (uint(D.betsStart)+i) % betsMax;
+                uint power=bets[pos]&0x1f;
+                pubdata[4+i]=bets[pos];
+                //bets[pos]=0; // no more gaspump
+                if(power>0){
+                    newBets+=uint128(getAmount(power-1));}}
+            require(update3.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else if(D.commitIndex<=5){
             uint[4+5] memory pubdata;
             pubdata[0]=lastRoot;
             pubdata[1]=uint(_newRoot);
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
-            for(uint i=0;i < D.commitIndex; i++){
+            for(uint i=0;i<D.commitIndex; i++){
                 uint pos = (uint(D.betsStart)+i) % betsMax;
                 uint power=bets[pos]&0x1f;
                 pubdata[4+i]=bets[pos];
@@ -353,13 +368,27 @@ contract Lottery {
                 if(power>0){
                     newBets+=uint128(getAmount(power-1));}}
             require(update5.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
+        else if(D.commitIndex<=11){
+            uint[4+11] memory pubdata;
+            pubdata[0]=lastRoot;
+            pubdata[1]=uint(_newRoot);
+            pubdata[2]=uint(D.nextIndex-1);
+            pubdata[3]=uint(newRand);
+            for(uint i=0;i<D.commitIndex; i++){
+                uint pos = (uint(D.betsStart)+i) % betsMax;
+                uint power=bets[pos]&0x1f;
+                pubdata[4+i]=bets[pos];
+                //bets[pos]=0; // no more gaspump
+                if(power>0){
+                    newBets+=uint128(getAmount(power-1));}}
+            require(update11.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else if(D.commitIndex<=21){
             uint[4+21] memory pubdata;
             pubdata[0]=lastRoot;
             pubdata[1]=uint(_newRoot);
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
-            for(uint i=0;i < D.commitIndex; i++){
+            for(uint i=0;i<D.commitIndex; i++){
                 uint pos = (uint(D.betsStart)+i) % betsMax;
                 uint power=bets[pos]&0x1f;
                 pubdata[4+i]=bets[pos];
@@ -367,13 +396,13 @@ contract Lottery {
                 if(power>0){
                     newBets+=uint128(getAmount(power-1));}}
             require(update21.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
-        else{
+        else if(D.commitIndex<=44){
             uint[4+44] memory pubdata;
             pubdata[0]=lastRoot;
             pubdata[1]=uint(_newRoot);
             pubdata[2]=uint(D.nextIndex-1);
             pubdata[3]=uint(newRand);
-            for(uint i=0;i < 44 && i<D.commitIndex; i++){
+            for(uint i=0;i<D.commitIndex; i++){
                 uint pos = (uint(D.betsStart)+i) % betsMax;
                 uint power=bets[pos]&0x1f;
                 pubdata[4+i]=bets[pos];
@@ -381,6 +410,36 @@ contract Lottery {
                 if(power>0){
                     newBets+=uint128(getAmount(power-1));}}
             require(update44.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
+        else if(D.commitIndex<=89){
+            uint[4+89] memory pubdata;
+            pubdata[0]=lastRoot;
+            pubdata[1]=uint(_newRoot);
+            pubdata[2]=uint(D.nextIndex-1);
+            pubdata[3]=uint(newRand);
+            for(uint i=0;i<D.commitIndex; i++){
+                uint pos = (uint(D.betsStart)+i) % betsMax;
+                uint power=bets[pos]&0x1f;
+                pubdata[4+i]=bets[pos];
+                //bets[pos]=0; // no more gaspump
+                if(power>0){
+                    newBets+=uint128(getAmount(power-1));}}
+            require(update89.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
+        /*else if(D.commitIndex<=179){
+            uint[4+179] memory pubdata;
+            pubdata[0]=lastRoot;
+            pubdata[1]=uint(_newRoot);
+            pubdata[2]=uint(D.nextIndex-1);
+            pubdata[3]=uint(newRand);
+            for(uint i=0;i<D.commitIndex; i++){
+                uint pos = (uint(D.betsStart)+i) % betsMax;
+                uint power=bets[pos]&0x1f;
+                pubdata[4+i]=bets[pos];
+                //bets[pos]=0; // no more gaspump
+                if(power>0){
+                    newBets+=uint128(getAmount(power-1));}}
+            require(update179.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}*/
+        else{
+            revert("fatal error, resetcommit and close");}
         currentBets+=uint128(newBets);
         D.nextIndex+=D.commitIndex;
         D.betsStart =uint8((uint(D.betsStart)+uint(D.commitIndex)) % betsMax);
