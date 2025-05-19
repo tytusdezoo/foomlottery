@@ -25,6 +25,7 @@ async function main() {
   for(;i<hashesLength;i++){
     if(newHashes[i]==0){
       break;}}
+  // TODO: will fail for 100 hashes !!!, need to do this in sync mode
   const newLeaves = await Promise.all(newHashes.slice(0, i).map(async (h,j) => await mimcsponge3(h,newRand,BigInt(oldLeaves.length)+BigInt(j))));
   tree.bulkInsert(newLeaves);
   const newProof = tree.path(oldLeaves.length-1+newLeaves.length)
@@ -47,6 +48,8 @@ async function main() {
   BigInt.prototype.toJSON = function () { return this.toString(); };
   fs.writeFileSync(path.join(__dirname, '../tmp/update'+hashesLength+'_input.json'), JSON.stringify(input, null, 2));
   //console.log(JSON.stringify(input));
+
+// ./update179 input.json output.wtns && ./prover update89_final.zkey output.wtns proof.json public.json
 
   // 5. Create groth16 proof for witness
   const { proof } = await snarkjs.groth16.fullProve(

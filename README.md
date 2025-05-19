@@ -47,3 +47,9 @@ forge test
 ## Credits
 
 For a comprehensive understanding of ZK-SNARKs, see the Rareskills [ZK Book](https://www.rareskills.io/zk-book) and their [article](https://www.rareskills.io/post/how-does-tornado-cash-work) on how Tornado Cash works.
+
+on ubuntu:
+apt-get install nlohmann-json3-dev
+apt-get install libgmp3-dev
+apt-get install gcc-multilib
+apt-get install nasm

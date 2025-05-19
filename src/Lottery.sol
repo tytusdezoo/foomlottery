@@ -29,11 +29,9 @@ interface IUpdate44 { // 1995329 c (340GvRAM+15GRAM,49s)
 interface IUpdate89 { // 3992609 c (380GvRAM+29GRAM,96s)
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[93] calldata _pubSignals) external view returns (bool); // 811439 g
 }
-/* too large to compute easily
-interface IUpdate179 { // 7987169 c (1TvRAM needed)// could not allocate memmory :-(
-  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[183] calldata _pubSignals) external view returns (bool); // g
+interface IUpdate179 { // 7987169 c (380vRAM+56GRAM,172s) // cpp: 7GRAM, 20s (5m user)
+  function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[183] calldata _pubSignals) external view returns (bool); // 1415063 g
 }
-*/
 
 /**
  * @title FOOM Lottery
@@ -49,7 +47,7 @@ contract Lottery {
     IUpdate21 public immutable update21;
     IUpdate44 public immutable update44;
     IUpdate89 public immutable update89;
-    //IUpdate179 public immutable update179;
+    IUpdate179 public immutable update179;
 
     uint public constant FIELD_SIZE = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
     uint public constant merkleTreeLevels = 32 ; // number of Merkle Tree levels
@@ -58,8 +56,8 @@ contract Lottery {
     uint public constant betPower1 = 10; // power of the first bet = 1024
     uint public constant betPower2 = 16; // power of the second bet = 65536
     uint public constant betPower3 = 22; // power of the third bet = 4194304
-    uint public constant betsMax = 128; // maximum number of bets in queue, max 8bit
-    uint public constant maxUpdate = 89; // maximum number of bets in queue to insert
+    uint public constant betsMax = 250; // maximum number of bets in queue, max 8bit
+    uint public constant maxUpdate = 179; // maximum number of bets in queue to insert
     uint public constant dividendFeePerCent = 4; // 4% of dividends go to the shareholders
     uint public constant generatorFeePerCent = 1; // 1% of dividends go to the generator
     uint public constant maxBalance = 2**108; // maximum balance of a user and maximum size of bets in period
@@ -116,7 +114,7 @@ contract Lottery {
                 IUpdate21 _Update21,
                 IUpdate44 _Update44,
                 IUpdate89 _Update89,
-                //IUpdate179 _Update179,
+                IUpdate179 _Update179,
                 IERC20 _Token,
                 uint _BetMin) {
         withdraw = _Withdraw;
@@ -128,7 +126,7 @@ contract Lottery {
         update21 = _Update21;
         update44 = _Update44;
         update89 = _Update89;
-        //update179 = _Update179;
+        update179 = _Update179;
         token = _Token;
         betMin = _BetMin;
         owner = msg.sender;
@@ -424,7 +422,7 @@ contract Lottery {
                 if(power>0){
                     newBets+=uint128(getAmount(power-1));}}
             require(update89.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
-        /*else if(D.commitIndex<=179){
+        else if(D.commitIndex<=179){
             uint[4+179] memory pubdata;
             pubdata[0]=lastRoot;
             pubdata[1]=uint(_newRoot);
@@ -437,7 +435,7 @@ contract Lottery {
                 //bets[pos]=0; // no more gaspump
                 if(power>0){
                     newBets+=uint128(getAmount(power-1));}}
-            require(update179.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}*/
+            require(update179.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else{
             revert("fatal error, resetcommit and close");}
         currentBets+=uint128(newBets);

@@ -16,7 +16,7 @@ contract FoomLottery is Lottery {
                 IUpdate21 _Update21,
                 IUpdate44 _Update44,
                 IUpdate89 _Update89,
-                //IUpdate179 _Update179,
+                IUpdate179 _Update179,
                 IERC20 _Token,
                 uint _BetMin) 
         Lottery(
@@ -29,7 +29,7 @@ contract FoomLottery is Lottery {
                 _Update21,
                 _Update44,
                 _Update89,
-                //_Update179,
+                _Update179,
                 _Token,
                 _BetMin) {}
 

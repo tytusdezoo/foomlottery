@@ -13,8 +13,8 @@ import {Update11G16Verifier} from "src/Update11.sol";
 import {Update21G16Verifier} from "src/Update21.sol";
 import {Update44G16Verifier} from "src/Update44.sol";
 import {Update89G16Verifier} from "src/Update89.sol";
-//import {Update179G16Verifier} from "src/Update179.sol";
-import {IWithdraw, ICancel, IUpdate1, IUpdate3, IUpdate5, IUpdate11, IUpdate21, IUpdate44, IUpdate89 /*, IUpdate179*/} from "src/Lottery.sol";
+import {Update179G16Verifier} from "src/Update179.sol";
+import {IWithdraw, ICancel, IUpdate1, IUpdate3, IUpdate5, IUpdate11, IUpdate21, IUpdate44, IUpdate89, IUpdate179} from "src/Lottery.sol";
 import {EthLottery} from "src/EthLottery.sol";
 
 contract EthLotteryTest is Test {
@@ -30,7 +30,7 @@ contract EthLotteryTest is Test {
     IUpdate21 public update21;
     IUpdate44 public update44;
     IUpdate89 public update89;
-    //IUpdate179 public update179;
+    IUpdate179 public update179;
 
     uint blocknumber = 1;
     uint oldIndex = 0;
@@ -72,11 +72,11 @@ contract EthLotteryTest is Test {
         update21 = IUpdate21(address(new Update21G16Verifier()));
         update44 = IUpdate44(address(new Update44G16Verifier()));
         update89 = IUpdate89(address(new Update89G16Verifier()));
-        //update179 = IUpdate179(address(new Update179G16Verifier()));
+        update179 = IUpdate179(address(new Update179G16Verifier()));
         // Deploy lottery contract.
         vm.roll(++blocknumber);
     	vm.recordLogs();
-        lottery = new EthLottery(withdraw, cancel, update1, update3, update5, update11, update21, update44, update89, /*update179,*/ IERC20(address(0)), betMin);
+        lottery = new EthLottery(withdraw, cancel, update1, update3, update5, update11, update21, update44, update89, update179, IERC20(address(0)), betMin);
     }
 
     function _getLogs() internal {
@@ -192,8 +192,8 @@ contract EthLotteryTest is Test {
           return(44);}
         if(commitSize<=89){
           return(89);}
-        //if(commitSize<=179){
-        //  return(179);}
+        if(commitSize<=179){
+          return(179);}
         revert("bad commitSize");
     }
 
@@ -258,9 +258,9 @@ contract EthLotteryTest is Test {
         else if(hashesLength==89){
           uint[4+89] memory pubdata;for(uint i=0;i<4+89;i++){pubdata[i]=data[i];} revealGasStart = gasleft();
           assertTrue(update89.verifyProof(pA,pB,pC,pubdata));}
-        //else if(hashesLength==179){
-        //  uint[4+179] memory pubdata;for(uint i=0;i<4+179;i++){pubdata[i]=data[i];} revealGasStart = gasleft();
-        //  assertTrue(update179.verifyProof(pA,pB,pC,pubdata));}
+        else if(hashesLength==179){
+          uint[4+179] memory pubdata;for(uint i=0;i<4+179;i++){pubdata[i]=data[i];} revealGasStart = gasleft();
+          assertTrue(update179.verifyProof(pA,pB,pC,pubdata));}
         else{
           revert("bad commitSize");}
         //console.log("after assert");
@@ -425,11 +425,22 @@ contract EthLotteryTest is Test {
         _withdraw(secret_power3,rand3,index3);
     }
 
-    function test9_updates() public {
-        uint[7] memory sizes=[uint(1),uint(2),uint(4),uint(10),uint(20),uint(43),uint(88)/*,uint(178)*/];
-        for(uint j=0;j<7;j++){
+    function test179_updates() public {
+        uint[1] memory sizes=[uint(90)];
+        for(uint j=0;j<1;j++){
           for(uint i=0;i<sizes[j];i++){
-            _fake_play(j*7+i);}
+            _fake_play(j*8+i);}
+          uint start = vm.unixTime();
+          _commit_reveal();
+          uint end = vm.unixTime();
+          console.log("time[%d]: %d",sizes[j],end - start);}
+    }
+    
+    function notest9_updates() public {
+        uint[8] memory sizes=[uint(1),uint(2),uint(4),uint(10),uint(20),uint(43),uint(88),uint(178)];
+        for(uint j=0;j<8;j++){
+          for(uint i=0;i<sizes[j];i++){
+            _fake_play(j*8+i);}
           uint start = vm.unixTime();
           _commit_reveal();
           uint end = vm.unixTime();
