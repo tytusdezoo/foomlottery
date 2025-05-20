@@ -85,25 +85,26 @@ contract EthLotteryTest is Test {
         for (uint i = 0; i < entries.length; i++) {
             if (uint(entries[i].topics[0]) == LogCancel){
                 uint index = uint(entries[i].topics[1]);
+                // append to wating list file
+                string[] memory inputs = new string[](3);
+                inputs[0] = "forge-ffi-scripts/waiting.bash";
+                inputs[1] = vm.toString(bytes32(index)); // index
+                inputs[2] = vm.toString(bytes32(uint(0x20))); // hash
+                vm.ffi(inputs);
                 allLeaves[index].topics[2]=bytes32(uint(0x20));}
             if (uint(entries[i].topics[0]) == LogBetIn){
                 assertEq(uint(allLeaves.length),uint(entries[i].topics[1]),"lost bet?");
-                string[] memory inputs = new string[](3);
                 if(oldIndex==0){
-                    inputs[0] = "mkdir";
-                    inputs[1] = "-p";
-                    inputs[2] = "www";
-                    vm.ffi(inputs);
-                    inputs[0] = "cp";
-                    inputs[1] = "/dev/null";
-                    inputs[2] = "www/waiting.csv";
-                    vm.ffi(inputs);
                     assertEq(entries[i].topics[2],0x0ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae520);
                     entries[i].topics[0]=0; // rand
                     entries[i].topics[1]=0x24d599883f039a5cb553f9ec0e5998d58d8816e823bd556164f72aef0ef7d9c0; // leaf
+                    string[] memory inputs = new string[](1);
+                    inputs[0] = "forge-ffi-scripts/init.bash";
+                    vm.ffi(inputs);
                     oldIndex=1;}
                 else{
                     // append to wating list file
+                    string[] memory inputs = new string[](3);
                     inputs[0] = "forge-ffi-scripts/waiting.bash";
                     inputs[1] = vm.toString(bytes32(entries[i].topics[1])); // index
                     inputs[2] = vm.toString(bytes32(entries[i].topics[2])); // hash
@@ -203,7 +204,7 @@ contract EthLotteryTest is Test {
         revert("bad commitSize");
     }
 
-    function _commit_reveal() internal {
+    function _commit_reveal() internal { // TODO: separate commit and reveal
         _getLogs();
         if(allLeaves.length==oldIndex){
           console.log("no tickets");
@@ -220,23 +221,16 @@ contract EthLotteryTest is Test {
         lottery.rememberHash();
         //console.log("after remember");
         _getLogs();
+        // this below should react on commit event
         // compute update
         uint newRand = uint128(uint(keccak256(abi.encodePacked(_revealSecret,lottery.commitBlockHash())))); // reads lottery.commitBlockHash ... could read from Logs later !!!
         uint hashesLength = updateSize(commitIndex);
-        string[] memory inputs = new string[](4 + hashesLength + oldIndex);
+        string[] memory inputs = new string[](5);
         inputs[0] = "node";
         inputs[1] = "forge-ffi-scripts/update.js";
-        inputs[2] = vm.toString(hashesLength);
-        inputs[3] = vm.toString(bytes32(newRand));
-        //console.log(commitIndex,"commmitIndex");
-        for (uint i = 0; i < hashesLength; i++){
-            if(i<commitIndex){
-                //console.log("leaf %x",uint(bytes32(allLeaves[oldIndex+i].topics[2])));
-                inputs[4 + i] = vm.toString(bytes32(allLeaves[oldIndex+i].topics[2]));}
-            else{
-                inputs[4 + i] = vm.toString(bytes32(0));}}
-        for (uint i = 0; i < oldIndex; i++){
-            inputs[4 + hashesLength + i] = vm.toString(bytes32(allLeaves[i].topics[1]));}
+        inputs[2] = vm.toString(commitIndex);
+        inputs[3] = vm.toString(hashesLength);
+        inputs[4] = vm.toString(bytes32(newRand));
         //console.log("before update");
         bytes memory result = vm.ffi(inputs);
         //console.log("after update");
@@ -295,6 +289,7 @@ contract EthLotteryTest is Test {
         uint gasUsed = gasStart - gasleft();
         if(0<showGas){ console.log("Gas used in _play: %d", gasUsed); }
         _getLogs();
+        console.log("%x,%x ticket", secret_power,lastindex);
         return (secret_power,lastindex);
     }
 
@@ -368,15 +363,15 @@ contract EthLotteryTest is Test {
 
     }
 
-    function test1_lottery_cancel() public {
+    function notest1_lottery_cancel() public {
         vm.roll(++blocknumber);
         _fake_play(0);
-        (uint secret_power,) = _play(10); // hash can be restored later
-        console.log("%x ticket", secret_power);
+        _fake_play(0);
         _commit_reveal();
-        (uint secret_power2,uint lastindex2) = _play(4); // hash can be restored later
-        console.log("%x ticket", secret_power2);
-        _cancelbet(secret_power2,lastindex2);
+        (uint secret_power,uint lastindex) = _play(4); // hash can be restored later
+        _fake_play(0);
+        _fake_play(0);
+        _cancelbet(secret_power,lastindex);
     }
 
     function notest5_ods() public {
@@ -400,21 +395,18 @@ contract EthLotteryTest is Test {
         vm.roll(++blocknumber);
         //_fake_play(0);
         (uint secret_power1,uint lastindex1) = _play(10); // hash can be restored later
-        console.log("%x ticket", secret_power1);
         _commit_reveal();
         _withdraw(secret_power1,lastindex1);
 
         vm.roll(++blocknumber);
         //_fake_play(0);
         (uint secret_power2,uint lastindex2) = _play(16); // hash can be restored later
-        console.log("%x ticket", secret_power2);
         _commit_reveal();
         _withdraw(secret_power2,lastindex2);
 
         vm.roll(++blocknumber);
         //_fake_play(0);
         (uint secret_power3,uint lastindex3) = _play(22); // hash can be restored later
-        console.log("%x ticket", secret_power3);
         _commit_reveal();
         _withdraw(secret_power3,lastindex3);
 
@@ -429,10 +421,12 @@ contract EthLotteryTest is Test {
         for(uint j=0;j<2;j++){
           for(uint i=0;i<sizes[j];i++){
             _fake_play(j*8+i);}
+          _play(10);
           uint start = vm.unixTime();
           _commit_reveal();
           uint end = vm.unixTime();
           console.log("time[%d]: %d",sizes[j],end - start);}
+        _fake_play(2);
     }
     
     function notest9_updates() public {

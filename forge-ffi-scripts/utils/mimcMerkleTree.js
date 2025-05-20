@@ -20,15 +20,15 @@ function readLast(){
     const fileold = openSync("www/last.csv", "r");
     const textold = readFileSync(fileold, "utf8");
     closeSync(fileold);
-    const [index,blocknumber,hash] = textold.split(',');
-    return [parseInt(index,16), hexToBigint(hash)];
+    const [index,blocknumber,hash,lastLeaf] = textold.split(',');
+    return [parseInt(index,16), hexToBigint(hash), hexToBigint(lastLeaf)];
   } catch(e) {
-    return [0,0n];
+    return [0,0n,0n];
   }
 }
+
 function getIndex(inHash) {
   const hashstr = bigintToHex(inHash).replace(/^0x0*/, '');
-  //console.log(hashstr);
   const fileold = openSync("www/waiting.csv", "r");
   const textold = readFileSync(fileold, "utf8");
   closeSync(fileold);
@@ -41,10 +41,41 @@ function getIndex(inHash) {
   }
   return 0;
 }
-function getLeaves(path){
-  const fileold = openSync(path, "r");
+
+function getWaitingList(lastindex,hashesLength){
+  const fileold = openSync("www/waiting.csv", "r");
   const textold = readFileSync(fileold, "utf8");
   closeSync(fileold);
+  const lines = textold.split("\n");
+  // create array of hashes of size hashesLength
+  const hashes = new Array(hashesLength);
+  for(let i=0;i<lines.length;i++) {
+    if (!lines[i]) continue;  // Skip empty lines
+    const [index,hash] = lines[i].split(','); // assume hash in 2nd column in waiting.csv
+    const indexnum = parseInt(index,16);
+    if(indexnum >= lastindex && indexnum < lastindex + hashesLength) {
+      hashes[indexnum-lastindex] = hexToBigint(hash);
+    }
+  }
+  return hashes;
+}
+
+function getLeaves(path){
+  // check if the file is compressed and decompress it if needed
+  let textold;
+  let fileold;
+  try {
+    if(fs.existsSync(path+".gz")){
+      fileold = openSync(path+".gz", "r"); // decompress the file
+      textold = zlib.gunzipSync(readFileSync(fileold)).toString();
+    } else {
+      fileold = openSync(path, "r");
+      textold = readFileSync(fileold, "utf8");
+    }
+    closeSync(fileold);
+  } catch(e) {
+    return [-1,[]];
+  }
   if(textold.length==0){
     return [-1,[]];
   }
@@ -62,6 +93,7 @@ function getLeaves(path){
   });
   return [lastindex, leaves];
 }
+
 async function getPath(index){
   const path = sprintfjs.sprintf("%08x",index);
   const path1 = path.slice(0,2);
@@ -106,6 +138,61 @@ async function getPath(index){
   const pathElements = [...mpath4.pathElements, ...mpath3.pathElements, ...mpath2.pathElements, ...mpath1.pathElements];
   return [...pathElements,newroot];
 }
+
+async function getNewRoot(lastindex,newLeaves){
+  const path = sprintfjs.sprintf("%08x",lastindex-1);
+  const path1 = path.slice(0,2);
+  const path2 = path.slice(2,4); 
+  const path3 = path.slice(4,6);
+
+  const [lastindex1,leaves1] = getLeaves("www/index.csv");
+  const [lastindex2,leaves2] = getLeaves("www/"+path1+"/index.csv");
+  const [lastindex3,leaves3] = getLeaves("www/"+path1+"/"+path2+"/index.csv");
+  const [lastindex4,leaves4] = getLeaves("www/"+path1+"/"+path2+"/"+path3+".csv");
+
+  const roots = new Array(2);
+  leaves4.push(...newLeaves);
+  if(leaves4.length>256){
+    const tree4a = await mimicMerkleTree(hexToBigint(zeros[0]),leaves4.slice(0,256),8);
+    roots[0] = tree4a.root;  
+    const tree4b = await mimicMerkleTree(hexToBigint(zeros[0]),leaves4.slice(256,leaves4.length),8);
+    roots[1] = tree4b.root;  
+  } else {
+    const tree4a = await mimicMerkleTree(hexToBigint(zeros[0]),leaves4,8);
+    roots[0] = tree4a.root;
+    roots[1] = hexToBigint(zeros[1]);
+  }
+  leaves3.push(...roots);
+  if(leaves3.length>256){
+    const tree3a = await mimicMerkleTree(hexToBigint(zeros[1]),leaves3.slice(0,256),8);
+    roots[0] = tree3a.root;  
+    const tree3b = await mimicMerkleTree(hexToBigint(zeros[1]),leaves3.slice(256,leaves3.length),8);
+    roots[1] = tree3b.root;  
+  } else {
+    const tree3a = await mimicMerkleTree(hexToBigint(zeros[1]),leaves3,8);
+    roots[0] = tree3a.root;
+    roots[1] = hexToBigint(zeros[2]);
+  }
+  leaves2.push(...roots);
+  if(leaves2.length>256){
+    const tree2a = await mimicMerkleTree(hexToBigint(zeros[2]),leaves2.slice(0,256),8);
+    roots[0] = tree2a.root;  
+    const tree2b = await mimicMerkleTree(hexToBigint(zeros[2]),leaves2.slice(256,leaves2.length),8);
+    roots[1] = tree2b.root;  
+  } else {
+    const tree2a = await mimicMerkleTree(hexToBigint(zeros[2]),leaves2,8);
+    roots[0] = tree2a.root;
+    roots[1] = hexToBigint(zeros[3]);
+  }
+  leaves1.push(...roots);
+  if(leaves1.length>256){
+    leaves1.pop();
+  }
+  const tree1 = await mimicMerkleTree(hexToBigint(zeros[3]),leaves1,8);
+  const newRoot = tree1.root;
+  return newRoot;
+}
+
 function getIndexRand(hashstr,startindex) {
   const path = sprintfjs.sprintf("%06x",startindex>>8);
   const path1 = path.slice(0,2);
@@ -143,18 +230,13 @@ function findIndex(inHash,startindex) { // TODO ... look also in waiting list
   return [0,0];
 }
 
-// Creates a fixed height merkle-tree with MiMC hash function (just like MerkleTreeWithHistory.sol)
 async function mimicMerkleTree(zero,leaves = [],hight=MERKLE_TREE_HEIGHT) {
-  //const pedersen = await circomlibjs.buildPedersenHash(); //TODO, not needed, fromMontgomery is in mimc
   const mimcsponge = await circomlibjs.buildMimcSponge();
   const leaf = (zero==0n)?16660660614175348086322821347366010925591495133565739687589833680199500683712n:zero;
-  //console.log(hight);
   const mimcspongeMultiHash = (left, right) =>
     leBufferToBigint(
-      //pedersen.babyJub.F.fromMontgomery(mimcsponge.multiHash([left, right]))
       mimcsponge.F.fromMontgomery(mimcsponge.multiHash([left, right]))
     );
-
   return new MerkleTree(hight, leaves, {
     hashFunction: mimcspongeMultiHash,
     zeroElement: leaf,
@@ -169,4 +251,6 @@ module.exports = {
   getIndex,
   getIndexRand,
   findIndex,
+  getNewRoot,
+  getWaitingList,
 };

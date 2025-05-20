@@ -1,12 +1,11 @@
 #!/usr/bin/node
-
 const { execSync } = require('child_process');
 const fs = require("fs");
 const path = require("path");
 const snarkjs = require("snarkjs");
 const { ethers } = require("ethers");
 const { hexToBigint, bigintToHex, leBufferToBigint } = require("./utils/bigint.js");
-const { mimicMerkleTree } = require("./utils/mimcMerkleTree.js");
+const { getNewRoot, getWaitingList, readLast, getPath } = require("./utils/mimcMerkleTree.js");
 const circomlibjs = require("circomlibjs");
 ////////////////////////////// MAIN ///////////////////////////////////////////
 // ./forge-ffi-scripts/update.js 0x0000000000000000000000000000000000000000000000000000000000000001 0x000000000000000000000000000000009691a9866228f0e680fe3c605b14a165 0x0000000000000000000000000000000000000000000000000000000000000000 0x24d599883f039a5cb553f9ec0e5998d58d8816e823bd556164f72aef0ef7d9c0
@@ -17,32 +16,40 @@ async function main() {
   const inputs = process.argv.slice(2, process.argv.length);
   const mimcsponge = await circomlibjs.buildMimcSponge();
 
+  const commitIndex = parseInt(inputs[0]);
+  const hashesLength = parseInt(inputs[1]);
+  const newRand = hexToBigint(inputs[2]);
+
+  const [lastindex, oldRoot, oldLeaf] = readLast();  // add lastLeaf
+  const pathElements = await getPath(lastindex-1);
+  const newHashes = getWaitingList(lastindex,commitIndex);
+  const newLeaves = newHashes.slice(0, commitIndex).map((h,j) => leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([h,newRand,BigInt(lastindex)+BigInt(j)]))));
+  const hashes = new Array(hashesLength);
+  for(let i=0;i<hashesLength;i++){
+    if(i<commitIndex){
+      hashes[i] = newHashes[i];
+    } else {
+      hashes[i] = 0n;
+    }
+  }
+  const newRoot = await getNewRoot(lastindex,newLeaves);
+
   // 1. Get nullifier and secret
-  const hashesLength = parseInt(inputs[0]);
-  const newRand = hexToBigint(inputs[1]);
-  const newHashes = inputs.slice(2, 2+hashesLength).map((l) => hexToBigint(l));
-  const oldLeaves = inputs.slice(2+hashesLength, inputs.length).map((l) => hexToBigint(l)); // TODO: read from www
-  const tree = await mimicMerkleTree(0n,oldLeaves);
-  const oldProof = tree.path(oldLeaves.length-1)
-  let i=0;
-  for(;i<hashesLength;i++){
-    if(newHashes[i]==0){
-      break;}}
-  const newLeaves = newHashes.slice(0, i).map((h,j) => leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([h,newRand,BigInt(oldLeaves.length)+BigInt(j)]))));
-  tree.bulkInsert(newLeaves);
-  const newProof = tree.path(oldLeaves.length-1+newLeaves.length)
+  //const oldLeaves = inputs.slice(2+hashesLength, inputs.length).map((l) => hexToBigint(l)); // TODO: read from www
+  //const tree = await mimicMerkleTree(0n,oldLeaves);
+  //const oldProof = tree.path(oldLeaves.length-1)
 
   // 4. Format witness input to exactly match circuit expectations
   const input = {
     // Public inputs
-    oldRoot: oldProof.pathRoot,
-    newRoot: newProof.pathRoot,
-    index: oldLeaves.length-1,
+    oldRoot: oldRoot,
+    newRoot: newRoot,
+    index: lastindex-1,
     newRand: newRand,
-    newhashes: newHashes.map((x) => x.toString()),
+    newhashes: hashes,
     // Private inputs
-    oldLeaf: oldLeaves[oldLeaves.length-1].toString(),
-    pathElements: oldProof.pathElements.map((x) => x.toString()),
+    oldLeaf: oldLeaf,
+    pathElements: pathElements.slice(0,32),
   };
 
   // Write input to input.json
@@ -86,11 +93,11 @@ async function main() {
       ],
       pC,
       [
-      bigintToHex(oldProof.pathRoot),
-      bigintToHex(newProof.pathRoot),
-      bigintToHex(oldLeaves.length-1),
+      bigintToHex(oldRoot),
+      bigintToHex(newRoot),
+      bigintToHex(lastindex-1),
       bigintToHex(newRand),
-      ...newHashes.map((x) => bigintToHex(x))
+      ...hashes.map((x) => bigintToHex(x))
       ]
     ]
   );

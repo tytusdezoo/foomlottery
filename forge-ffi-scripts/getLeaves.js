@@ -133,25 +133,11 @@ async function main() {
   }
 
   let nextindex=0;
-  if(index==1){
-    mkdirSync("www/00/00", { recursive: true });
-    const file = openSync("www/00/00/00.csv", "w");
-    const text=sprintfjs.sprintf("%x,%s,%s,%s\n",0,
-      "24d599883f039a5cb553f9ec0e5998d58d8816e823bd556164f72aef0ef7d9c0",
-      "ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae520","0");
-    writeFileSync(file, text);
-    closeSync(file);
-    const filelast = openSync("www/last.csv", "w");
-    const textlast=sprintfjs.sprintf("%x,%x\n",1,blocknumber); // TODO, write block number too
-    writeFileSync(filelast, textlast);
-    closeSync(filelast);
-  } else {
-    const filelast = openSync("www/last.csv", "r");
-    const textlast=readFileSync(filelast, "utf8");
-    closeSync(filelast);
-    const [indexlast] = textlast.split(',');
-    nextindex=parseInt(indexlast,16);
-  }
+  const filelast = openSync("www/last.csv", "r");
+  const lasttext=readFileSync(filelast, "utf8");
+  closeSync(filelast);
+  const [lastindex,lastblocknumber,lasthash,lastleaf] = lasttext.split(',');
+  nextindex=parseInt(lastindex,16);
   let pathlast=index>>8;
   let text='';
   let i=0;
@@ -169,7 +155,7 @@ async function main() {
   await appendtofile(pathlast,text,(index+i)&0xff==0?true:false);
   // write last index to file
   const file = openSync("www/last.csv", "w");
-  const textlast=sprintfjs.sprintf("%x,%x,%s\n",index+i,blocknumber,no0x(inputs[2])); // TODO, write block number too
+  const textlast=sprintfjs.sprintf("%x,%x,%s,%s\n",index+i,blocknumber,no0x(inputs[2]),no0x(bigintToHex(newLeaves[newLeaves.length-1]))); // TODO, write block number too
   writeFileSync(file, textlast);
   closeSync(file);
 

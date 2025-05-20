@@ -27,7 +27,7 @@ async function main() {
         break;
       }
     }
-    if(ticket >= 10000n) { throw new Error("Failed to find ticket"); }
+    if(ticket >= 10000n) { throw new Error("Failed to create ticket"); }
     secret_power = secret<<8n | power;
   }
 
