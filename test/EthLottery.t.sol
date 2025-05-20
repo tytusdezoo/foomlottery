@@ -37,6 +37,7 @@ contract EthLotteryTest is Test {
     uint oldIndex = 0;
     uint commitIndex=0;
     Vm.Log[] public allLeaves;
+    uint revealSecret;
 
     // Test vars
     address public constant relayer = payable(address(0x0));
@@ -133,7 +134,9 @@ contract EthLotteryTest is Test {
                 oldIndex=newIndex;}
             if (uint(entries[i].topics[0]) == LogCommit){
                 assertEq(uint(oldIndex),uint(entries[i].topics[1]),"missed index update?");
-                commitIndex=uint(entries[i].topics[2]);}}
+                commitIndex=uint(entries[i].topics[2]);
+                _reveal();                      
+                }}
     }
 
     function _cancelbet(uint secret_power,uint lastindex) internal {
@@ -180,7 +183,6 @@ contract EthLotteryTest is Test {
         gasStart = gasleft();
         lottery.collect( pA, pB, pC, root, nullifierHash, recipient, relayer, 0, 0, rewardbits, invest);
         gasUsed = gasStart - gasleft();
-        //if(reward>0){ //assertGt(recipient.balance,(reward*94)/100); //console.log("Balance: %d\n",recipient.balance); }
         if(0<showGas){ console.log("Gas used in _withdraw: %d", gasUsed); }
     }
 
@@ -204,14 +206,14 @@ contract EthLotteryTest is Test {
         revert("bad commitSize");
     }
 
-    function _commit_reveal() internal { // TODO: separate commit and reveal
+    function _commit() internal { // TODO: separate commit and reveal
         _getLogs();
         if(allLeaves.length==oldIndex){
           console.log("no tickets");
           return;}
         vm.roll(++blocknumber);
-        uint _revealSecret = uint(keccak256(abi.encodePacked(oldIndex)));
-        uint _commitHash = uint(keccak256(abi.encodePacked(_revealSecret)));
+        uint revealSecret = uint(keccak256(abi.encodePacked(oldIndex)));
+        uint _commitHash = uint(keccak256(abi.encodePacked(revealSecret)));
         uint commitGasStart = gasleft();
         uint maxUpdate=lottery.maxUpdate();
         lottery.commit(_commitHash,maxUpdate);
@@ -219,11 +221,13 @@ contract EthLotteryTest is Test {
         if(0<showGas){ console.log("Gas used in _commit: %d", commitGasUsed); }
         vm.roll(++blocknumber);
         lottery.rememberHash();
-        //console.log("after remember");
+        vm.roll(++blocknumber);
         _getLogs();
-        // this below should react on commit event
+    }
+
+    function _reveal() internal { // TODO: separate commit and reveal
         // compute update
-        uint newRand = uint128(uint(keccak256(abi.encodePacked(_revealSecret,lottery.commitBlockHash())))); // reads lottery.commitBlockHash ... could read from Logs later !!!
+        uint newRand = uint128(uint(keccak256(abi.encodePacked(revealSecret,lottery.commitBlockHash())))); // reads lottery.commitBlockHash ... could read from Logs later !!!
         uint hashesLength = updateSize(commitIndex);
         string[] memory inputs = new string[](5);
         inputs[0] = "node";
@@ -268,7 +272,7 @@ contract EthLotteryTest is Test {
         uint revealGasUsed = revealGasStart - gasleft();
         if(0<showGas){ console.log("Gas used in update[%d].verifyProof: %d", hashesLength,revealGasUsed); }
         revealGasStart = gasleft();
-        lottery.reveal(_revealSecret,pA,pB,pC,newRoot); // data[1]=newRoot
+        lottery.reveal(revealSecret,pA,pB,pC,newRoot); // data[1]=newRoot
         revealGasUsed = revealGasStart - gasleft();
         if(0<showGas){ console.log("Gas used in _reveal[%d]: %d", hashesLength,revealGasUsed); }
         vm.roll(++blocknumber);
