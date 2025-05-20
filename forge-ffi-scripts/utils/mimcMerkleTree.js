@@ -2,9 +2,9 @@ const circomlibjs = require("circomlibjs");
 const { MerkleTree } = require("fixed-merkle-tree");
 
 const { leBufferToBigint, hexToBigint, bigintToHex } = require("./bigint.js");
-const { openSync, readFileSync, closeSync } = require("fs");
+const { openSync, readFileSync, closeSync, existsSync } = require("fs");
 const sprintfjs = require('sprintf-js');
-
+const zlib = require('zlib');
 // Constants from MerkleTreeWithHistory.sol
 const MERKLE_TREE_HEIGHT = 32;
 
@@ -62,10 +62,10 @@ function getWaitingList(lastindex,hashesLength){
 
 function getLeaves(path){
   // check if the file is compressed and decompress it if needed
-  let textold;
   let fileold;
+  let textold;
   try {
-    if(fs.existsSync(path+".gz")){
+    if(existsSync(path+".gz")){
       fileold = openSync(path+".gz", "r"); // decompress the file
       textold = zlib.gunzipSync(readFileSync(fileold)).toString();
     } else {
