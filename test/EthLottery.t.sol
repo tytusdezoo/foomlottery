@@ -87,25 +87,41 @@ contract EthLotteryTest is Test {
                 allLeaves[index].topics[2]=bytes32(uint(0x20));}
             if (uint(entries[i].topics[0]) == LogBetIn){
                 assertEq(uint(allLeaves.length),uint(entries[i].topics[1]),"lost bet?");
+                string[] memory inputs = new string[](3);
                 if(oldIndex==0){
+                    inputs[0] = "mkdir";
+                    inputs[1] = "-p";
+                    inputs[2] = "www";
+                    vm.ffi(inputs);
+                    inputs[0] = "cp";
+                    inputs[1] = "/dev/null";
+                    inputs[2] = "www/waiting.csv";
+                    vm.ffi(inputs);
                     assertEq(entries[i].topics[2],0x0ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae520);
                     entries[i].topics[0]=0; // rand
                     entries[i].topics[1]=0x24d599883f039a5cb553f9ec0e5998d58d8816e823bd556164f72aef0ef7d9c0; // leaf
                     oldIndex=1;}
+                else{
+                    // append to wating list file
+                    inputs[0] = "forge-ffi-scripts/waiting.bash";
+                    inputs[1] = vm.toString(bytes32(entries[i].topics[1])); // index
+                    inputs[2] = vm.toString(bytes32(entries[i].topics[2])); // hash
+                    vm.ffi(inputs);
+                } 
                 allLeaves.push(entries[i]);}
             if (uint(entries[i].topics[0]) == LogUpdate){
                 uint newIndex = uint(entries[i].topics[1]);
                 uint newRand = uint(entries[i].topics[2]);
                 uint hashesLength = newIndex-oldIndex;
-                string[] memory inputs = new string[](4+hashesLength);
+                string[] memory inputs = new string[](5+hashesLength);
                 inputs[0] = "node";
                 inputs[1] = "forge-ffi-scripts/getLeaves.js";
                 //inputs[2] = vm.toString(bytes32(oldIndex));
                 inputs[2] = vm.toString(oldIndex);
-                //console.log("index: ",inputs[2]);
-                inputs[3] = vm.toString(bytes32(newRand));
+                inputs[3] = vm.toString(block.number);
+                inputs[4] = vm.toString(bytes32(newRand));
                 for (uint j = 0; j < hashesLength; j++) {
-                    inputs[4+j] = vm.toString(bytes32(allLeaves[oldIndex+j].topics[2]));}
+                    inputs[5+j] = vm.toString(bytes32(allLeaves[oldIndex+j].topics[2]));}
                 bytes memory result = vm.ffi(inputs);
                 (uint[] memory leaves) = abi.decode(result, (uint[]));
                 for(uint j=0;j<hashesLength;j++){
@@ -399,7 +415,7 @@ contract EthLotteryTest is Test {
                 _withdraw(secret[j][i],rand[j][i],index[j][i]);}}
     }
 
-    function notest2_lottery_single_deposit() public {
+    function test2_lottery_single_deposit() public {
         vm.roll(++blocknumber);
         //_fake_play(0);
         (uint secret_power1,) = _play(10); // hash can be restored later
@@ -426,9 +442,14 @@ contract EthLotteryTest is Test {
         (uint hash3,) = _getHash(secret_power3);
         (uint rand3,uint index3) = _getRandIndex(hash3+(secret_power3&0x1f)+1);
         _withdraw(secret_power3,rand3,index3);
+
+        vm.roll(++blocknumber);
+        _fake_play(1);
+        _fake_play(2);
+        _getLogs();
     }
 
-    function test179_updates() public {
+    function notest179_updates() public {
         uint[2] memory sizes=[uint(180),uint(180)];
         for(uint j=0;j<2;j++){
           for(uint i=0;i<sizes[j];i++){

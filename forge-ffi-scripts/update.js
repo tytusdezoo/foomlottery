@@ -46,27 +46,28 @@ async function main() {
   };
 
   // Write input to input.json
-  // only for debugging
   BigInt.prototype.toJSON = function () { return this.toString(); };
   fs.writeFileSync(path.join(__dirname, '../groth16/update'+hashesLength+'_input.json'), JSON.stringify(input, null, 2));
   //console.log(JSON.stringify(input));
 
-  // console.log current working directory
-  let stdout = execSync("cd "+__dirname+"/../groth16 && "+
-    "./update"+hashesLength+" update"+hashesLength+"_input.json update"+hashesLength+"_output.wtns && "+
-    "./prover update"+hashesLength+"_final.zkey update"+hashesLength+"_output.wtns update"+hashesLength+"_proof.json "+
-    "update"+hashesLength+"_public.json && "+
-    "sed -i 's/}.*/}/g' update"+hashesLength+"_proof.json && "+
-    "sed -i 's/].*/]/g' update"+hashesLength+"_public.json" );
-  // read proof.json and parse to json object
-  const proof = JSON.parse(fs.readFileSync(path.join(__dirname, '../groth16/update'+hashesLength+'_proof.json'), 'utf8'));
-
-  // 5. Create groth16 proof for witness
-  /*const { proof } = await snarkjs.groth16.fullProve(
-    input,
-    path.join(__dirname, "../groth16/update"+hashesLength+".wasm"),
-    path.join(__dirname, "../groth16/update"+hashesLength+"_final.zkey")
-  );*/
+  let proof;
+  if(fs.existsSync(path.join(__dirname, '../groth16/prover'))){
+    // 5. Create groth16 proof for witness with rapidsnark
+    let stdout = execSync("cd "+__dirname+"/../groth16 && "+
+      "./update"+hashesLength+" update"+hashesLength+"_input.json update"+hashesLength+"_output.wtns && "+
+      "./prover update"+hashesLength+"_final.zkey update"+hashesLength+"_output.wtns update"+hashesLength+"_proof.json "+
+      "update"+hashesLength+"_public.json && "+
+      "sed -i 's/}.*/}/g' update"+hashesLength+"_proof.json && "+
+      "sed -i 's/].*/]/g' update"+hashesLength+"_public.json" );
+    // read proof.json and parse to json object
+    proof = JSON.parse(fs.readFileSync(path.join(__dirname, '../groth16/update'+hashesLength+'_proof.json'), 'utf8'));
+  } else {
+  // 5. Create groth16 proof for witness with snarkjs
+    proof = await snarkjs.groth16.fullProve(input,
+      path.join(__dirname, "../groth16/update"+hashesLength+".wasm"),
+      path.join(__dirname, "../groth16/update"+hashesLength+"_final.zkey")
+    );
+  }
 
   const pA = proof.pi_a.slice(0, 2);
   const pB = proof.pi_b.slice(0, 2);
