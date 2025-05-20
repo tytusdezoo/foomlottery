@@ -1,15 +1,13 @@
 #!/usr/bin/node
-
 const { ethers } = require("ethers");
 const { pedersenHash } = require("./utils/pedersen.js");
 const { rbigint, bigintToHex, leBigintToBuffer, hexToBigint } = require("./utils/bigint.js");
-//const { getMask } = require("./utils/mask.js");
-//const { mimcRC } = require("./utils/mimcsponge.js");
-
+const { readLast } = require("./utils/mimcMerkleTree.js");
 ////////////////////////////// MAIN ///////////////////////////////////////////
 
 async function main() {
   const inputs = process.argv.slice(2, process.argv.length);
+  const [lastindex, root] = readLast();
 
   let power = hexToBigint(inputs[0]);
   let hash = 0n;
@@ -35,8 +33,8 @@ async function main() {
 
   // 3. Return abi encoded hash, secret+power
   const res = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["uint", "uint"],
-    [bigintToHex(hash), bigintToHex(secret_power)]
+    ["uint", "uint", "uint"],
+    [bigintToHex(secret_power), bigintToHex(hash), bigintToHex(lastindex)]
   );
   return res;
 }
