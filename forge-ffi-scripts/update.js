@@ -21,7 +21,7 @@ async function main() {
   const hashesLength = parseInt(inputs[0]);
   const newRand = hexToBigint(inputs[1]);
   const newHashes = inputs.slice(2, 2+hashesLength).map((l) => hexToBigint(l));
-  const oldLeaves = inputs.slice(2+hashesLength, inputs.length).map((l) => hexToBigint(l));
+  const oldLeaves = inputs.slice(2+hashesLength, inputs.length).map((l) => hexToBigint(l)); // TODO: read from www
   const tree = await mimicMerkleTree(0n,oldLeaves);
   const oldProof = tree.path(oldLeaves.length-1)
   let i=0;

@@ -32,6 +32,7 @@ contract EthLotteryTest is Test {
     IUpdate89 public update89;
     IUpdate179 public update179;
 
+    uint newRoot;
     uint blocknumber = 1;
     uint oldIndex = 0;
     uint commitIndex=0;
@@ -113,15 +114,16 @@ contract EthLotteryTest is Test {
                 uint newIndex = uint(entries[i].topics[1]);
                 uint newRand = uint(entries[i].topics[2]);
                 uint hashesLength = newIndex-oldIndex;
-                string[] memory inputs = new string[](5+hashesLength);
+                string[] memory inputs = new string[](6+hashesLength);
                 inputs[0] = "node";
                 inputs[1] = "forge-ffi-scripts/getLeaves.js";
                 //inputs[2] = vm.toString(bytes32(oldIndex));
                 inputs[2] = vm.toString(oldIndex);
                 inputs[3] = vm.toString(block.number);
-                inputs[4] = vm.toString(bytes32(newRand));
+                inputs[4] = vm.toString(bytes32(newRoot));
+                inputs[5] = vm.toString(bytes32(newRand));
                 for (uint j = 0; j < hashesLength; j++) {
-                    inputs[5+j] = vm.toString(bytes32(allLeaves[oldIndex+j].topics[2]));}
+                    inputs[6+j] = vm.toString(bytes32(allLeaves[oldIndex+j].topics[2]));}
                 bytes memory result = vm.ffi(inputs);
                 (uint[] memory leaves) = abi.decode(result, (uint[]));
                 for(uint j=0;j<hashesLength;j++){
@@ -143,14 +145,14 @@ contract EthLotteryTest is Test {
         return (hash, secret_power);
     }
 
-    function _cancelbet(uint secret_power, uint hash, uint index) internal {
-        string[] memory inputs = new string[](4);
+    function _cancelbet(uint secret_power) internal {
+        string[] memory inputs = new string[](3);
         inputs[0] = "node";
         inputs[1] = "forge-ffi-scripts/cancelBet.js";
         inputs[2] = vm.toString(bytes32(secret_power));
-        inputs[3] = vm.toString(bytes32(hash));
+        //inputs[3] = vm.toString(bytes32(hash));
         bytes memory result = vm.ffi(inputs);
-        (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC,uint[1] memory data) = abi.decode(result, (uint[2], uint[2][2], uint[2], uint[1]));
+        (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC,uint[1] memory data, uint index) = abi.decode(result, (uint[2], uint[2][2], uint[2], uint[1], uint));
         uint gasStart = gasleft();
         assertTrue(cancel.verifyProof(pA,pB,pC,data));
         uint gasUsed = gasStart - gasleft();
@@ -281,11 +283,12 @@ contract EthLotteryTest is Test {
           assertTrue(update179.verifyProof(pA,pB,pC,pubdata));}
         else{
           revert("bad commitSize");}
+        newRoot = data[1];
         //console.log("after assert");
         uint revealGasUsed = revealGasStart - gasleft();
         if(0<showGas){ console.log("Gas used in update[%d].verifyProof: %d", hashesLength,revealGasUsed); }
         revealGasStart = gasleft();
-        lottery.reveal(_revealSecret,pA,pB,pC,data[1]); // data[1]=newRoot
+        lottery.reveal(_revealSecret,pA,pB,pC,newRoot); // data[1]=newRoot
         revealGasUsed = revealGasStart - gasleft();
         if(0<showGas){ console.log("Gas used in _reveal[%d]: %d", hashesLength,revealGasUsed); }
         vm.roll(++blocknumber);
@@ -307,12 +310,14 @@ contract EthLotteryTest is Test {
         lottery.play{value: betMin * (2 + 2**_power)}(hash,_power);
         uint gasUsed = gasStart - gasleft();
         if(0<showGas){ console.log("Gas used in _play: %d", gasUsed); }
+        _getLogs();
         return (secret_power,hash);
     }
 
     function _fake_play(uint i) internal {
         uint hash = uint(uint240(uint(keccak256(abi.encode(i))))<<5);
         lottery.play{value: 3*betMin}(hash,0);
+        _getLogs();
     }
 
     function view_status() view public {
@@ -384,15 +389,16 @@ contract EthLotteryTest is Test {
 
     }
 
-    function notest1_lottery_cancel() public {
+    function test1_lottery_cancel() public {
         vm.roll(++blocknumber);
         _fake_play(0);
         (uint secret_power,) = _play(10); // hash can be restored later
         console.log("%x ticket", secret_power);
         _commit_reveal();
-        (uint secret_power2,uint hash2) = _play(4); // hash can be restored later
-        (,uint index2) = _getRandIndex(hash2+(secret_power2&0x1f)+1);
-        _cancelbet(secret_power2,hash2,index2);
+        (uint secret_power2,) = _play(4); // hash can be restored later
+        //(,uint index2) = _getRandIndex(hash2+(secret_power2&0x1f)+1);
+        console.log("%x ticket", secret_power2);
+        _cancelbet(secret_power2);
     }
 
     function notest5_ods() public {
@@ -415,7 +421,7 @@ contract EthLotteryTest is Test {
                 _withdraw(secret[j][i],rand[j][i],index[j][i]);}}
     }
 
-    function test2_lottery_single_deposit() public {
+    function notest2_lottery_single_deposit() public {
         vm.roll(++blocknumber);
         //_fake_play(0);
         (uint secret_power1,) = _play(10); // hash can be restored later
@@ -449,7 +455,7 @@ contract EthLotteryTest is Test {
         _getLogs();
     }
 
-    function notest179_updates() public {
+    function notest9_179_updates() public {
         uint[2] memory sizes=[uint(180),uint(180)];
         for(uint j=0;j<2;j++){
           for(uint i=0;i<sizes[j];i++){
@@ -463,6 +469,7 @@ contract EthLotteryTest is Test {
     function notest9_updates() public {
         uint[8] memory sizes=[uint(1),uint(2),uint(4),uint(10),uint(20),uint(43),uint(88),uint(178)];
         for(uint j=0;j<8;j++){
+          console.log("blocknumber: %d",blocknumber);
           for(uint i=0;i<sizes[j];i++){
             _fake_play(j*8+i);}
           uint start = vm.unixTime();
@@ -482,11 +489,11 @@ contract EthLotteryTest is Test {
             _fake_play(i);}
         vm.roll(++blocknumber);
         _commit_reveal();
-        (uint secret_power2,uint hash2) = _play(4); // hash can be restored later
+        (uint secret_power2,) = _play(4); // hash can be restored later
         for (; i < 20; i++) {
             _fake_play(i);}
-        (,uint index2) = _getRandIndex(hash2+(secret_power2&0x1f)+1);
-        _cancelbet(secret_power2,hash2,index2);
+        //(,uint index2) = _getRandIndex(hash2+(secret_power2&0x1f)+1);
+        _cancelbet(secret_power2);
         _commit_reveal();
         (secret_power,hash) = _play(10);
         for (; i < 60; i++) {

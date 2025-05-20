@@ -5,6 +5,7 @@ const { bigintToHex, hexToBigint, leBufferToBigint } = require("./utils/bigint.j
 const circomlibjs = require("circomlibjs");
 const sprintfjs = require('sprintf-js');
 const { mkdirSync, openSync, writeFileSync, readFileSync, closeSync, existsSync } = require('fs');
+const { execSync } = require('child_process');
 const { mimicMerkleTree } = require("./utils/mimcMerkleTree.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
@@ -124,8 +125,9 @@ async function main() {
   const inputs = process.argv.slice(2, process.argv.length);
   const index = parseInt(inputs[0]);
   const blocknumber = parseInt(inputs[1]);
-  const newRand = hexToBigint(inputs[2]);
-  const newLeaves = inputs.slice(3,inputs.length).map((h,j) => leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([h,newRand,BigInt(index)+BigInt(j)]))));
+  //const newRoot = hexToBigint(inputs[2]);
+  const newRand = hexToBigint(inputs[3]);
+  const newLeaves = inputs.slice(4,inputs.length).map((h,j) => leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([h,newRand,BigInt(index)+BigInt(j)]))));
   if(newLeaves.length==0) {
     return;
   }
@@ -161,13 +163,13 @@ async function main() {
       pathlast=pathnew;
     }
     if(nextindex<=(index+i)) {
-      text+=sprintfjs.sprintf("%x,%s,%s,%s\n",(index+i)&0xFF,no0x(bigintToHex(newLeaves[i])),no0x(inputs[3+i]),no0x(inputs[2])); // index, leaf, hash, rand
+      text+=sprintfjs.sprintf("%x,%s,%s,%s\n",(index+i)&0xFF,no0x(bigintToHex(newLeaves[i])),no0x(inputs[4+i]),no0x(inputs[3])); // index, leaf, hash, rand
     }
   }
   await appendtofile(pathlast,text,(index+i)&0xff==0?true:false);
   // write last index to file
   const file = openSync("www/last.csv", "w");
-  const textlast=sprintfjs.sprintf("%x,%x\n",index+i,blocknumber); // TODO, write block number too
+  const textlast=sprintfjs.sprintf("%x,%x,%s\n",index+i,blocknumber,no0x(inputs[2])); // TODO, write block number too
   writeFileSync(file, textlast);
   closeSync(file);
 
