@@ -652,7 +652,7 @@ contract Lottery {
 /* getters */
     
     /**
-     * @dev Show balance of wallet.
+     * @dev Show last balance eligible for dividend.
      * @param _owner The address of the account.
      */
     function walletSharesOf(address _owner) public view returns (uint) {
@@ -660,11 +660,22 @@ contract Lottery {
     }
     
     /**
-     * @dev Show last balance eligible for dividend.
+     * @dev Show balance of wallet (including unpaid dividends).
      * @param _owner The address of the account.
      */
     function walletBalanceOf(address _owner) public view returns (uint) {
-        return uint(wallets[_owner].balance);
+        uint last = wallets[_owner].lastDividendPeriod;
+        uint dividend = 0;
+        if(last>0 && last<D.dividendPeriod){
+          uint shares = uint(wallets[_owner].shares) * 0xffffffff;
+          uint betshares = shares * periods[last].bets / periods[last].shares;
+          shares = uint(wallets[_owner].balance) * 0xffffffff;
+          for(last++;last<D.dividendPeriod;last++) {
+              betshares += shares * periods[last].bets / periods[last].shares;
+          }
+          dividend = betshares * dividendFeePerCent / 100 / 0xffffffff;
+        }
+        return uint(wallets[_owner].balance+dividend);
     }
     
     /**

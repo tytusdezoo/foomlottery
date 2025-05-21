@@ -355,16 +355,16 @@ contract EthLotteryTest is Test {
 
         blocknumber+=periodBlocks+1;
         vm.roll(blocknumber);
-        (secret_power,startIndex) = _play(10);
+        (secret_power,startIndex) = _play(16);
         _commit();
         invest = 2000;
-        recipient=a1;
+        recipient=a2;//a1;
         _withdraw(secret_power,startIndex);
         view_status(3);
 
         blocknumber+=periodBlocks+1;
         vm.roll(blocknumber);
-        (secret_power,startIndex) = _play(10);
+        (secret_power,startIndex) = _play(16);
         _commit();
         invest = 2000;
         recipient=a2;
@@ -373,16 +373,16 @@ contract EthLotteryTest is Test {
 
         blocknumber+=periodBlocks+1;
         vm.roll(blocknumber);
-        (secret_power,startIndex) = _play(10);
+        (secret_power,startIndex) = _play(16);
         _commit();
         invest = 2000;
-        recipient=a1;
+        recipient=a2;//a1;
         _withdraw(secret_power,startIndex);
         view_status(5);
 
         blocknumber+=periodBlocks+1;
         vm.roll(blocknumber);
-        (secret_power,startIndex) = _play(10);
+        (secret_power,startIndex) = _play(16);
         _commit();
         invest = 2000;
         recipient=a2;
@@ -391,16 +391,16 @@ contract EthLotteryTest is Test {
 
         blocknumber+=periodBlocks+1;
         vm.roll(blocknumber);
-        (secret_power,startIndex) = _play(10);
+        (secret_power,startIndex) = _play(16);
         _commit();
         invest = 2000;
-        recipient=a1;
+        recipient=a2;//a1;
         _withdraw(secret_power,startIndex);
         view_status(7);
 
         blocknumber+=periodBlocks+1;
         vm.roll(blocknumber);
-        (secret_power,startIndex) = _play(10);
+        (secret_power,startIndex) = _play(16);
         _commit();
         invest = 2000;
         recipient=a2;
@@ -409,48 +409,30 @@ contract EthLotteryTest is Test {
 
         blocknumber+=periodBlocks+1;
         vm.roll(blocknumber);
-        (secret_power,startIndex) = _play(10);
+        (secret_power,startIndex) = _play(16);
         _commit();
         invest = 2000;
-        recipient=a1;
+        recipient=a2;//a1;
         _withdraw(secret_power,startIndex);
         view_status(9);
 
         blocknumber+=periodBlocks+1;
         vm.roll(blocknumber);
-        (secret_power,startIndex) = _play(10);
+        (secret_power,startIndex) = _play(16);
         _commit();
         invest = 2000;
         recipient=a2;
         _withdraw(secret_power,startIndex);
         view_status(10);
 
-        blocknumber+=periodBlocks+1;
-        vm.roll(blocknumber);
-        (secret_power,startIndex) = _play(10);
-        _commit();
-        invest = 2000;
-        recipient=a1;
-        _withdraw(secret_power,startIndex);
-        view_status(11);
-
-        blocknumber+=periodBlocks+1;
-        vm.roll(blocknumber);
-        (secret_power,startIndex) = _play(10);
-        _commit();
-        invest = 2000;
-        recipient=a2;
-        _withdraw(secret_power,startIndex);
-        view_status(12);
-
         vm.prank(a2);
         lottery.payOut();
         vm.prank(a1);
         lottery.payOut();
         vm.roll(++blocknumber);
-        uint ballot=view_status(13);
+        uint ballot=view_status(0);
  
-        uint vol=1026*12;
+        uint vol=2*(2**10+2)+8*(2**16+2);
         console.log("\nvol: %d, lot: %d, fee: %d/10000",vol,ballot,ballot*10000/vol);
     }
 
