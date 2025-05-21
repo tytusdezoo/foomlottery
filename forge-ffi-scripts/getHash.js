@@ -7,7 +7,7 @@ const { readLast } = require("./utils/mimcMerkleTree.js");
 
 async function main() {
   const inputs = process.argv.slice(2, process.argv.length);
-  const [lastindex, root] = readLast();
+  const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();
 
   let power = hexToBigint(inputs[0]);
   let hash = 0n;
@@ -33,8 +33,8 @@ async function main() {
 
   // 3. Return abi encoded hash, secret+power
   const res = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["uint", "uint", "uint"],
-    [bigintToHex(secret_power), bigintToHex(hash), bigintToHex(lastindex)]
+    ["uint", "uint", "uint", "uint"],
+    [bigintToHex(secret_power), bigintToHex(hash), bigintToHex(nextIndex),bigintToHex(blockNumber)]
   );
   return res;
 }

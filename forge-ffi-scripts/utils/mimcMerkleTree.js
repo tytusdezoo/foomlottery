@@ -20,10 +20,10 @@ function readLast(){
     const fileold = openSync("www/last.csv", "r");
     const textold = readFileSync(fileold, "utf8");
     closeSync(fileold);
-    const [index,blocknumber,hash,lastLeaf] = textold.split(',');
-    return [parseInt(index,16), hexToBigint(hash), hexToBigint(lastLeaf)];
+    const [nextIndex,blockNumber,lastRoot,lastLeaf] = textold.split(',');
+    return [parseInt(nextIndex,16), parseInt(blockNumber,16), hexToBigint(lastRoot), hexToBigint(lastLeaf)];
   } catch(e) {
-    return [0,0n,0n];
+    return [0,0,0n,0n];
   }
 }
 
@@ -42,7 +42,7 @@ function getIndex(inHash) {
   return 0;
 }
 
-function getWaitingList(lastindex,hashesLength){
+function getWaitingList(nextIndex,hashesLength){
   const fileold = openSync("www/waiting.csv", "r");
   const textold = readFileSync(fileold, "utf8");
   closeSync(fileold);
@@ -53,8 +53,8 @@ function getWaitingList(lastindex,hashesLength){
     if (!lines[i]) continue;  // Skip empty lines
     const [index,hash] = lines[i].split(','); // assume hash in 2nd column in waiting.csv
     const indexnum = parseInt(index,16);
-    if(indexnum >= lastindex && indexnum < lastindex + hashesLength) {
-      hashes[indexnum-lastindex] = hexToBigint(hash);
+    if(indexnum >= nextIndex && indexnum < nextIndex + hashesLength) {
+      hashes[indexnum-nextIndex] = hexToBigint(hash);
     }
   }
   return hashes;
@@ -200,7 +200,7 @@ function getIndexRand(hashstr,startindex) {
   const path3 = path.slice(4,6);
     //console.log(hashstr);
   let fileold;
-  try {
+  try { 
     fileold = openSync("www/"+path1+"/"+path2+"/"+path3+".csv", "r");
   } catch(e) {
     return [-1,BigInt(0)];

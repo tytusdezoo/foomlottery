@@ -19,9 +19,12 @@ async function main() {
   const hash_power1 = hash + power + 1n;
   const startindex = parseInt(inputs[1].replace(/^0x0*/, ''),16); // could be int instead of hex later
   const [index,rand] = findIndex(hash_power1,startindex);
+  if(index>0 && rand==0){
+    throw("bet not processed yet");}
+  if(!index){
+    throw("bet not found");}
   const bigindex = BigInt(index);
   const dice = await mimcsponge3(secret,rand,bigindex);
-
 
   // 1.5. calculate reward
   const power1=10n;

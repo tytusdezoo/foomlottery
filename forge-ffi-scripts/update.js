@@ -13,42 +13,30 @@ const circomlibjs = require("circomlibjs");
 
 
 async function main() {
-  const inputs = process.argv.slice(2, process.argv.length);
   const mimcsponge = await circomlibjs.buildMimcSponge();
+  const inputs = process.argv.slice(2, process.argv.length);
 
   const commitIndex = parseInt(inputs[0]);
   const hashesLength = parseInt(inputs[1]);
   const newRand = hexToBigint(inputs[2]);
 
-  const [lastindex, oldRoot, oldLeaf] = readLast();  // add lastLeaf
-  const pathElements = await getPath(lastindex-1);
-  const newHashes = getWaitingList(lastindex,commitIndex);
-  const newLeaves = newHashes.slice(0, commitIndex).map((h,j) => leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([h,newRand,BigInt(lastindex)+BigInt(j)]))));
-  const hashes = new Array(hashesLength);
-  for(let i=0;i<hashesLength;i++){
-    if(i<commitIndex){
-      hashes[i] = newHashes[i];
-    } else {
-      hashes[i] = 0n;
-    }
-  }
-  const newRoot = await getNewRoot(lastindex,newLeaves);
+  const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();  // add lastLeaf
+  const newHashes = getWaitingList(nextIndex,commitIndex);
+  const newLeaves = newHashes.slice(0, commitIndex).map((h,j) => leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([h,newRand,BigInt(nextIndex)+BigInt(j)]))));
+  const newRoot = await getNewRoot(nextIndex,newLeaves);
+  const hashes = new Array(hashesLength).fill(null).map((x,j) => (j<commitIndex?newHashes[j]:0n));
 
-  // 1. Get nullifier and secret
-  //const oldLeaves = inputs.slice(2+hashesLength, inputs.length).map((l) => hexToBigint(l)); // TODO: read from www
-  //const tree = await mimicMerkleTree(0n,oldLeaves);
-  //const oldProof = tree.path(oldLeaves.length-1)
+  const pathElements = await getPath(nextIndex-1);
 
-  // 4. Format witness input to exactly match circuit expectations
   const input = {
     // Public inputs
-    oldRoot: oldRoot,
+    oldRoot: lastRoot,
     newRoot: newRoot,
-    index: lastindex-1,
+    index: nextIndex-1,
     newRand: newRand,
     newhashes: hashes,
     // Private inputs
-    oldLeaf: oldLeaf,
+    oldLeaf: lastLeaf,
     pathElements: pathElements.slice(0,32),
   };
 
@@ -93,9 +81,9 @@ async function main() {
       ],
       pC,
       [
-      bigintToHex(oldRoot),
+      bigintToHex(lastRoot),
       bigintToHex(newRoot),
-      bigintToHex(lastindex-1),
+      bigintToHex(nextIndex-1),
       bigintToHex(newRand),
       ...hashes.map((x) => bigintToHex(x))
       ]

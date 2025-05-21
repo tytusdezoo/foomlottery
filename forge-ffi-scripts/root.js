@@ -5,8 +5,8 @@ const { bigintToHex } = require("./utils/bigint.js");
 ////////////////////////////// MAIN ///////////////////////////////////////////
 
 async function main() {
-  const [lastindex, root] = readLast();  
-  const pathElements = await getPath(lastindex-1);
+  const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();  // add lastLeaf
+  const pathElements = await getPath(nextIndex-1);
   console.log(pathElements.map((p) => bigintToHex(p)));
   return;
 }

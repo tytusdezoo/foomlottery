@@ -298,7 +298,8 @@ contract Lottery {
                 commitBlockHash=uint(keccak256(abi.encodePacked(D.commitBlock)));}
           if(commitBlockHash==0){
             commitBlockHash=_open;}
-          //TODO, log hash
+          else{
+            emit LogHash(commitBlockHash);}
         } 
     }
 
@@ -689,10 +690,32 @@ contract Lottery {
         return uint(D.dividendPeriod);
     }
 
+    /**
+     * @dev Show number of Bets to process
+     */
+    function commitIndex() public view returns (uint) {
+        return uint(D.commitIndex);
+    }
+
+    /**
+     * @dev Show next betIndex
+     */
+    function nextIndex() public view returns (uint) {
+        return uint(D.nextIndex);
+    }
+
+    /**
+     * @dev Show number of waiting bets in queue
+     */
+    function betsIndex() public view returns (uint) {
+        return uint(D.betsIndex);
+    }
+
     // events
     event LogBetIn(uint indexed index,uint indexed newHash);
     event LogCancel(uint indexed index);
     event LogCommit(uint indexed index,uint indexed commitIndex,uint indexed commitHash);
+    event LogHash(uint indexed commitBlockHash);
     event LogSecret(uint indexed lastRoot,uint indexed revealSecret);
     event LogUpdate(uint indexed index,uint indexed newRand,uint indexed newRoot);
     event LogWin(uint indexed nullifierHash, uint indexed reward);

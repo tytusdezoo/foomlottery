@@ -17,9 +17,9 @@ async function main() {
   const power = secret_power & 0x1fn;
   const hash = await pedersenHash(leBigintToBuffer(secret, 31));
   const hash_power1 = hash + power + 1n;
-  const startindex = parseInt(inputs[1].replace(/^0x0*/, ''),16); // could be int instead of hex later
+  const startIndex = parseInt(inputs[1].replace(/^0x0*/, ''),16); // could be int instead of hex later
 
-  const index = getIndex(hash_power1);
+  const betIndex = getIndex(hash_power1); // use startIndex !!! TODO: refactor
   const input = {
     inHash: hash,
     secret: secret
@@ -41,7 +41,7 @@ async function main() {
       ],
       pC,
       [bigintToHex(hash)],
-      index
+      betIndex
     ]
   );
   return witness;

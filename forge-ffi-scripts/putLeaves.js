@@ -6,7 +6,7 @@ const circomlibjs = require("circomlibjs");
 const sprintfjs = require('sprintf-js');
 const { mkdirSync, openSync, writeFileSync, readFileSync, closeSync, existsSync } = require('fs');
 const { execSync } = require('child_process');
-const { mimicMerkleTree } = require("./utils/mimcMerkleTree.js");
+const { mimicMerkleTree, getWaitingList, readLast, getNewRoot } = require("./utils/mimcMerkleTree.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 // const zero08 = hexToBigint("0x0e5c230fa94b937789a1980f91b9de6233a7d0315f037c7d4917cba089e0042a"); needed in withdraw
@@ -17,7 +17,8 @@ const { mimicMerkleTree } = require("./utils/mimcMerkleTree.js");
 const zeros = [
   "0x24d599883f039a5cb553f9ec0e5998d58d8816e823bd556164f72aef0ef7d9c0",
   "0x0e5c230fa94b937789a1980f91b9de6233a7d0315f037c7d4917cba089e0042a",
-  "0x255da7d5316310ad81de31bfd5b8272b30ce70c742685ac9696446f618399317"
+  "0x255da7d5316310ad81de31bfd5b8272b30ce70c742685ac9696446f618399317",
+  "0x1dd4b847fd5bdd5d53a661d8268eb5dd6629669922e8a0dcbbeedc8d6a966aaf"
 ];
 
 function touchfile(path) {
@@ -29,6 +30,13 @@ function touchfile(path) {
 
 function no0x(str) {
   return str.replace(/^0x0*/, '');
+}
+
+function writeLast(nextIndex,blockNumber,lastRoot,lastLeaf){
+  const file = openSync("www/last.csv", "w");
+  const textlast=sprintfjs.sprintf("%x,%x,%s,%s\n",nextIndex,blockNumber,no0x(bigintToHex(lastRoot)),no0x(bigintToHex(lastLeaf)));
+  writeFileSync(file, textlast);
+  closeSync(file);
 }
 
 async function computeRoot(path,zero) {
@@ -119,55 +127,43 @@ async function appendtofile(pathlast,text,hash) {
   }
 }
 
-//TODO, change format: remove 0x0* from .csv file
-async function main() {
+async function main() { // TODO: test if update is correct
   const mimcsponge = await circomlibjs.buildMimcSponge();
   const inputs = process.argv.slice(2, process.argv.length);
-  const index = parseInt(inputs[0]);
-  const blocknumber = parseInt(inputs[1]);
-  //const newRoot = hexToBigint(inputs[2]);
-  const newRand = hexToBigint(inputs[3]);
-  const newLeaves = inputs.slice(4,inputs.length).map((h,j) => leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([h,newRand,BigInt(index)+BigInt(j)]))));
-  if(newLeaves.length==0) {
-    return;
-  }
 
-  let nextindex=0;
-  const filelast = openSync("www/last.csv", "r");
-  const lasttext=readFileSync(filelast, "utf8");
-  closeSync(filelast);
-  const [lastindex,lastblocknumber,lasthash,lastleaf] = lasttext.split(',');
-  nextindex=parseInt(lastindex,16);
-  let pathlast=index>>8;
+  const newIndex = parseInt(inputs[0]);
+  const newRand = hexToBigint(inputs[1]);
+  const newRoot = hexToBigint(inputs[2]);
+  const blockNumber = parseInt(inputs[3]);
+
+  const [nextIndex,lastBlockNumber,lastRoot,lastLeaf] = readLast();  // add lastLeaf
+  if(newIndex<=nextIndex){
+    return;}
+  const commitIndex=newIndex-nextIndex;
+  const newHashes = getWaitingList(nextIndex,commitIndex);
+  const newLeaves = newHashes.slice(0, commitIndex).map((h,j) => leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([h,newRand,BigInt(nextIndex)+BigInt(j)]))));
+  const testRoot = await getNewRoot(nextIndex,newLeaves);
+  if(testRoot!=newRoot){
+    throw("root mismatch");}
+
+  let pathlast=nextIndex>>8;
   let text='';
-  let i=0;
-  for (;i<newLeaves.length;i++) {
-    const pathnew = (index+i)>>8;
+  for (let i=0;i<commitIndex;i++) {
+    const pathnew = (nextIndex+i)>>8;
     if(pathnew!=pathlast) {
       await appendtofile(pathlast,text,true);
       text='';
       pathlast=pathnew;
     }
-    if(nextindex<=(index+i)) {
-      text+=sprintfjs.sprintf("%x,%s,%s,%s\n",(index+i)&0xFF,no0x(bigintToHex(newLeaves[i])),no0x(inputs[4+i]),no0x(inputs[3])); // index, leaf, hash, rand
-    }
+    text+=sprintfjs.sprintf("%x,%s,%s,%s\n",(nextIndex+i)&0xFF,no0x(bigintToHex(newLeaves[i])),no0x(bigintToHex(newHashes[i])),no0x(bigintToHex(newRand))); // index, leaf, hash, rand
   }
-  await appendtofile(pathlast,text,(index+i)&0xff==0?true:false);
-  // write last index to file
-  const file = openSync("www/last.csv", "w");
-  const textlast=sprintfjs.sprintf("%x,%x,%s,%s\n",index+i,blocknumber,no0x(inputs[2]),no0x(bigintToHex(newLeaves[newLeaves.length-1]))); // TODO, write block number too
-  writeFileSync(file, textlast);
-  closeSync(file);
-
-  cleanwaiting(index+i);
-
-  const res = ethers.AbiCoder.defaultAbiCoder().encode( ["uint[]"], [newLeaves.map((x) => bigintToHex(x))]);
-  return res;
+  await appendtofile(pathlast,text,(nextIndex+commitIndex)&0xff==0?true:false);
+  writeLast(nextIndex+commitIndex,blockNumber,no0x(bigintToHex(newRoot)),no0x(bigintToHex(newLeaves[commitIndex-1])));
+  cleanwaiting(nextIndex+commitIndex);
 }
 
 main()
   .then((res) => {
-    process.stdout.write(res);
     process.exit(0);
   })
   .catch((error) => {
