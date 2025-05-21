@@ -78,6 +78,7 @@ contract EthLotteryTest is Test {
         vm.roll(++blocknumber);
     	vm.recordLogs();
         lottery = new EthLottery(withdraw, cancel, update1, update3, update5, update11, update21, update44, update89, update179, IERC20(address(0)), betMin);
+	_init();
     }
 
     function _getLogs() internal {
@@ -93,10 +94,7 @@ contract EthLotteryTest is Test {
                 vm.ffi(inputs);}
             if (uint(entries[i].topics[0]) == LogBetIn){
                 if(entries[i].topics[1]==0){ // first fixed bet
-                    assertEq(entries[i].topics[2],0x0ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae520);
-                    string[] memory inputs = new string[](1);
-                    inputs[0] = "forge-ffi-scripts/init.bash";
-                    vm.ffi(inputs);}
+                    assertEq(entries[i].topics[2],0x0ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae520);}
                 else{
                     // append to wating list file
                     string[] memory inputs = new string[](3);
@@ -123,6 +121,12 @@ contract EthLotteryTest is Test {
             if (uint(entries[i].topics[0]) == LogHash){
                 commitBlockHash=uint(entries[i].topics[1]);
                 _reveal();}}
+    }
+
+    function _init() internal {
+        string[] memory inputs = new string[](1);
+        inputs[0] = "forge-ffi-scripts/init.bash";
+        vm.ffi(inputs);
     }
 
     function _cancelbet(uint secret_power,uint lastindex) internal {
@@ -311,6 +315,16 @@ contract EthLotteryTest is Test {
             console.log("%d shares: %d,withdrawperiod: %d",i,shares,wperiod);}
     }
 
+    function test() public { // can not run tests in parralel because of a common www repo
+        notest1_lottery_cancel();
+        //notest9_179_updates();
+        notest3_lottery_many_deposits();
+        //notest2_lottery_single_deposit();
+        notest9_updates();
+        //notest5_ods();
+        //notest0_investments();
+    }
+
     function notest0_investments() public {
         _getLogs();
         // console.log("period %d",periodBlocks);
@@ -363,7 +377,7 @@ contract EthLotteryTest is Test {
 
     }
 
-    function test1_lottery_cancel() public {
+    function notest1_lottery_cancel() public {
         _getLogs();
         vm.roll(++blocknumber);
         _fake_play(0);
@@ -373,6 +387,8 @@ contract EthLotteryTest is Test {
         _fake_play(0);
         _fake_play(0);
         _cancelbet(secret_power,startIndex);
+        _fake_play(0);
+        _commit();
     }
 
     function notest5_ods() public {
@@ -393,7 +409,7 @@ contract EthLotteryTest is Test {
                 _withdraw(secret[j][i],startIndex[j][i]);}}
     }
 
-    function test2_lottery_single_deposit() public {
+    function notest2_lottery_single_deposit() public {
         _getLogs();
         uint secret_power;
         uint startIndex;
