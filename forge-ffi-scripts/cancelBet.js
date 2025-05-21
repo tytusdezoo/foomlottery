@@ -5,8 +5,7 @@ const snarkjs = require("snarkjs");
 const { ethers } = require("ethers");
 const { hexToBigint, bigintToHex, leBigintToBuffer } = require("./utils/bigint.js");
 const { pedersenHash } = require("./utils/pedersen.js");
-const { openSync, readFileSync, closeSync } = require("fs");
-const { mimicMerkleTree, readLast, getLeaves, getPath, getIndex } = require("./utils/mimcMerkleTree.js");
+const { findBet } = require("./utils/mimcMerkleTree.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 
@@ -19,6 +18,10 @@ async function main() {
   const hash_power1 = hash + power + 1n;
   const startIndex = parseInt(inputs[1].replace(/^0x0*/, ''),16); // could be int instead of hex later
   const [betIndex,betRand] = findBet(hash_power1,startIndex); // use startIndex !!! TODO: refactor
+  if(betIndex>0 && betRand>0n){
+    throw("bet already processed for "+bigintToHex(hash_power1)+" starting at "+startIndex.toString(16));}
+  if(betIndex==0){
+    throw("bet not found for "+bigintToHex(hash_power1)+" starting at "+startIndex.toString(16));}
   const input = {
     inHash: hash,
     secret: secret

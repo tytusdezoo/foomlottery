@@ -60,12 +60,12 @@ function getIndexRand(hashstr,betIndex) {
 
 function getIndexWaiting(hashstr) {
   const lines = getLines("www/waiting.csv");
-  lines.forEach((line) => {
-    const [index,hash] = line.split(',');
+  for(let i=0;i<lines.length;i++) {
+    const [index,hash] = lines[i].split(',');
     if(hash==hashstr) {
       return [parseInt(index,16),0n];
     }
-  });
+  }
   return [0,0n];
 }
 

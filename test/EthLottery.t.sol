@@ -363,7 +363,7 @@ contract EthLotteryTest is Test {
 
     }
 
-    function notest1_lottery_cancel() public {
+    function test1_lottery_cancel() public {
         _getLogs();
         vm.roll(++blocknumber);
         _fake_play(0);
