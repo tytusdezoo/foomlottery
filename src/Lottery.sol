@@ -167,9 +167,9 @@ contract Lottery {
      * @dev Play in lottery
      */
     function play(uint _secrethash,uint _power) payable external { // unchecked {
+        require(D.nextIndex < 2 ** merkleTreeLevels - 1 - betsMax, "No more bets allowed");
         require(0<_secrethash && _secrethash < FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
-        require(D.betsIndex < betsMax && D.nextIndex + D.betsIndex < 2 ** merkleTreeLevels - 1, "No more bets allowed");
-        require(_power >= 0 && _power<=betPower3, "Invalid bet amount");
+        require(_power<=betPower3, "Invalid bet amount");
         _deposit(getAmount(_power));
         uint newHash = _secrethash + _power + 1;
         uint pos = (uint(D.betsStart) + uint(D.betsIndex)) % betsMax;
@@ -254,9 +254,9 @@ contract Lottery {
         uint[2] calldata _pC,
         uint _betIndex,
         address _recipient) payable external nonReentrant {
-        require(D.nextIndex<=_betIndex && _betIndex-D.nextIndex<D.betsIndex, "Bet probably processed");
+        require(D.nextIndex<=_betIndex && _betIndex<D.nextIndex+D.betsIndex, "Bet probably processed");
         rememberHash();
-        require(D.commitBlock != 0 || _betIndex-D.nextIndex>=D.commitIndex, "Commit in progress"); // do not allow generator to cancel bets after selecting commitBlock for random index
+        require(D.commitBlock == 0 || D.nextIndex+D.commitIndex<=_betIndex, "Commit in progress"); // do not allow generator to cancel bets after selecting commitBlock for random index
         uint pos = (uint(D.betsStart)+(_betIndex-D.nextIndex)) % betsMax;
         uint power1=bets[pos]&0x1f;
         require(power1>0);

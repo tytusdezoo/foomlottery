@@ -316,13 +316,13 @@ contract EthLotteryTest is Test {
     }
 
     function test() public { // can not run tests in parralel because of a common www repo
-        notest1_lottery_cancel();
+        //notest1_lottery_cancel();
         //notest9_179_updates();
-        notest3_lottery_many_deposits();
+        //notest3_lottery_many_deposits();
         //notest2_lottery_single_deposit();
         //notest9_updates();
         //notest5_ods();
-        //notest0_investments();
+        notest0_investments();
     }
 
     function notest0_investments() public {
