@@ -15,53 +15,7 @@ const zeros = [
   "0x1dd4b847fd5bdd5d53a661d8268eb5dd6629669922e8a0dcbbeedc8d6a966aaf"
 ];
 
-function readLast(){
-  try {
-    const fileold = openSync("www/last.csv", "r");
-    const textold = readFileSync(fileold, "utf8");
-    closeSync(fileold);
-    const [nextIndex,blockNumber,lastRoot,lastLeaf] = textold.split(',');
-    return [parseInt(nextIndex,16), parseInt(blockNumber,16), hexToBigint(lastRoot), hexToBigint(lastLeaf)];
-  } catch(e) {
-    return [0,0,0n,0n];
-  }
-}
-
-function getIndex(inHash) {
-  const hashstr = bigintToHex(inHash).replace(/^0x0*/, '');
-  const fileold = openSync("www/waiting.csv", "r");
-  const textold = readFileSync(fileold, "utf8");
-  closeSync(fileold);
-  const lines = textold.split("\n");
-  for(let i=0;i<lines.length;i++) {
-    const [index,hash] = lines[i].split(',');
-    if(hash==hashstr) {
-      return parseInt(index,16);
-    }
-  }
-  return 0;
-}
-
-function getWaitingList(nextIndex,hashesLength){
-  const fileold = openSync("www/waiting.csv", "r");
-  const textold = readFileSync(fileold, "utf8");
-  closeSync(fileold);
-  const lines = textold.split("\n");
-  // create array of hashes of size hashesLength
-  const hashes = new Array(hashesLength);
-  for(let i=0;i<lines.length;i++) {
-    if (!lines[i]) continue;  // Skip empty lines
-    const [index,hash] = lines[i].split(','); // assume hash in 2nd column in waiting.csv
-    const indexnum = parseInt(index,16);
-    if(indexnum >= nextIndex && indexnum < nextIndex + hashesLength) {
-      hashes[indexnum-nextIndex] = hexToBigint(hash);
-    }
-  }
-  return hashes;
-}
-
-function getLeaves(path){
-  // check if the file is compressed and decompress it if needed
+function getLines(path){
   let fileold;
   let textold;
   try {
@@ -74,15 +28,76 @@ function getLeaves(path){
     }
     closeSync(fileold);
   } catch(e) {
-    return [-1,[]];
+    return [];
   }
   if(textold.length==0){
-    return [-1,[]];
+    return [];
   }
-  const lines = textold.split('\n');
-  // remove last empty line
-  lines.pop();
+  // remove empty lines
+  return textold.split("\n").filter((line) => line.trim() !== "");
+}
+
+function readLast(){
+  const lines = getLines("www/last.csv");
+  const [nextIndex,blockNumber,lastRoot,lastLeaf] = lines[0].split(',');
+  return [parseInt(nextIndex,16), parseInt(blockNumber,16), hexToBigint(lastRoot), hexToBigint(lastLeaf)];
+}
+
+function getIndexRand(hashstr,betIndex) {
+  const path = sprintfjs.sprintf("%06x",betIndex>>8);
+  const path1 = path.slice(0,2);
+  const path2 = path.slice(2,4); 
+  const path3 = path.slice(4,6);
+  const lines = getLines("www/"+path1+"/"+path2+"/"+path3+".csv");
+  for(let i=0;i<lines.length;i++) {
+    const [index,skip,hash,myrand] = lines[i].split(',');
+    if(hash==hashstr) {
+      return [parseInt(index,16),hexToBigint(myrand)];
+    }
+  }
+  return [0,0n];
+}
+
+function getIndexWaiting(hashstr) {
+  const lines = getLines("www/waiting.csv");
+  lines.forEach((line) => {
+    const [index,hash] = line.split(',');
+    if(hash==hashstr) {
+      return [parseInt(index,16),0n];
+    }
+  });
+  return [0,0n];
+}
+
+function findBet(inHash,startindex) { // TODO ... look also in waiting list
+  const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();  // add lastLeaf
+  const hashstr = bigintToHex(inHash).replace(/^0x0*/, '');
+  for(;startindex<nextIndex;startindex+=0xff) {
+    [betIndex,betRand] = getIndexRand(hashstr,startindex);
+    if(betIndex>0) {
+      return [betIndex,betRand];
+    }
+  }
+  return getIndexWaiting(hashstr);
+}
+
+function getWaitingList(nextIndex,hashesLength){
+  const lines = getLines("www/waiting.csv");
+  const hashes = new Array(hashesLength);
+  lines.forEach((line) => {
+    if (!line) return;  // Skip empty lines
+    const [index,hash] = line.split(','); // assume hash in 2nd column in waiting.csv
+    const indexnum = parseInt(index,16);
+    if(indexnum >= nextIndex && indexnum < nextIndex + hashesLength) {
+      hashes[indexnum-nextIndex] = hexToBigint(hash);
+    }
+  });
+  return hashes;
+}
+
+function getLeaves(path){
   let lastindex=-1;
+  const lines = getLines(path);
   const leaves = lines.map((line) => {
     const [index,hash] = line.split(',');
     const indexnum = parseInt(index,16);
@@ -193,53 +208,16 @@ async function getNewRoot(lastindex,newLeaves){
   return newRoot;
 }
 
-function getIndexRand(hashstr,startindex) {
-  const path = sprintfjs.sprintf("%06x",startindex>>8);
-  const path1 = path.slice(0,2);
-  const path2 = path.slice(2,4); 
-  const path3 = path.slice(4,6);
-    //console.log(hashstr);
-  let fileold;
-  try { 
-    fileold = openSync("www/"+path1+"/"+path2+"/"+path3+".csv", "r");
-  } catch(e) {
-    return [-1,BigInt(0)];
-  }
-  const textold = readFileSync(fileold, "utf8");
-  closeSync(fileold);
-  const lines = textold.split("\n");
-  for(let i=0;i<lines.length;i++) {
-    const [index,skip,hash,myrand] = lines[i].split(',');
-    if(hash==hashstr) {
-      return [parseInt(index,16),hexToBigint(myrand)];
-    }
-  }
-  return [-1,BigInt(0)];
-}
-
-function findIndex(inHash,startindex) { // TODO ... look also in waiting list
-  const hashstr = bigintToHex(inHash).replace(/^0x0*/, '');
-  let index=0;
-  while(index>=0) {
-    [index,myrand] = getIndexRand(hashstr,startindex);
-    if(index>0) {
-      return [index,myrand];
-    }
-    startindex += 0xff;
-  }
-  return [0,0];
-}
-
 async function mimicMerkleTree(zero,leaves = [],hight=MERKLE_TREE_HEIGHT) {
   const mimcsponge = await circomlibjs.buildMimcSponge();
-  const leaf = (zero==0n)?16660660614175348086322821347366010925591495133565739687589833680199500683712n:zero;
+  //const leaf = (zero==0n)?16660660614175348086322821347366010925591495133565739687589833680199500683712n:zero;
   const mimcspongeMultiHash = (left, right) =>
     leBufferToBigint(
       mimcsponge.F.fromMontgomery(mimcsponge.multiHash([left, right]))
     );
   return new MerkleTree(hight, leaves, {
     hashFunction: mimcspongeMultiHash,
-    zeroElement: leaf,
+    zeroElement: zero,
   });
 }
 
@@ -248,9 +226,9 @@ module.exports = {
   readLast,
   getLeaves,
   getPath,
-  getIndex,
+  getIndexWaiting,
   getIndexRand,
-  findIndex,
+  findBet,
   getNewRoot,
   getWaitingList,
 };

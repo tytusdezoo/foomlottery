@@ -2,15 +2,16 @@
 const path = require("path");
 const snarkjs = require("snarkjs");
 const { ethers } = require("ethers");
-const { hexToBigint, bigintToHex, leBigintToBuffer, reverseBits, } = require("./utils/bigint.js");
+const { hexToBigint, bigintToHex, leBigintToBuffer, reverseBits, leBufferToBigint } = require("./utils/bigint.js");
 const { pedersenHash } = require("./utils/pedersen.js");
-const { mimcsponge3 } = require("./utils/mimcsponge.js");
-const { getPath, findIndex } = require("./utils/mimcMerkleTree.js");
+const { getPath, findBet } = require("./utils/mimcMerkleTree.js");
+const circomlibjs = require("circomlibjs");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 // forge-ffi-scripts/withdraw.js 0x4229f5eb2109ba8e3a1c4134720bda5a1d4070f1086fa128a1d630576a67fa0a 0x0000000000000000000000000000000000000000000000000000000000000002 0x0000000000000000000000000000000000000001 0x0000000000000000000000000000000000000000 0x0 0x0
 
 async function main() {
+  const mimcsponge = await circomlibjs.buildMimcSponge();
   const inputs = process.argv.slice(2, process.argv.length);
   const secret_power = hexToBigint(inputs[0]); // TODO: compute hash and read from www
   const secret = secret_power>>8n;
@@ -18,13 +19,13 @@ async function main() {
   const hash = await pedersenHash(leBigintToBuffer(secret, 31));
   const hash_power1 = hash + power + 1n;
   const startindex = parseInt(inputs[1].replace(/^0x0*/, ''),16); // could be int instead of hex later
-  const [index,rand] = findIndex(hash_power1,startindex);
-  if(index>0 && rand==0){
+  const [betIndex,betRand] = findBet(hash_power1,startindex);
+  if(betIndex>0 && betRand==0n){
     throw("bet not processed yet");}
-  if(!index){
+  if(betIndex==0){
     throw("bet not found");}
-  const bigindex = BigInt(index);
-  const dice = await mimcsponge3(secret,rand,bigindex);
+  const bigindex = BigInt(betIndex);
+  const dice = await leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([secret,betRand,bigindex])));
 
   // 1.5. calculate reward
   const power1=10n;
@@ -42,7 +43,7 @@ async function main() {
   const terces = reverseBits(dice,31*8);
   const nullifierHash = await pedersenHash(leBigintToBuffer(terces, 31));
 
-  const pathElements = await getPath(index);
+  const pathElements = await getPath(betIndex);
 
   // 4. Format witness input to exactly match circuit expectations
   const input = {
@@ -57,8 +58,8 @@ async function main() {
     // Private inputs
     secret: secret,
     power: power,
-    rand: rand,
-    pathIndex: BigInt(index),
+    rand: betRand,
+    pathIndex: BigInt(betIndex),
     pathElements: pathElements.slice(0,32),
   };
 
