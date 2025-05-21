@@ -76,10 +76,7 @@ contract Lottery {
         uint8 status;
     }
     Data public D;
-    uint128 public currentBets = 1; // total bet volume in current period
-    uint128 public currentShares = 1; // sum of funds eligible for dividend in current period
-    uint128 public currentBalance = 1; // sum of funds in wallets
-    uint128 public currentPayout = 1; // sum of available funds for withdraw (with dividends)
+    uint128 public currentBalance = 1; // sum of available funds in wallets
     uint public lastRoot; // current tree root
     uint public commitHash; //
     uint public commitBlockHash; //
@@ -221,7 +218,6 @@ contract Lottery {
             if(_invest > reward - _fee) {
                 _invest = reward - _fee;
             }
-            currentPayout += uint128(_invest);
             currentBalance += uint128(_invest);
             wallets[_recipient].balance += uint112(_invest);
             reward -= _invest;
@@ -229,7 +225,6 @@ contract Lottery {
         /* process withdrawal */
         if(balance < reward) {
             _invest = reward - balance/2;
-            currentPayout += uint128(_invest);
             currentBalance += uint128(_invest);
             wallets[_recipient].balance += uint112(_invest);
             wallets[_recipient].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // wait 1 period for more funds
@@ -251,7 +246,7 @@ contract Lottery {
           require(ok,"failed to refund");
         }
         rememberHash();
-        emit LogWin(uint(_nullifierHash),reward);
+        emit LogWin(uint(_nullifierHash),reward,_recipient);
     }
 
    /**
@@ -444,7 +439,7 @@ contract Lottery {
             require(update179.verifyProof( _pA, _pB, _pC, pubdata), "Invalid update proof");}
         else{
             revert("fatal error, resetcommit and close");}
-        currentBets+=uint128(newBets);
+        periods[uint(D.dividendPeriod)].bets+=uint128(newBets);
         D.nextIndex+=D.commitIndex;
         D.betsStart =uint8((uint(D.betsStart)+uint(D.commitIndex)) % betsMax);
         D.betsIndex-=D.commitIndex;
@@ -456,7 +451,6 @@ contract Lottery {
         lastRoot=_newRoot;
         collectDividend(msg.sender);
         uint generatorReward = newBets * generatorFeePerCent / 100;
-        currentPayout += uint128(generatorReward);
         currentBalance += uint128(generatorReward);
         wallets[msg.sender].balance += uint112(generatorReward);
         updateDividendPeriod();
@@ -469,14 +463,11 @@ contract Lottery {
      * @dev Update dividend period
      */
     function updateDividendPeriod() public {
-        if(block.number >= D.periodStartBlock + periodBlocks || currentBets > maxBalance) {
-            periods[D.dividendPeriod]=Period(currentBets,currentShares);
-            /* estimate dividend ? */
-            currentPayout += uint128(uint(currentBets)*dividendFeePerCent/100);
-            currentShares = currentBalance;
-            currentBets = 0;
+        if(block.number >= D.periodStartBlock + periodBlocks || periods[D.dividendPeriod].bets > maxBalance) {
+            currentBalance += uint128(uint(periods[D.dividendPeriod].bets)*dividendFeePerCent/100);
             D.periodStartBlock = uint64(block.number);
             D.dividendPeriod++;
+            periods[D.dividendPeriod].shares=currentBalance;
         }
     }
 
@@ -493,20 +484,15 @@ contract Lottery {
         if(last==D.dividendPeriod) {
             return;
         }
-        uint shares = uint(wallets[_who].shares) * 0xffffffff;
-        uint betshares = 0;
+        uint balance=uint(wallets[_who].balance);
         if(periods[last].shares>0){
-            betshares = shares * periods[last].bets / periods[last].shares;}
-        shares = uint(wallets[_who].balance) * 0xffffffff;
+            balance += uint(wallets[_who].shares) * periods[last].bets * dividendFeePerCent / (periods[last].shares * 100);}
         for(last++;last<D.dividendPeriod;last++) {
             if(periods[last].shares>0){
-                betshares += shares * periods[last].bets / periods[last].shares;}
+                balance += balance * periods[last].bets * dividendFeePerCent / (periods[last].shares * 100);}
         }
-        uint dividend = betshares * dividendFeePerCent / 100 / 0xffffffff;
-        currentBalance += uint128(dividend);
-        currentShares += uint128(dividend);
-        wallets[_who].balance += uint112(dividend);
-        wallets[_who].shares = uint112(wallets[_who].balance);
+        wallets[_who].balance = uint112(balance);
+        wallets[_who].shares = uint112(balance);
         wallets[_who].lastDividendPeriod = uint16(D.dividendPeriod);
     }
 
@@ -528,20 +514,16 @@ contract Lottery {
             wallets[msg.sender].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // wait 1 period for more funds
         }
         wallets[msg.sender].balance -= uint112(_amount);
-        if(currentPayout>uint128(_amount)){
-            currentPayout -= uint128(_amount);}
-        else{
-            currentPayout = 0;}
         if(currentBalance>uint128(_amount)){
             currentBalance -= uint128(_amount);}
         else{
             currentBalance = 0;}
         if(wallets[msg.sender].balance<wallets[msg.sender].shares) {
             uint reduce = uint128(wallets[msg.sender].shares - wallets[msg.sender].balance);
-            if(currentShares>reduce){
-                currentShares -= uint128(reduce);}
+            if(periods[D.dividendPeriod].shares>reduce){
+                periods[D.dividendPeriod].shares -= uint128(reduce);}
             else{
-                currentShares = 0;}
+                periods[D.dividendPeriod].shares = 0;}
             wallets[msg.sender].shares = uint112(wallets[msg.sender].balance);
         }
         _withdraw(payable(msg.sender),_amount);
@@ -675,13 +657,13 @@ contract Lottery {
 /* getters */
     
     /**
-     * @dev Show last balance eligible for dividend.
+     * @dev Show current balance eligible for dividend.
      * @param _owner The address of the account.
      */
     function walletSharesOf(address _owner) public view returns (uint) {
         uint last = wallets[_owner].lastDividendPeriod;
         if(last<D.dividendPeriod){
-            return(uint(wallets[_owner].balance));}
+            return walletBalanceOf(_owner);}
         return uint(wallets[_owner].shares);
     }
     
@@ -689,32 +671,18 @@ contract Lottery {
      * @dev Show balance of wallet (including unpaid dividends).
      * @param _owner The address of the account.
      */
-    function walletPayoutOf(address _owner) public view returns (uint) {
+    function walletBalanceOf(address _owner) public view returns (uint) {
         uint last = wallets[_owner].lastDividendPeriod;
-        uint dividend = 0;
-        if(last>0 && last<D.dividendPeriod){
-            uint shares = uint(wallets[_owner].shares) * 0xffffffff;
-            uint betshares = 0;
+        uint balance=uint(wallets[_owner].balance);
+        if(periods[last].shares>0){
+            balance += uint(wallets[_owner].shares) * periods[last].bets * dividendFeePerCent / (periods[last].shares * 100);}
+        for(last++;last<D.dividendPeriod;last++) {
             if(periods[last].shares>0){
-                betshares = shares * periods[last].bets / periods[last].shares;}
-            shares = uint(wallets[_owner].balance) * 0xffffffff;
-            for(last++;last<D.dividendPeriod;last++) {
-                if(periods[last].shares>0){
-                    betshares += shares * periods[last].bets / periods[last].shares;}
-            }
-            dividend = betshares * dividendFeePerCent / 100 / 0xffffffff;
+                balance += balance * periods[last].bets * dividendFeePerCent / (periods[last].shares * 100);}
         }
-        return uint(wallets[_owner].balance+dividend);
+        return(balance);
     }
 
-    /**
-     * @dev Show balance of wallet (without unpaid dividends).
-     * @param _owner The address of the account.
-     */
-    function walletBalanceOf(address _owner) public view returns (uint) {
-        return uint(wallets[_owner].balance);
-    }
-    
     /**
      * @dev Show last dividend period processed.
      * @param _owner The address of the account.
@@ -781,7 +749,7 @@ contract Lottery {
     event LogHash(uint indexed commitBlockHash);
     event LogSecret(uint indexed lastRoot,uint indexed revealSecret);
     event LogUpdate(uint indexed index,uint indexed newRand,uint indexed newRoot);
-    event LogWin(uint indexed nullifierHash, uint indexed reward);
+    event LogWin(uint indexed nullifierHash, uint indexed reward,address indexed recipient);
     event LogWithdraw(address indexed owner);
     event LogClose(address indexed owner);
     event LogReopen(address indexed owner);

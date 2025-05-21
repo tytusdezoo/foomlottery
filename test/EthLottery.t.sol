@@ -312,27 +312,17 @@ contract EthLotteryTest is Test {
 	uint period=lottery.dividendPeriod();
         uint pbets=lottery.periodBets(period-1);
         uint pshares=lottery.periodShares(period-1);
-        uint cpayout=lottery.currentPayout();
         uint cbalance=lottery.currentBalance();
-        uint cshares=lottery.currentShares();
-        uint spayout=0;
-        uint sbalance=0;
-        uint sshares=0;
         console.log("lottery: %d (%d,%d)",lwallet,block.number,period);
         console.log("%d: Bets: %d Shares: %d",period-1,pbets,pshares);
+        uint sbalance=0;
         address[3] memory who=[a1,a2,ag];
         for(uint i=0;i<who.length;i++){
             uint wallet=who[i].balance;
-            uint payout=lottery.walletPayoutOf(who[i]);
-            uint shares=lottery.walletSharesOf(who[i]);
             uint balance=lottery.walletBalanceOf(who[i]);
-            spayout+=payout;
-            sshares+=shares;
             sbalance+=balance;
-            console.log("%d wallet: %d,payout: %d",i,wallet,payout);
-            console.log("%d shares: %d,balance: %d",i,shares,balance);}
-        console.log("cPayout: %d Balance: %d Shares: %d",cpayout,cbalance,cshares);
-        console.log("sPayout: %d Balance: %d Shares: %d",spayout,sbalance,sshares);
+            console.log("%d wallet: %d,balance: %d",i,wallet,balance);}
+        console.log("cBalance: %d sBalance: %d",cbalance,sbalance);
         return(lwallet);
     }
 
