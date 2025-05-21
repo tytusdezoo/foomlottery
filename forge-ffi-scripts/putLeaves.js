@@ -1,18 +1,13 @@
 #!/usr/bin/node
 
-const { ethers } = require("ethers");
 const { bigintToHex, hexToBigint, leBufferToBigint } = require("./utils/bigint.js");
 const circomlibjs = require("circomlibjs");
 const sprintfjs = require('sprintf-js');
-const { mkdirSync, openSync, writeFileSync, readFileSync, closeSync, existsSync } = require('fs');
+const { mkdirSync, writeFileSync, existsSync } = require('fs');
 const { execSync } = require('child_process');
 const { mimicMerkleTree, getWaitingList, readLast, getNewRoot, getLines } = require("./utils/mimcMerkleTree.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
-// const zero08 = hexToBigint("0x0e5c230fa94b937789a1980f91b9de6233a7d0315f037c7d4917cba089e0042a"); needed in withdraw
-// const zero16 = hexToBigint("0x255da7d5316310ad81de31bfd5b8272b30ce70c742685ac9696446f618399317"); needed in withdraw
-
-// forge-ffi-scripts/getLeaves.js 1 0x0000000000000000000000000000000007a723530a3ee4727fca6baed148b971 0x1d4a9174860dc2bb70074560843307f625509fa9c8bc88677425d0b0b05c364b
 
 const zeros = [
   "0x24d599883f039a5cb553f9ec0e5998d58d8816e823bd556164f72aef0ef7d9c0",
