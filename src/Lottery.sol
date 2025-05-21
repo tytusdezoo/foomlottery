@@ -648,8 +648,13 @@ contract Lottery {
      */
     function changeGenerator(address _who) external onlyOwner {
         assert(_who != address(0));
-        collectDividend(msg.sender);
+        collectDividend(generator);
         collectDividend(_who);
+        if(wallets[generator].balance>=1 && wallets[generator].shares>=1){
+            wallets[generator].balance-=1;
+            wallets[_who].balance+=1;
+            wallets[generator].shares-=1;
+            wallets[_who].shares+=1;}
         generator = _who;
         emit LogChangeGenerator(msg.sender, _who);
     }
