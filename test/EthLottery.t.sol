@@ -210,6 +210,8 @@ contract EthLotteryTest is Test {
         uint commitGasStart = gasleft();
         uint maxUpdate=lottery.maxUpdate();
         lottery.commit(_commitHash,maxUpdate);
+        vm.roll(++blocknumber);
+        vm.setBlockhash(blocknumber-1,bytes32(keccak256(abi.encodePacked(blocknumber-1))));
         uint commitGasUsed = commitGasStart - gasleft();
         if(0<showGas){ console.log("Gas used in _commit: %d", commitGasUsed); }
         vm.roll(++blocknumber);

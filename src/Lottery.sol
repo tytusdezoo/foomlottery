@@ -154,6 +154,18 @@ contract Lottery {
         //emit LogBetHash(0,0x0ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae520,0);
     }
 
+/* most important functions */
+
+    /**
+     * @dev Pray to the terrestrial God !!!
+     * To pray effectively, begin by finding a quiet space, addressing God respectfully, expressing gratitude for blessings, and acknowledging your needs and concerns.
+     * Prayers can be done out loud or silently, and sincerity is more important than elaborate language. End your prayer by reaffirming your faith.
+     * A well conducted prayer increases your odds in the lottery significantly.
+     */
+    function pray(bytes32[] calldata prayer) payable external {
+        emit LogPrayer(prayer);
+    }
+
 /* lottery functions */
 
     /**
@@ -196,16 +208,14 @@ contract Lottery {
         require(nullifier[_nullifierHash] == 0, "Incorrect nullifier");
         nullifier[_nullifierHash] = 1;
         require(msg.value == _refund, "Incorrect refund amount received by the contract");
-        require(roots[_root]>0, "Cannot find your merkle root");
-        require(withdraw.verifyProof( _pA, _pB, _pC, [ _root, _nullifierHash, _rewardbits, uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
         uint reward =  betMin * ( (_rewardbits&0x1>0?1:0) * 2**betPower1 + (_rewardbits&0x2>0?1:0) * 2**betPower2 + (_rewardbits&0x4>0?1:0) * 2**betPower3 );
-        emit LogWin(uint(_nullifierHash),reward);
-        //currentBets += uint128(reward);
-        collectDividend(_recipient);
         reward = reward * (100 - dividendFeePerCent - generatorFeePerCent) / 100;
-        uint balance = _balance();
         require(reward >= _fee, "Insufficient reward");
+        require(roots[_root]>0, "Cannot find your merkle root");
+        uint balance = _balance();
         require(balance >= _fee, "Insufficient balance");
+        require(withdraw.verifyProof( _pA, _pB, _pC, [ _root, _nullifierHash, _rewardbits, uint(uint160(_recipient)), uint(uint160(_relayer)), _fee, _refund ]), "Invalid withdraw proof");
+        collectDividend(_recipient);
         if(_invest>0 && wallets[_recipient].balance < maxBalance) {
             if(_invest > reward - _fee) {
                 _invest = reward - _fee;
@@ -215,13 +225,6 @@ contract Lottery {
             reward -= _invest;
         }
         /* process withdrawal */
-        /*if(betMin * 2**betPower2 < reward ) { // limit max withdrawal
-            _invest = reward - (betMin * 2**betPower2);
-            currentBalance += uint128(_invest);
-            wallets[_recipient].balance += uint112(_invest);
-            wallets[_recipient].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // wait 1 period for more funds
-            reward -= _invest;
-        }*/
         if(balance < reward) {
             _invest = reward - balance/2;
             currentBalance += uint128(_invest);
@@ -243,6 +246,7 @@ contract Lottery {
           require(ok);
         }
         rememberHash();
+        emit LogWin(uint(_nullifierHash),reward);
     }
 
    /**
@@ -253,20 +257,19 @@ contract Lottery {
         uint[2][2] calldata _pB,
         uint[2] calldata _pC,
         uint _betIndex,
-        address _recipient) payable external nonReentrant {
-        require(D.nextIndex<=_betIndex && _betIndex<D.nextIndex+D.betsIndex, "Bet probably processed");
-        rememberHash();
-        require(D.commitBlock == 0 || D.nextIndex+D.commitIndex<=_betIndex, "Commit in progress"); // do not allow generator to cancel bets after selecting commitBlock for random index
+        address _recipient) external nonReentrant {
+        require(D.nextIndex+D.commitIndex<=_betIndex && _betIndex<D.nextIndex+D.betsIndex, "Bet probably processed");
         uint pos = (uint(D.betsStart)+(_betIndex-D.nextIndex)) % betsMax;
         uint power1=bets[pos]&0x1f;
         require(power1>0);
         require(cancel.verifyProof( _pA, _pB, _pC, [uint(bets[pos]-power1)]), "Invalid cancel proof");
         uint reward=getAmount(power1-1);
         bets[pos]=0x20;
-        emit LogCancel(_betIndex); // TODO: remember to update tree leaves !!!
         uint balance = _balance();
         require(balance >= reward,"Not anough funds");
         _withdraw(_recipient,reward);
+        rememberHash();
+        emit LogCancel(_betIndex); // TODO: remember to update tree leaves !!!
     }
 
 /* random number generator functions */
@@ -293,9 +296,6 @@ contract Lottery {
     function rememberHash() public {
         if(D.commitBlock != 0 && commitBlockHash == _open){
           commitBlockHash = uint(blockhash(D.commitBlock));
-              /* rest is for testing only , TODO remove later */
-              if(commitBlockHash == 0 && D.commitBlock<block.number && D.commitBlock>block.number-256){
-                commitBlockHash=uint(keccak256(abi.encodePacked(D.commitBlock)));}
           if(commitBlockHash==0){
             commitBlockHash=_open;}
           else{
@@ -712,6 +712,7 @@ contract Lottery {
     }
 
     // events
+    event LogPrayer(bytes32[] prayer);
     event LogBetIn(uint indexed index,uint indexed newHash);
     event LogCancel(uint indexed index);
     event LogCommit(uint indexed index,uint indexed commitIndex,uint indexed commitHash);
