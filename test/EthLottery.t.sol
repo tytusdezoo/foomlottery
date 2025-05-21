@@ -39,9 +39,9 @@ contract EthLotteryTest is Test {
 
     // Test vars
     address public me=payable(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
-    address public ag;
     address public a1=payable(address(0x01));
     address public a2=payable(address(0x02));
+    address public ag=payable(address(0x03));
     address public recipient = a1;
     address public relayer = payable(address(0x0));
     uint public fee = 0;
@@ -78,7 +78,7 @@ contract EthLotteryTest is Test {
         vm.roll(++blocknumber);
     	vm.recordLogs();
         lottery = new EthLottery(withdraw, cancel, update1, update3, update5, update11, update21, update44, update89, update179, IERC20(address(0)), betMin);
-        ag=payable(lottery.generator());
+        lottery.changeGenerator(ag);
 	_init();
     }
 
@@ -210,6 +210,7 @@ contract EthLotteryTest is Test {
         uint _commitHash = uint(keccak256(abi.encodePacked(revealSecret)));
         uint commitGasStart = gasleft();
         uint maxUpdate=lottery.maxUpdate();
+        vm.prank(ag);
         lottery.commit(_commitHash,maxUpdate);
         vm.roll(++blocknumber);
         vm.setBlockhash(blocknumber-1,bytes32(keccak256(abi.encodePacked(blocknumber-1))));
@@ -274,6 +275,7 @@ contract EthLotteryTest is Test {
         uint revealGasUsed = revealGasStart - gasleft();
         if(0<showGas){ console.log("Gas used in update[%d].verifyProof: %d", hashesLength,revealGasUsed); }
         revealGasStart = gasleft();
+        vm.prank(ag);
         lottery.reveal(revealSecret,pA,pB,pC,newRoot); // data[1]=newRoot
         revealGasUsed = revealGasStart - gasleft();
         if(0<showGas){ console.log("Gas used in _reveal[%d]: %d", hashesLength,revealGasUsed); }
@@ -306,24 +308,32 @@ contract EthLotteryTest is Test {
     }
 
     function view_status() view public returns(uint) {
-        uint ballot=address(lottery).balance;
+        uint lwallet=address(lottery).balance;
 	uint period=lottery.dividendPeriod();
-        uint tbets=lottery.periodBets(period-1);
-        uint tshares=lottery.periodShares(period-1);
+        uint pbets=lottery.periodBets(period-1);
+        uint pshares=lottery.periodShares(period-1);
+        uint cpayout=lottery.currentPayout();
         uint cbalance=lottery.currentBalance();
         uint cshares=lottery.currentShares();
-        console.log("lottery: %d (%d,%d)",ballot,block.number,period);
-        console.log("%d: Bets: %d Shares: %d",period-1,tbets,tshares);
-        console.log("%d: Balance: %d Shares: %d",period,cbalance,cshares);
+        uint spayout=0;
+        uint sbalance=0;
+        uint sshares=0;
+        console.log("lottery: %d (%d,%d)",lwallet,block.number,period);
+        console.log("%d: Bets: %d Shares: %d",period-1,pbets,pshares);
         address[3] memory who=[a1,a2,ag];
         for(uint i=0;i<who.length;i++){
-            uint balance=who[i].balance;
-            uint wallet=lottery.walletBalanceOf(who[i]);
+            uint wallet=who[i].balance;
+            uint payout=lottery.walletPayoutOf(who[i]);
             uint shares=lottery.walletSharesOf(who[i]);
-            uint wperiod=lottery.walletWithdrawPeriodOf(who[i]);
-            console.log("%d balance: %d,wallet: %d",i,balance,wallet);
-            console.log("%d shares: %d,withdrawperiod: %d",i,shares,wperiod);}
-        return(ballot);
+            uint balance=lottery.walletBalanceOf(who[i]);
+            spayout+=payout;
+            sshares+=shares;
+            sbalance+=balance;
+            console.log("%d wallet: %d,payout: %d",i,wallet,payout);
+            console.log("%d shares: %d,balance: %d",i,shares,balance);}
+        console.log("cPayout: %d Balance: %d Shares: %d",cpayout,cbalance,cshares);
+        console.log("sPayout: %d Balance: %d Shares: %d",spayout,sbalance,sshares);
+        return(lwallet);
     }
 
     function test() public { // can not run tests in parralel because of a common www repo
@@ -415,6 +425,7 @@ contract EthLotteryTest is Test {
         lottery.updateDividendPeriod();
         console.log("");
 
+        view_status();
         vm.prank(a2);
         lottery.payOut();
         vm.prank(a1);
@@ -426,6 +437,8 @@ contract EthLotteryTest is Test {
         console.log("");
 
         view_status();
+        vm.prank(ag);
+        lottery.payOut();
 
         blocknumber+=periodBlocks+1;
         vm.roll(blocknumber);

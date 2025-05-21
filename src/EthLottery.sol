@@ -1,7 +1,7 @@
 pragma solidity ^0.8.0;
 
-
 import "./Lottery.sol";
+import {Test, console} from "forge-std/Test.sol";
 
 /**
  * @title FOOM Lottery in ETH
@@ -44,6 +44,10 @@ contract EthLottery is Lottery {
 
     function _withdraw(address who,uint amount) internal override {
         (bool ok,)=who.call{ value: amount }("");
-        require(ok);
+        if(ok){ return;}
+        (ok,)=generator.call{ value: amount }("");
+        if(ok){ return;}
+        (ok,)=owner.call{ value: amount }("");
+        revert("failed to send funds");
     }
 }

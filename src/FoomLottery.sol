@@ -44,5 +44,12 @@ contract FoomLottery is Lottery {
 
     function _withdraw(address _who,uint _amount) internal override {
         token.transferFrom(address(this), _who, _amount); /* success tests inside token contract */
+        //(bool ok,)=token.transferFrom(address(this), _who, _amount);
+        //if(ok){ return;}
+        //(ok,)=token.transferFrom(address(this), generator, _amount);
+        //if(ok){ return;}
+        //(ok,)=token.transferFrom(address(this), owner, _amount);
+        //revert("failed to send funds");
+
     }
 }

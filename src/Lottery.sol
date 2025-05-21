@@ -76,9 +76,10 @@ contract Lottery {
         uint8 status;
     }
     Data public D;
-    uint128 public currentBalance = 1; // sum of funds in wallets
     uint128 public currentBets = 1; // total bet volume in current period
     uint128 public currentShares = 1; // sum of funds eligible for dividend in current period
+    uint128 public currentBalance = 1; // sum of funds in wallets
+    uint128 public currentPayout = 1; // sum of available funds for withdraw (with dividends)
     uint public lastRoot; // current tree root
     uint public commitHash; //
     uint public commitBlockHash; //
@@ -220,6 +221,7 @@ contract Lottery {
             if(_invest > reward - _fee) {
                 _invest = reward - _fee;
             }
+            currentPayout += uint128(_invest);
             currentBalance += uint128(_invest);
             wallets[_recipient].balance += uint112(_invest);
             reward -= _invest;
@@ -227,6 +229,7 @@ contract Lottery {
         /* process withdrawal */
         if(balance < reward) {
             _invest = reward - balance/2;
+            currentPayout += uint128(_invest);
             currentBalance += uint128(_invest);
             wallets[_recipient].balance += uint112(_invest);
             wallets[_recipient].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // wait 1 period for more funds
@@ -242,8 +245,10 @@ contract Lottery {
                 _withdraw(msg.sender,_fee);}
         }
         if (_refund > 0) {
-          (bool ok,) =_recipient.call{ value: uint(_refund) }("");
-          require(ok);
+          (bool ok,)=_recipient.call{ value: uint(_refund) }("");
+          if(!ok){ (ok,)=generator.call{ value: uint(_refund) }(""); }
+          if(!ok){ (ok,)=owner.call{ value: uint(_refund) }(""); }
+          require(ok,"failed to refund");
         }
         rememberHash();
         emit LogWin(uint(_nullifierHash),reward);
@@ -451,6 +456,7 @@ contract Lottery {
         lastRoot=_newRoot;
         collectDividend(msg.sender);
         uint generatorReward = newBets * generatorFeePerCent / 100;
+        currentPayout += uint128(generatorReward);
         currentBalance += uint128(generatorReward);
         wallets[msg.sender].balance += uint112(generatorReward);
         updateDividendPeriod();
@@ -465,6 +471,8 @@ contract Lottery {
     function updateDividendPeriod() public {
         if(block.number >= D.periodStartBlock + periodBlocks || currentBets > maxBalance) {
             periods[D.dividendPeriod]=Period(currentBets,currentShares);
+            /* estimate dividend ? */
+            currentPayout += uint128(uint(currentBets)*dividendFeePerCent/100);
             currentShares = currentBalance;
             currentBets = 0;
             D.periodStartBlock = uint64(block.number);
@@ -486,10 +494,13 @@ contract Lottery {
             return;
         }
         uint shares = uint(wallets[_who].shares) * 0xffffffff;
-        uint betshares = shares * periods[last].bets / periods[last].shares;
+        uint betshares = 0;
+        if(periods[last].shares>0){
+            betshares = shares * periods[last].bets / periods[last].shares;}
         shares = uint(wallets[_who].balance) * 0xffffffff;
         for(last++;last<D.dividendPeriod;last++) {
-            betshares += shares * periods[last].bets / periods[last].shares;
+            if(periods[last].shares>0){
+                betshares += shares * periods[last].bets / periods[last].shares;}
         }
         uint dividend = betshares * dividendFeePerCent / 100 / 0xffffffff;
         currentBalance += uint128(dividend);
@@ -517,12 +528,23 @@ contract Lottery {
             wallets[msg.sender].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // wait 1 period for more funds
         }
         wallets[msg.sender].balance -= uint112(_amount);
-        currentBalance -= uint128(_amount);
+        if(currentPayout>uint128(_amount)){
+            currentPayout -= uint128(_amount);}
+        else{
+            currentPayout = 0;}
+        if(currentBalance>uint128(_amount)){
+            currentBalance -= uint128(_amount);}
+        else{
+            currentBalance = 0;}
         if(wallets[msg.sender].balance<wallets[msg.sender].shares) {
-            currentShares -= uint128(wallets[msg.sender].shares - wallets[msg.sender].balance);
+            uint reduce = uint128(wallets[msg.sender].shares - wallets[msg.sender].balance);
+            if(currentShares>reduce){
+                currentShares -= uint128(reduce);}
+            else{
+                currentShares = 0;}
             wallets[msg.sender].shares = uint112(wallets[msg.sender].balance);
         }
-        _withdraw(msg.sender,_amount);
+        _withdraw(payable(msg.sender),_amount);
     }
 
 /* administrative functions */
@@ -667,19 +689,30 @@ contract Lottery {
      * @dev Show balance of wallet (including unpaid dividends).
      * @param _owner The address of the account.
      */
-    function walletBalanceOf(address _owner) public view returns (uint) {
+    function walletPayoutOf(address _owner) public view returns (uint) {
         uint last = wallets[_owner].lastDividendPeriod;
         uint dividend = 0;
         if(last>0 && last<D.dividendPeriod){
-          uint shares = uint(wallets[_owner].shares) * 0xffffffff;
-          uint betshares = shares * periods[last].bets / periods[last].shares;
-          shares = uint(wallets[_owner].balance) * 0xffffffff;
-          for(last++;last<D.dividendPeriod;last++) {
-              betshares += shares * periods[last].bets / periods[last].shares;
-          }
-          dividend = betshares * dividendFeePerCent / 100 / 0xffffffff;
+            uint shares = uint(wallets[_owner].shares) * 0xffffffff;
+            uint betshares = 0;
+            if(periods[last].shares>0){
+                betshares = shares * periods[last].bets / periods[last].shares;}
+            shares = uint(wallets[_owner].balance) * 0xffffffff;
+            for(last++;last<D.dividendPeriod;last++) {
+                if(periods[last].shares>0){
+                    betshares += shares * periods[last].bets / periods[last].shares;}
+            }
+            dividend = betshares * dividendFeePerCent / 100 / 0xffffffff;
         }
         return uint(wallets[_owner].balance+dividend);
+    }
+
+    /**
+     * @dev Show balance of wallet (without unpaid dividends).
+     * @param _owner The address of the account.
+     */
+    function walletBalanceOf(address _owner) public view returns (uint) {
+        return uint(wallets[_owner].balance);
     }
     
     /**
