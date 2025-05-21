@@ -448,9 +448,9 @@ contract EthLotteryTest is Test {
         vm.prank(a1);
         lottery.payOut();
         vm.roll(++blocknumber);
-        uint ballot=view_status(6);
+        uint ballot=view_status(13);
  
-        uint vol=1026*10;
+        uint vol=1026*12;
         console.log("\nvol: %d, lot: %d, fee: %d/10000",vol,ballot,ballot*10000/vol);
     }
 
