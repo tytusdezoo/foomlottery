@@ -453,6 +453,7 @@ contract Lottery {
         uint generatorReward = newBets * generatorFeePerCent / 100;
         currentBalance += uint128(generatorReward);
         wallets[msg.sender].balance += uint112(generatorReward);
+        updateDividendPeriod();
         emit LogUpdate(uint(D.nextIndex),newRand,_newRoot);
     } // }
 
@@ -656,6 +657,9 @@ contract Lottery {
      * @param _owner The address of the account.
      */
     function walletSharesOf(address _owner) public view returns (uint) {
+        uint last = wallets[_owner].lastDividendPeriod;
+        if(last<D.dividendPeriod){
+            return(uint(wallets[_owner].balance));}
         return uint(wallets[_owner].shares);
     }
     
@@ -699,6 +703,20 @@ contract Lottery {
      */
     function dividendPeriod() public view returns (uint) {
         return uint(D.dividendPeriod);
+    }
+
+    /**
+     * @dev Show total Bets in dividend Period
+     */
+    function periodBets(uint period) public view returns (uint) {
+        return uint(periods[period].bets);
+    }
+
+    /**
+     * @dev Show total Shares in dividend Period
+     */
+    function periodShares(uint period) public view returns (uint) {
+        return uint(periods[period].shares);
     }
 
     /**

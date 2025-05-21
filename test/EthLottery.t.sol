@@ -39,7 +39,7 @@ contract EthLotteryTest is Test {
 
     // Test vars
     address public me=payable(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
-    address public ag=payable(address(0x10));
+    address public ag;
     address public a1=payable(address(0x01));
     address public a2=payable(address(0x02));
     address public recipient = a1;
@@ -78,6 +78,7 @@ contract EthLotteryTest is Test {
         vm.roll(++blocknumber);
     	vm.recordLogs();
         lottery = new EthLottery(withdraw, cancel, update1, update3, update5, update11, update21, update44, update89, update179, IERC20(address(0)), betMin);
+        ag=payable(lottery.generator());
 	_init();
     }
 
@@ -304,10 +305,17 @@ contract EthLotteryTest is Test {
         _getLogs();
     }
 
-    function view_status(uint round) view public returns(uint) {
+    function view_status() view public returns(uint) {
         uint ballot=address(lottery).balance;
-        console.log("\nlottery: %d (%d,%d)",ballot,block.number,round);
-        address[2] memory who=[a1,a2];
+	uint period=lottery.dividendPeriod();
+        uint tbets=lottery.periodBets(period-1);
+        uint tshares=lottery.periodShares(period-1);
+        uint cbalance=lottery.currentBalance();
+        uint cshares=lottery.currentShares();
+        console.log("lottery: %d (%d,%d)",ballot,block.number,period);
+        console.log("%d: Bets: %d Shares: %d",period-1,tbets,tshares);
+        console.log("%d: Balance: %d Shares: %d",period,cbalance,cshares);
+        address[3] memory who=[a1,a2,ag];
         for(uint i=0;i<who.length;i++){
             uint balance=who[i].balance;
             uint wallet=lottery.walletBalanceOf(who[i]);
@@ -330,109 +338,103 @@ contract EthLotteryTest is Test {
 
     function notest0_investments() public {
         _getLogs();
-        view_status(0);
+        view_status();
         showGas=0;
         uint secret_power;
         uint startIndex;
         uint periodBlocks=lottery.periodBlocks();
-        vm.roll(++blocknumber);
 
+        vm.roll(++blocknumber);
+        lottery.updateDividendPeriod();
+        console.log("");
+
+        view_status();
         (secret_power,startIndex) = _play(10);
         _commit();
         invest = 2000;
         recipient=a1;
         _withdraw(secret_power,startIndex);
-        view_status(1);
 
         blocknumber+=periodBlocks+1;
         vm.roll(blocknumber);
+        lottery.updateDividendPeriod();
+        console.log("");
+
+        view_status();
         (secret_power,startIndex) = _play(10);
         _commit();
-        invest = 2000;
+        invest = 0;
         recipient=a2;
         _withdraw(secret_power,startIndex);
-        view_status(2);
 
         blocknumber+=periodBlocks+1;
         vm.roll(blocknumber);
+        lottery.updateDividendPeriod();
+        console.log("");
+
+        view_status();
+        (secret_power,startIndex) = _play(0);
+        _commit();
+        invest = 0;
+        recipient=a2;
+        _withdraw(secret_power,startIndex);
+
+        blocknumber+=periodBlocks+1;
+        vm.roll(blocknumber);
+        lottery.updateDividendPeriod();
+        console.log("");
+
+        view_status();
         (secret_power,startIndex) = _play(16);
         _commit();
-        invest = 2000;
+        invest = 0;
         recipient=a2;//a1;
         _withdraw(secret_power,startIndex);
-        view_status(3);
 
         blocknumber+=periodBlocks+1;
         vm.roll(blocknumber);
+        lottery.updateDividendPeriod();
+        console.log("");
+
+        view_status();
         (secret_power,startIndex) = _play(16);
         _commit();
-        invest = 2000;
+        invest = 0;
         recipient=a2;
         _withdraw(secret_power,startIndex);
-        view_status(4);
 
         blocknumber+=periodBlocks+1;
         vm.roll(blocknumber);
-        (secret_power,startIndex) = _play(16);
-        _commit();
-        invest = 2000;
-        recipient=a2;//a1;
-        _withdraw(secret_power,startIndex);
-        view_status(5);
+        lottery.updateDividendPeriod();
+        console.log("");
+
+        view_status();
 
         blocknumber+=periodBlocks+1;
         vm.roll(blocknumber);
-        (secret_power,startIndex) = _play(16);
-        _commit();
-        invest = 2000;
-        recipient=a2;
-        _withdraw(secret_power,startIndex);
-        view_status(6);
-
-        blocknumber+=periodBlocks+1;
-        vm.roll(blocknumber);
-        (secret_power,startIndex) = _play(16);
-        _commit();
-        invest = 2000;
-        recipient=a2;//a1;
-        _withdraw(secret_power,startIndex);
-        view_status(7);
-
-        blocknumber+=periodBlocks+1;
-        vm.roll(blocknumber);
-        (secret_power,startIndex) = _play(16);
-        _commit();
-        invest = 2000;
-        recipient=a2;
-        _withdraw(secret_power,startIndex);
-        view_status(8);
-
-        blocknumber+=periodBlocks+1;
-        vm.roll(blocknumber);
-        (secret_power,startIndex) = _play(16);
-        _commit();
-        invest = 2000;
-        recipient=a2;//a1;
-        _withdraw(secret_power,startIndex);
-        view_status(9);
-
-        blocknumber+=periodBlocks+1;
-        vm.roll(blocknumber);
-        (secret_power,startIndex) = _play(16);
-        _commit();
-        invest = 2000;
-        recipient=a2;
-        _withdraw(secret_power,startIndex);
-        view_status(10);
+        lottery.updateDividendPeriod();
+        console.log("");
 
         vm.prank(a2);
         lottery.payOut();
         vm.prank(a1);
         lottery.payOut();
-        vm.roll(++blocknumber);
-        uint ballot=view_status(0);
+
+        blocknumber+=periodBlocks+1;
+        vm.roll(blocknumber);
+        lottery.updateDividendPeriod();
+        console.log("");
+
+        view_status();
+
+        blocknumber+=periodBlocks+1;
+        vm.roll(blocknumber);
+        lottery.updateDividendPeriod();
+        console.log("");
+
+        uint ballot=view_status();
  
-        uint vol=2*(2**10+2)+8*(2**16+2);
+        uint vol=2*(2**10+2)+2*(2**16+2)+3;
         console.log("\nvol: %d, lot: %d, fee: %d/10000",vol,ballot,ballot*10000/vol);
     }
 
