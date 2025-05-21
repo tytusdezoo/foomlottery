@@ -231,4 +231,5 @@ module.exports = {
   findBet,
   getNewRoot,
   getWaitingList,
+  getLines
 };

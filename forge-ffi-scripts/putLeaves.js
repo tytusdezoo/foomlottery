@@ -6,7 +6,7 @@ const circomlibjs = require("circomlibjs");
 const sprintfjs = require('sprintf-js');
 const { mkdirSync, openSync, writeFileSync, readFileSync, closeSync, existsSync } = require('fs');
 const { execSync } = require('child_process');
-const { mimicMerkleTree, getWaitingList, readLast, getNewRoot } = require("./utils/mimcMerkleTree.js");
+const { mimicMerkleTree, getWaitingList, readLast, getNewRoot, getLines } = require("./utils/mimcMerkleTree.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 // const zero08 = hexToBigint("0x0e5c230fa94b937789a1980f91b9de6233a7d0315f037c7d4917cba089e0042a"); needed in withdraw
@@ -33,59 +33,42 @@ function no0x(str) {
 }
 
 function writeLast(nextIndex,blockNumber,lastRoot,lastLeaf){
-  const file = openSync("www/last.csv", "w");
-  const textlast=sprintfjs.sprintf("%x,%x,%s,%s\n",nextIndex,blockNumber,no0x(bigintToHex(lastRoot)),no0x(bigintToHex(lastLeaf)));
-  writeFileSync(file, textlast);
-  closeSync(file);
+  writeFileSync("www/last.csv", sprintfjs.sprintf("%x,%x,%s,%s\n",nextIndex,blockNumber,no0x(bigintToHex(lastRoot)),no0x(bigintToHex(lastLeaf))));
 }
 
 async function computeRoot(path,zero) {
   const hashes = new Array(256);
-  const hashfile = openSync(path, "r");
   // leave if file does not exists or is gzipped
-  const hashcontent = readFileSync(hashfile, "utf8");
-  closeSync(hashfile);
-  //split file by lines:
-  const leafs = hashcontent.split("\n");
   let needfix=0;
+  const leafs = getLines(path);
   for(let i=0;i<leafs.length;i++) {
-    if (!leafs[i]) continue;  // Skip empty lines
     const [numStr, leafStr] = leafs[i].split(',');
     const num = parseInt(numStr, 16);
+    const leaf = hexToBigint(leafStr);    
+    hashes[num] = leaf;
     if(num!=i){
       needfix++;
     }
-    const leaf = hexToBigint(leafStr);    
-    hashes[num] = leaf;
   }
   if(needfix>0){
-    const filefix = openSync("www/fix.csv", "a");
-    const textfix=sprintfjs.sprintf("%s\n",path); // TODO, write block number too
-    writeFileSync(filefix, textfix);
-    closeSync(filefix);
+    writeFileSync("www/fix.csv", sprintfjs.sprintf("%s\n",path), { flag: 'a' }); // TODO, write block number too
   }
   execSync("gzip -9 "+path);
-
   const tree = await mimicMerkleTree(zeros[zero],hashes,8);
   return tree.root;
 }
 
-function cleanwaiting(indexlast) {
-  const fileold = openSync("www/waiting.csv", "r");
-  const textold = readFileSync(fileold, "utf8");
-  closeSync(fileold);
-  const lines = textold.split("\n");
+function cleanwaiting(nextIndex) {
+  const lines = getLines("www/waiting.csv");
   let textnew='';
   for(let i=0;i<lines.length;i++) {
     const [index] = lines[i].split(',');
     const indexnum = parseInt(index,16);
-    if(indexnum>=indexlast) {
+    if(indexnum>=nextIndex) {
       textnew+=lines[i]+"\n";
     }
   }
-  const file = openSync("www/waiting.csv", "w");
-  writeFileSync(file, textnew);
-  closeSync(file);
+  writeFileSync("www/waiting.csv", textnew);
 }
 
 async function appendtofile(pathlast,text,hash) {
@@ -104,24 +87,16 @@ async function appendtofile(pathlast,text,hash) {
       }
     }
   }
-  const file = openSync("www/"+path1+"/"+path2+"/"+path3+".csv", "a");
-  writeFileSync(file, text);
-  closeSync(file);
+  writeFileSync("www/"+path1+"/"+path2+"/"+path3+".csv", text, { flag: 'a' });
   if(hash) {
     const root = await computeRoot("www/"+path1+"/"+path2+"/"+path3+".csv",0);
-    const file = openSync("www/"+path1+"/"+path2+"/index.csv", "a");
-    writeFileSync(file, sprintfjs.sprintf("%s,%s\n",path3,no0x(bigintToHex(root))));
-    closeSync(file);
+    writeFileSync("www/"+path1+"/"+path2+"/index.csv", sprintfjs.sprintf("%s,%s\n",path3,no0x(bigintToHex(root))), { flag: 'a' });
     if(path3=="ff"){
       const root = await computeRoot("www/"+path1+"/"+path2+"/index.csv",1);
-      const file = openSync("www/"+path1+"/index.csv", "a");
-      writeFileSync(file, sprintfjs.sprintf("%s,%s\n",path2,no0x(bigintToHex(root))));
-      closeSync(file);
+      writeFileSync("www/"+path1+"/index.csv", sprintfjs.sprintf("%s,%s\n",path2,no0x(bigintToHex(root))), { flag: 'a' });
       if(path2=="ff"){
         const root = await computeRoot("www/"+path1+"/index.csv",2);
-        const file = openSync("www/index.csv", "a");
-        writeFileSync(file, sprintfjs.sprintf("%s,%s\n",path1,no0x(bigintToHex(root))));
-        closeSync(file);
+        writeFileSync("www/index.csv", sprintfjs.sprintf("%s,%s\n",path1,no0x(bigintToHex(root))), { flag: 'a' });
       }
     }
   }
@@ -158,7 +133,7 @@ async function main() { // TODO: test if update is correct
     text+=sprintfjs.sprintf("%x,%s,%s,%s\n",(nextIndex+i)&0xFF,no0x(bigintToHex(newLeaves[i])),no0x(bigintToHex(newHashes[i])),no0x(bigintToHex(newRand))); // index, leaf, hash, rand
   }
   await appendtofile(pathlast,text,(nextIndex+commitIndex)&0xff==0?true:false);
-  writeLast(nextIndex+commitIndex,blockNumber,no0x(bigintToHex(newRoot)),no0x(bigintToHex(newLeaves[commitIndex-1])));
+  writeLast(nextIndex+commitIndex,blockNumber,newRoot,newLeaves[commitIndex-1]);
   cleanwaiting(nextIndex+commitIndex);
 }
 

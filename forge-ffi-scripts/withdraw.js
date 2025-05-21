@@ -8,7 +8,6 @@ const { getPath, findBet } = require("./utils/mimcMerkleTree.js");
 const circomlibjs = require("circomlibjs");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
-// forge-ffi-scripts/withdraw.js 0x4229f5eb2109ba8e3a1c4134720bda5a1d4070f1086fa128a1d630576a67fa0a 0x0000000000000000000000000000000000000000000000000000000000000002 0x0000000000000000000000000000000000000001 0x0000000000000000000000000000000000000000 0x0 0x0
 
 async function main() {
   const mimcsponge = await circomlibjs.buildMimcSponge();
@@ -21,9 +20,9 @@ async function main() {
   const startindex = parseInt(inputs[1].replace(/^0x0*/, ''),16); // could be int instead of hex later
   const [betIndex,betRand] = findBet(hash_power1,startindex);
   if(betIndex>0 && betRand==0n){
-    throw("bet not processed yet");}
+    throw("bet not processed yet for "+bigintToHex(hash_power1)+" starting at "+startindex.toString(16));}
   if(betIndex==0){
-    throw("bet not found");}
+    throw("bet not found for "+bigintToHex(hash_power1)+" starting at "+startindex.toString(16));}
   const bigindex = BigInt(betIndex);
   const dice = await leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([secret,betRand,bigindex])));
 
@@ -33,7 +32,7 @@ async function main() {
   const power3=22n;
   const mask = (power<=power1)?(((2n**(power1+power2+power3+1n)-1n)<<(power              ))                         )&(2n**(power1+power2+power3+1n)-1n) :
               ((power<=power2)?(((2n**(       power2+power3+1n)-1n)<<(power+power1       ))|(2n**(power1       )-1n))&(2n**(power1+power2+power3+1n)-1n) :
-			       (((2n**(              power3+1n)-1n)<<(power+power1+power2))|(2n**(power1+power2)-1n))&(2n**(power1+power2+power3+1n)-1n));
+			                         (((2n**(              power3+1n)-1n)<<(power+power1+power2))|(2n**(power1+power2)-1n))&(2n**(power1+power2+power3+1n)-1n));
   const maskdice= mask & dice;
   const rew1 = (maskdice &                                       0b1111111111n)?0n:1n ;
   const rew2 = (maskdice &                       0b11111111111111110000000000n)?0n:1n ;

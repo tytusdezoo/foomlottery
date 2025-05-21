@@ -320,7 +320,7 @@ contract EthLotteryTest is Test {
         //notest9_179_updates();
         notest3_lottery_many_deposits();
         //notest2_lottery_single_deposit();
-        notest9_updates();
+        //notest9_updates();
         //notest5_ods();
         //notest0_investments();
     }
