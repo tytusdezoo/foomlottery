@@ -16,8 +16,8 @@ async function main() {
   const mimcsponge = await circomlibjs.buildMimcSponge();
   const inputs = process.argv.slice(2, process.argv.length);
 
-  const commitIndex = parseInt(inputs[0]);
-  const hashesLength = parseInt(inputs[1]);
+  const commitIndex = parseInt(inputs[0],16);
+  const hashesLength = parseInt(inputs[1],16);
   const newRand = hexToBigint(inputs[2]);
 
   const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();  // add lastLeaf

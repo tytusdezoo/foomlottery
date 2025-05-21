@@ -8,3 +8,5 @@ ffi=true
 #]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+[rpc_endpoints]
+base = "https://site2.moralis-nodes.com/base/1f9d822b81654b2a8fe661f66c1d6925"

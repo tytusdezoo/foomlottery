@@ -102,10 +102,10 @@ async function main() { // TODO: test if update is correct
   const mimcsponge = await circomlibjs.buildMimcSponge();
   const inputs = process.argv.slice(2, process.argv.length);
 
-  const newIndex = parseInt(inputs[0]);
+  const newIndex = parseInt(inputs[0],16);
   const newRand = hexToBigint(inputs[1]);
   const newRoot = hexToBigint(inputs[2]);
-  const blockNumber = parseInt(inputs[3]);
+  const blockNumber = parseInt(inputs[3],16);
 
   const [nextIndex,lastBlockNumber,lastRoot,lastLeaf] = readLast();  // add lastLeaf
   if(newIndex<=nextIndex){

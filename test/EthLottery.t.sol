@@ -109,10 +109,10 @@ contract EthLotteryTest is Test {
                 string[] memory inputs = new string[](6);
                 inputs[0] = "node";
                 inputs[1] = "forge-ffi-scripts/putLeaves.js";
-                inputs[2] = vm.toString(newIndex);
+                inputs[2] = vm.toString(bytes32(newIndex));
                 inputs[3] = vm.toString(bytes32(newRand));
                 inputs[4] = vm.toString(bytes32(newRoot));
-                inputs[5] = vm.toString(block.number); // only for convenience
+                inputs[5] = vm.toString(bytes32(block.number)); // only for convenience
                 vm.ffi(inputs);}
             if (uint(entries[i].topics[0]) == LogCommit){
                 // _reveal should react here and take blockhash and commit index from blockchain and contract
@@ -153,11 +153,11 @@ contract EthLotteryTest is Test {
         inputs[0] = "node";
         inputs[1] = "forge-ffi-scripts/withdraw.js";
         inputs[2] = vm.toString(bytes32(secret_power));
-        inputs[3] = vm.toString(lastindex);
+        inputs[3] = vm.toString(bytes32(lastindex));
         inputs[4] = vm.toString(recipient);
         inputs[5] = vm.toString(relayer);
-        inputs[6] = vm.toString(fee);
-        inputs[7] = vm.toString(refund);
+        inputs[6] = vm.toString(bytes32(fee));
+        inputs[7] = vm.toString(bytes32(refund));
         bytes memory result = vm.ffi(inputs);
         (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint[7] memory data) =
             abi.decode(result, (uint[2], uint[2][2], uint[2], uint[7]));
@@ -233,8 +233,8 @@ contract EthLotteryTest is Test {
         string[] memory inputs = new string[](5);
         inputs[0] = "node";
         inputs[1] = "forge-ffi-scripts/update.js";
-        inputs[2] = vm.toString(commitIndex);
-        inputs[3] = vm.toString(hashesLength);
+        inputs[2] = vm.toString(bytes32(commitIndex));
+        inputs[3] = vm.toString(bytes32(hashesLength));
         inputs[4] = vm.toString(bytes32(newRand));
         //console.log("before update");
         bytes memory result = vm.ffi(inputs);
@@ -304,9 +304,9 @@ contract EthLotteryTest is Test {
         _getLogs();
     }
 
-    function view_status() view public {
+    function view_status(uint round) view public returns(uint) {
         uint ballot=address(lottery).balance;
-        console.log("\nlottery: %d (%d,%d)",ballot,block.number,lottery.dividendPeriod());
+        console.log("\nlottery: %d (%d,%d)",ballot,block.number,round);
         address[2] memory who=[a1,a2];
         for(uint i=0;i<who.length;i++){
             uint balance=who[i].balance;
@@ -315,6 +315,7 @@ contract EthLotteryTest is Test {
             uint wperiod=lottery.walletWithdrawPeriodOf(who[i]);
             console.log("%d balance: %d,wallet: %d",i,balance,wallet);
             console.log("%d shares: %d,withdrawperiod: %d",i,shares,wperiod);}
+        return(ballot);
     }
 
     function test() public { // can not run tests in parralel because of a common www repo
@@ -329,11 +330,8 @@ contract EthLotteryTest is Test {
 
     function notest0_investments() public {
         _getLogs();
-        // console.log("period %d",periodBlocks);
-        // console.log("me %x",msg.sender); // 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
-        view_status();
+        view_status(0);
         showGas=0;
-        uint i=0;
         uint secret_power;
         uint startIndex;
         uint periodBlocks=lottery.periodBlocks();
@@ -341,42 +339,119 @@ contract EthLotteryTest is Test {
 
         (secret_power,startIndex) = _play(10);
         _commit();
-        invest = 1000;
+        invest = 2000;
         recipient=a1;
         _withdraw(secret_power,startIndex);
-        view_status(); // p1
-
-        for (i = 0; i < 3; i++) {
-            _fake_play(i);}
-        blocknumber+=periodBlocks;
-        vm.roll(blocknumber);
-        (secret_power,startIndex) = _play(10);
-        _commit();
-        invest = 0;
-        recipient=a2;
-        _withdraw(secret_power,startIndex);
-        view_status(); // p1
-
-        blocknumber+=periodBlocks;
-        vm.roll(blocknumber);
-        (secret_power,startIndex) = _play(10);
-        for (i = 0; i < 3; i++) {
-            _fake_play(i);}
-        _commit();
-        invest = 0;
-        recipient=a2;
-        _withdraw(secret_power,startIndex);
-        view_status(); // p3
+        view_status(1);
 
         blocknumber+=periodBlocks+1;
         vm.roll(blocknumber);
+        (secret_power,startIndex) = _play(10);
+        _commit();
+        invest = 2000;
+        recipient=a2;
+        _withdraw(secret_power,startIndex);
+        view_status(2);
+
+        blocknumber+=periodBlocks+1;
+        vm.roll(blocknumber);
+        (secret_power,startIndex) = _play(10);
+        _commit();
+        invest = 2000;
+        recipient=a1;
+        _withdraw(secret_power,startIndex);
+        view_status(3);
+
+        blocknumber+=periodBlocks+1;
+        vm.roll(blocknumber);
+        (secret_power,startIndex) = _play(10);
+        _commit();
+        invest = 2000;
+        recipient=a2;
+        _withdraw(secret_power,startIndex);
+        view_status(4);
+
+        blocknumber+=periodBlocks+1;
+        vm.roll(blocknumber);
+        (secret_power,startIndex) = _play(10);
+        _commit();
+        invest = 2000;
+        recipient=a1;
+        _withdraw(secret_power,startIndex);
+        view_status(5);
+
+        blocknumber+=periodBlocks+1;
+        vm.roll(blocknumber);
+        (secret_power,startIndex) = _play(10);
+        _commit();
+        invest = 2000;
+        recipient=a2;
+        _withdraw(secret_power,startIndex);
+        view_status(6);
+
+        blocknumber+=periodBlocks+1;
+        vm.roll(blocknumber);
+        (secret_power,startIndex) = _play(10);
+        _commit();
+        invest = 2000;
+        recipient=a1;
+        _withdraw(secret_power,startIndex);
+        view_status(7);
+
+        blocknumber+=periodBlocks+1;
+        vm.roll(blocknumber);
+        (secret_power,startIndex) = _play(10);
+        _commit();
+        invest = 2000;
+        recipient=a2;
+        _withdraw(secret_power,startIndex);
+        view_status(8);
+
+        blocknumber+=periodBlocks+1;
+        vm.roll(blocknumber);
+        (secret_power,startIndex) = _play(10);
+        _commit();
+        invest = 2000;
+        recipient=a1;
+        _withdraw(secret_power,startIndex);
+        view_status(9);
+
+        blocknumber+=periodBlocks+1;
+        vm.roll(blocknumber);
+        (secret_power,startIndex) = _play(10);
+        _commit();
+        invest = 2000;
+        recipient=a2;
+        _withdraw(secret_power,startIndex);
+        view_status(10);
+
+        blocknumber+=periodBlocks+1;
+        vm.roll(blocknumber);
+        (secret_power,startIndex) = _play(10);
+        _commit();
+        invest = 2000;
+        recipient=a1;
+        _withdraw(secret_power,startIndex);
+        view_status(11);
+
+        blocknumber+=periodBlocks+1;
+        vm.roll(blocknumber);
+        (secret_power,startIndex) = _play(10);
+        _commit();
+        invest = 2000;
+        recipient=a2;
+        _withdraw(secret_power,startIndex);
+        view_status(12);
+
         vm.prank(a2);
         lottery.payOut();
         vm.prank(a1);
         lottery.payOut();
         vm.roll(++blocknumber);
-        view_status(); // p3
-
+        uint ballot=view_status(6);
+ 
+        uint vol=1026*10;
+        console.log("\nvol: %d, lot: %d, fee: %d/10000",vol,ballot,ballot*10000/vol);
     }
 
     function notest1_lottery_cancel() public {
