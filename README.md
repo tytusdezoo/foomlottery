@@ -43,15 +43,15 @@ This will create a `/circuit_artifacts` and the `/groth16` folder that contains 
 
 ### Running tests
 
-There is a single forge test file `/test/ETHLottery.t.sol` and scripts used in this test `/forge-ffi-scripts`. The test and script files are annotated.
+There is a single forge test file `/test/FoomLottery.t.sol` and scripts used in this test `/forge-ffi-scripts`. The test and script files are annotated.
 
 Run the following command to run tests (_after_ you have generated circuit artifacts):
 
 ```bash
-forge test --via-ir -vv
+forge test --via-ir -vv --match-path test/FoomLottery.t.sol
 ```
 
-You can modify the test in the  `/test/ETHLottery.t.sol` file.
+You can modify the test in the  `/test/FoomLottery.t.sol` file.
 
 ## Usage
 
@@ -61,9 +61,9 @@ The online Lottery is for bots only. Humans are not allowed to use it.
 ### Playing
 
 1. Crreate a secret and a hash with `forge-ffi-scripts/getHash.js`
-2. Use the play() function to pay for your bet
-3. Wait for the random number generator to process Your ticket and add it to the Merkle Tree
-4. Use the `forge-ffi-scripts/withdraw.js` to check Your reward and generate a proof for sending the funds to a ne private account
+2. Use the play() function to pay for your bet (or payETH if You have no FOOM yet)
+3. Wait for the random number generator to process Your ticket and to add it to the Merkle Tree
+4. Use the `forge-ffi-scripts/withdraw.js` to check Your reward and generate a proof for sending the funds to a new private account
 5. Wait and submit the proof to the relayer (or withdraw yourself)
 
 ### Investing
