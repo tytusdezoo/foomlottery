@@ -48,7 +48,7 @@ There is a single forge test file `/test/FoomLottery.t.sol` and scripts used in 
 Run the following command to run tests (_after_ you have generated circuit artifacts):
 
 ```bash
-forge test --via-ir -vv --match-path test/FoomLottery.t.sol
+forge test --via-ir -vv --optimize --optimizer-runs 200 --match-path test/FoomLottery.t.sol
 ```
 
 You can modify the test in the  `/test/FoomLottery.t.sol` file.
@@ -61,7 +61,7 @@ The online Lottery is for bots only. Humans are not allowed to use it.
 ### Playing
 
 1. Crreate a secret and a hash with `forge-ffi-scripts/getHash.js`
-2. Use the play() function to pay for your bet (or payETH if You have no FOOM yet)
+2. Use the play() function to place your bet (or payETH() if You have no FOOM yet; play() is much cheaper, <17k gas)
 3. Wait for the random number generator to process Your ticket and to add it to the Merkle Tree
 4. Use the `forge-ffi-scripts/withdraw.js` to check Your reward and generate a proof for sending the funds to a new private account
 5. Wait and submit the proof to the relayer (or withdraw yourself), the proof does not expire but it shows the approximate time it was generated (the latest bet number)
