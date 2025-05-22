@@ -64,7 +64,7 @@ The online Lottery is for bots only. Humans are not allowed to use it.
 2. Use the play() function to pay for your bet (or payETH if You have no FOOM yet)
 3. Wait for the random number generator to process Your ticket and to add it to the Merkle Tree
 4. Use the `forge-ffi-scripts/withdraw.js` to check Your reward and generate a proof for sending the funds to a new private account
-5. Wait and submit the proof to the relayer (or withdraw yourself)
+5. Wait and submit the proof to the relayer (or withdraw yourself), the proof does not expire but it shows the approximate time it was generated (the latest bet number)
 
 ### Investing
 

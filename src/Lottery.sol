@@ -180,7 +180,7 @@ contract Lottery {
         //(uint _power,uint _invest)=getPower(amount);
         require(msg.value>0 && address(token)!=address(0), "Use play to play with FOOM");
         require(D.nextIndex < 2 ** merkleTreeLevels - 1 - betsMax, "No more bets allowed");
-        require(0<_secrethash && _secrethash < FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
+        require(0<_secrethash && _secrethash<FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
         require(_power<=betPower3, "Invalid bet amount");
         IWETH(WETH_ADDRESS).deposit{value: msg.value}();
         IERC20(WETH_ADDRESS).approve(address(router), msg.value);

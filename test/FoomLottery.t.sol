@@ -53,7 +53,8 @@ contract FoomLotteryTest is Test {
     uint public showGas = 1;
     uint constant testsize=5; // test size
 
-    uint public          betMin = 1; //0.001 ether;
+    uint public          betMinETH = 1; //0.001 ether;
+    uint public          betMin;
     uint public constant betPower1 = 10; // power of the first bet = 1024
     uint public constant betPower2 = 16; // power of the second bet = 65536
     uint public constant betPower3 = 22; // power of the third bet = 4194304
@@ -67,6 +68,18 @@ contract FoomLotteryTest is Test {
 
     function test() public { // can not run tests in parralel because of a common www repo
         notest2_lottery_single_deposit();
+        // get more FOOM to play with
+        uint amount=betMinETH*2**23;
+        IWETH(WETH_ADDRESS).deposit{value: amount}();
+        IERC20(WETH_ADDRESS).approve(router,amount);
+        address[] memory path = new address[](2);
+        path[0] = WETH_ADDRESS;
+        path[1] = FOOM_ADDRESS;
+        console.log("swap %d",amount);
+        IUniswapV2Router02(router).swapExactTokensForTokens(amount,0,path,address(this),block.timestamp);
+        // now test with FOOM available
+        notest2_lottery_single_deposit();
+
         //notest1_lottery_cancel();
         //notest9_179_updates();
         //notest3_lottery_many_deposits();
@@ -91,12 +104,12 @@ contract FoomLotteryTest is Test {
         // get some info on Foom
         vm.createSelectFork(vm.rpcUrl("base")); // use data from Base
         //uint amount=0.001 ether; liquidity too small on base
-        uint amount=1;
+        uint amount=betMinETH;
         IWETH(WETH_ADDRESS).deposit{value: amount}();
         IERC20(WETH_ADDRESS).approve(router, amount);
         address[] memory path = new address[](2);
         path[0] = WETH_ADDRESS;
-        path[1] = address(FOOM_ADDRESS);
+        path[1] = FOOM_ADDRESS;
         uint[] memory amounts = IUniswapV2Router02(router).swapExactTokensForTokens(amount,0,path,address(this),block.timestamp);
         betMin = amounts[1];
         console.log(betMin,"betMin");
@@ -319,14 +332,31 @@ contract FoomLotteryTest is Test {
         bytes memory result = vm.ffi(inputs);
         (secret_power, hash, startIndex, startBlock) = abi.decode(result, (uint, uint, uint, uint));
         uint amount = betMin * (2 + 2**_power);
-        uint gasStart = gasleft();
         if(router==address(0)){
-            lottery.play{value: amount}(hash,_power);}
+            uint gasStart = gasleft();
+            lottery.play{value: amount}(hash,_power);
+            uint gasUsed = gasStart - gasleft();
+            if(0<showGas){ console.log("Gas used in _play: %d", gasUsed); } }
         else{
-            amount=amount+amount>>4; // 4: (1+1/16) 106% ,5: (1+1/32) 103%
-            lottery.playETH{value: amount}(hash,_power);}
-        uint gasUsed = gasStart - gasleft();
-        if(0<showGas){ console.log("Gas used in _play: %d", gasUsed); }
+            uint balance=IERC20(FOOM_ADDRESS).balanceOf(address(this));
+            if(balance>amount){
+              console.log("%d, try play with FOOM",balance);
+              uint gasStart = gasleft();
+              IERC20(FOOM_ADDRESS).approve(address(lottery),amount);
+              uint gasUsed = gasStart - gasleft();
+              if(0<showGas){ console.log("Gas used in approve: %d", gasUsed); }
+                   gasStart = gasleft();
+              lottery.play(hash,_power);
+                   gasUsed = gasStart - gasleft();
+              if(0<showGas){ console.log("Gas used in _playFOOM: %d", gasUsed); } }
+            else{
+              console.log("%d, try playETH with ETH",balance);
+              uint amountETH = betMinETH * (2 + 2**_power);
+              amountETH=amountETH+amountETH>>0; // 4: (1+1/16) 106% ,5: (1+1/32) 103%
+              uint gasStart = gasleft();
+              lottery.playETH{value: amountETH}(hash,_power); 
+              uint gasUsed = gasStart - gasleft();
+              if(0<showGas){ console.log("Gas used in _playETH: %d", gasUsed); } }}
         console.log("%x,%x ticket (%d)", secret_power,startIndex,amount);
         _getLogs();
         return (secret_power,startIndex);
@@ -336,9 +366,11 @@ contract FoomLotteryTest is Test {
         uint hash = uint(uint240(uint(keccak256(abi.encode(i))))<<5);
         uint amount = 3*betMin;
         if(router==address(0)){
+            //console.log("fake play with FOOM %d",amount);
             lottery.play{value: 3*betMin}(hash,0);}
         else{
-            amount*=2;
+            amount=3*betMinETH*2;
+            //console.log("fake playETH with ETH %d",amount);
             lottery.playETH{value: amount}(hash,0);}
         _getLogs();
     }
