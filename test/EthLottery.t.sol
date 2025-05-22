@@ -416,10 +416,13 @@ contract EthLotteryTest is Test {
         console.log("");
 
         view_status();
+        console.log("payout a2");
         vm.prank(a2);
-        lottery.payOut();
+        //lottery.payOut(500);
+        lottery.payOut(500);
+        console.log("payout a1");
         vm.prank(a1);
-        lottery.payOut();
+        lottery.payOut(500);
 
         blocknumber+=periodBlocks+1;
         vm.roll(blocknumber);
@@ -427,8 +430,9 @@ contract EthLotteryTest is Test {
         console.log("");
 
         view_status();
+        console.log("payout ag");
         vm.prank(ag);
-        lottery.payOut();
+        lottery.payOut(0);
 
         blocknumber+=periodBlocks+1;
         vm.roll(blocknumber);

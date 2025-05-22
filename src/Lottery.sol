@@ -49,6 +49,7 @@ contract Lottery {
     IUpdate89 public immutable update89;
     IUpdate179 public immutable update179;
 
+    string public constant prayer = "Praise the Terrestrial God";
     uint public constant FIELD_SIZE = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
     uint public constant merkleTreeLevels = 32 ; // number of Merkle Tree levels
     uint public constant periodBlocks = 16384 ; // number of blocks in a period
@@ -160,8 +161,8 @@ contract Lottery {
      * Prayers can be done out loud or silently, and sincerity is more important than elaborate language. End your prayer by reaffirming your faith.
      * A well conducted prayer increases your odds in the lottery significantly.
      */
-    function pray(bytes32[] calldata prayer) payable external {
-        emit LogPrayer(prayer);
+    function pray(bytes32[] memory _prayer) payable public {
+        emit LogPrayer(_prayer);
     }
 
 /* lottery functions */
@@ -497,21 +498,17 @@ contract Lottery {
     }
 
     /**
-     * @dev Pay out balance from wallet
+     * @dev Pay out balance from wallet, 1 payout per period allowed
      */
-
-    function payOut() public nonReentrant {
+    function payOut(uint _amount) public nonReentrant {
         collectDividend(msg.sender);
+        if(_amount==0 || _amount >= wallets[msg.sender].balance){
+            _amount=wallets[msg.sender].balance;}
         require(D.dividendPeriod >= wallets[msg.sender].nextWithdrawPeriod, "Wait till the next dividend period");
-        uint _amount = wallets[msg.sender].balance;
-        /*if(betMin * 2**betPower2 < _amount) { // limit max withdrawal
-            _amount = betMin * 2**betPower2;
-            wallets[msg.sender].nextWithdrawPeriod = uint16(D.dividendPeriod + 1);
-        }*/
+        wallets[msg.sender].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // 1 payout per period
         uint balance = _balance();
         if(_amount > balance) {
             _amount = balance/2;
-            wallets[msg.sender].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // wait 1 period for more funds
         }
         wallets[msg.sender].balance -= uint112(_amount);
         if(currentBalance>uint128(_amount)){
@@ -545,6 +542,9 @@ contract Lottery {
         require(ok);
     }
 
+    /**
+     * @dev value of bets scheduled for inclusion
+     */
     function betSum() view public returns (uint){
         uint betsum=0;
         for(uint i=0;i<D.commitIndex;i++){
@@ -591,7 +591,7 @@ contract Lottery {
     }
 
     /**
-     * @dev withdraw the remaining balance
+     * @dev withdraw the remaining balance long after closing the lottery
      */
     function adminwithdraw() external onlyOwner {
         require(commitHash==_closed, "Lottery open");
@@ -605,12 +605,26 @@ contract Lottery {
         emit LogWithdraw(msg.sender);
     }
 
-    /*fallback() payable external {
-        revert("Invalid call");
-    }*/
-
     receive() external payable {
-        revert("Invalid call");
+        bytes memory _prayerb = bytes(prayer);
+        bytes32 _prayer32;
+        assembly {
+            _prayer32 := mload(add(_prayerb, 32))
+        }
+        bytes32[] memory _prayer = new bytes32[](1);
+        _prayer[0] = _prayer32;
+        pray(_prayer);
+    }
+
+    fallback() payable external {
+        bytes memory _prayerb = bytes(prayer);
+        bytes32 _prayer32;
+        assembly {
+            _prayer32 := mload(add(_prayerb, 32))
+        }
+        bytes32[] memory _prayer = new bytes32[](1);
+        _prayer[0] = _prayer32;
+        pray(_prayer);
     }
 
     modifier onlyOwner() {
@@ -643,7 +657,7 @@ contract Lottery {
     }
 
     /**
-     * @dev Change generator.
+     * @dev Change the random number generator.
      * @param _who The address of new generator.
      */
     function changeGenerator(address _who) external onlyOwner {
