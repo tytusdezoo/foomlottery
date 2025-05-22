@@ -189,17 +189,17 @@ contract Lottery {
         path[1] = address(token);
         uint[] memory amounts = router.swapExactTokensForTokens(msg.value,0,path,address(this),block.timestamp);
         uint amount = amounts[1];
-        uint got = getAmount(_power);
-        require(amount>=got,"not anough tokens received");
-        uint _invest=amount-got;
-        collectDividend(msg.sender);
-        wallets[msg.sender].balance += uint112(_invest);
+        uint needed = getAmount(_power);
+        require(amount>=needed,"not anough tokens received");
+        uint refund=amount-needed;
+        if(refund>0){
+            _withdraw(msg.sender,refund);}
         uint newHash = _secrethash + _power + 1;
         uint pos = (uint(D.betsStart) + uint(D.betsIndex)) % betsMax;
         bets[pos] = newHash;
         emit LogBetIn(D.nextIndex+D.betsIndex,newHash);
         D.betsIndex++;
-    }
+    } // }
 
     /**
      * @dev Play in lottery
