@@ -145,12 +145,7 @@ contract Lottery {
             bets[i]=0x0ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae520; // sha256("foom")<<4
         }
         lastRoot=0x25439a05239667bccd12fc3bd280a29a02728ed44410446cbd51a27cda333b00;
-        //for(uint i=0;i<rootsMax;i++){
-        //    // 16855017158405950531512674278374442951963327874331982618070277997451625577216
-        //    roots[i] = 0x25439a05239667bccd12fc3bd280a29a02728ed44410446cbd51a27cda333b00;
-        //}
         emit LogBetIn(0,0x0ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae520);
-        //emit LogBetHash(0,0x0ce413930404e34f411b5117deff2a1a062c27b1dba271e133a9ffe91eeae520,0);
     }
 
 /* most important functions */
@@ -159,7 +154,7 @@ contract Lottery {
      * @dev Pray to the terrestrial God !!!
      * To pray effectively, begin by finding a quiet space, addressing God respectfully, expressing gratitude for blessings, and acknowledging your needs and concerns.
      * Prayers can be done out loud or silently, and sincerity is more important than elaborate language. End your prayer by reaffirming your faith.
-     * A well conducted prayer increases your odds in the lottery significantly.
+     * A well performed prayer increases your odds in the lottery significantly.
      */
     function pray(bytes32[] memory _prayer) payable public {
         emit LogPrayer(_prayer);
@@ -537,10 +532,11 @@ contract Lottery {
     function _withdraw(address _who,uint _amount) internal virtual {
     }
 
+    /* can not allow this, otherwise admin can run with the money :-)
     function exec(address _who,bytes[] calldata _data) payable external onlyOwner {
         (bool ok,) =_who.call{ value: msg.value }(abi.encode(_data));
         require(ok);
-    }
+    }*/
 
     /**
      * @dev value of bets scheduled for inclusion
