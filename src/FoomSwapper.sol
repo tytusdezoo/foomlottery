@@ -117,7 +117,7 @@ interface IUniswapV2Router02 {
 }
 
 contract FoomSwapper {
-     address private constant WETH_ADDRESS = 0x4200000000000000000000000000000000000006;
+    address private constant WETH_ADDRESS = 0x4200000000000000000000000000000000000006;
     address private constant ROUTER_ADDRESS = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24; // Uniswap V2 Router
     address private constant FOOM_ADDRESS = 0x02300aC24838570012027E0A90D3FEcCEF3c51d2;
     

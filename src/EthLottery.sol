@@ -18,6 +18,7 @@ contract EthLottery is Lottery {
                 IUpdate89 _Update89,
                 IUpdate179 _Update179,
                 IERC20 _Token,
+                IUniswapV2Router02 _Router,
                 uint _BetMin)
         Lottery(
                 _Withdraw,
@@ -31,6 +32,7 @@ contract EthLottery is Lottery {
                 _Update89,
                 _Update179,
                 _Token,
+                _Router,
                 _BetMin) {}
 
     function _balance() internal view override returns (uint) {

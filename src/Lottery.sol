@@ -32,12 +32,19 @@ interface IUpdate89 { // 3992609 c (380GvRAM+29GRAM,96s)
 interface IUpdate179 { // 7987169 c (380vRAM+56GRAM,172s) // cpp: 7GRAM, 20s (5m user)
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[183] calldata _pubSignals) external view returns (bool); // 1415063 g
 }
+interface IUniswapV2Router02 {
+  function swapExactTokensForTokens( uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts);
+}
+interface IWETH is IERC20 {
+  function deposit() external payable;
+}
 
 /**
  * @title FOOM Lottery
  */
 contract Lottery {
     IERC20 public immutable token; // FOOM token
+    IUniswapV2Router02 public immutable router; // FOOM dex
     IWithdraw public immutable withdraw;
     ICancel public immutable cancel;
     IUpdate1 public immutable update1;
@@ -50,10 +57,10 @@ contract Lottery {
     IUpdate179 public immutable update179;
 
     string public constant prayer = "Praise the Terrestrial God";
-    uint public constant FIELD_SIZE = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
-    uint public constant merkleTreeLevels = 32 ; // number of Merkle Tree levels
+    address private constant WETH_ADDRESS = address(0x4200000000000000000000000000000000000006);
+    uint private constant FIELD_SIZE = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
+    uint private constant merkleTreeLevels = 32 ; // number of Merkle Tree levels
     uint public constant periodBlocks = 16384 ; // number of blocks in a period
-    uint public          betMin; // TODO: set to constant later !
     uint public constant betPower1 = 10; // power of the first bet = 1024
     uint public constant betPower2 = 16; // power of the second bet = 65536
     uint public constant betPower3 = 22; // power of the third bet = 4194304
@@ -61,7 +68,7 @@ contract Lottery {
     uint public constant maxUpdate = 179; // maximum number of bets in queue to insert
     uint public constant dividendFeePerCent = 4; // 4% of dividends go to the shareholders
     uint public constant generatorFeePerCent = 1; // 1% of dividends go to the generator
-    uint public constant maxBalance = 2**108; // maximum balance of a user and maximum size of bets in period
+    uint private constant maxBalance = 2**108; // maximum balance of a user and maximum size of bets in period
     uint private constant _open = 1;
     uint private constant _closed = 2;
 
@@ -77,6 +84,7 @@ contract Lottery {
         uint8 status;
     }
     Data public D;
+    uint128 public immutable betMin; // TODO: set to constant later !
     uint128 public currentBalance = 1; // sum of available funds in wallets
     uint public lastRoot; // current tree root
     uint public commitHash; //
@@ -115,6 +123,7 @@ contract Lottery {
                 IUpdate89 _Update89,
                 IUpdate179 _Update179,
                 IERC20 _Token,
+                IUniswapV2Router02 _Router,
                 uint _BetMin) {
         withdraw = _Withdraw;
         cancel = _Cancel;
@@ -127,7 +136,8 @@ contract Lottery {
         update89 = _Update89;
         update179 = _Update179;
         token = _Token;
-        betMin = _BetMin;
+        router = _Router;
+        betMin = uint128(_BetMin);
         owner = msg.sender;
         generator = msg.sender;
         D.periodStartBlock = uint64(block.number);
@@ -163,16 +173,39 @@ contract Lottery {
 /* lottery functions */
 
     /**
-     * @dev Calculate ticket price
+     * @dev Play in lottery with ETH
+     * it will automatically convert ETH to FOOM and pay as much as possible for the bet ticket
      */
-    function getAmount(uint _power) view public returns (uint) {
-        return(betMin * (2 + 2**_power));
+    function playETH(uint _secrethash,uint _power) payable external nonReentrant { // unchecked {
+        //(uint _power,uint _invest)=getPower(amount);
+        require(msg.value>0 && address(token)!=address(0), "Use play to play with FOOM");
+        require(D.nextIndex < 2 ** merkleTreeLevels - 1 - betsMax, "No more bets allowed");
+        require(0<_secrethash && _secrethash < FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
+        require(_power<=betPower3, "Invalid bet amount");
+        IWETH(WETH_ADDRESS).deposit{value: msg.value}();
+        IERC20(WETH_ADDRESS).approve(address(router), msg.value);
+        address[] memory path = new address[](2);
+        path[0] = WETH_ADDRESS;
+        path[1] = address(token);
+        uint[] memory amounts = router.swapExactTokensForTokens(msg.value,0,path,address(this),block.timestamp);
+        uint amount = amounts[1];
+        uint got = getAmount(_power);
+        require(amount>=got,"not anough tokens received");
+        uint _invest=amount-got;
+        collectDividend(msg.sender);
+        wallets[msg.sender].balance += uint112(_invest);
+        uint newHash = _secrethash + _power + 1;
+        uint pos = (uint(D.betsStart) + uint(D.betsIndex)) % betsMax;
+        bets[pos] = newHash;
+        emit LogBetIn(D.nextIndex+D.betsIndex,newHash);
+        D.betsIndex++;
     }
 
     /**
      * @dev Play in lottery
      */
     function play(uint _secrethash,uint _power) payable external { // unchecked {
+        require(msg.value==0 || address(token)==address(0), "Use playETH to play with ETH");
         require(D.nextIndex < 2 ** merkleTreeLevels - 1 - betsMax, "No more bets allowed");
         require(0<_secrethash && _secrethash < FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
         require(_power<=betPower3, "Invalid bet amount");
@@ -183,6 +216,24 @@ contract Lottery {
         emit LogBetIn(D.nextIndex+D.betsIndex,newHash);
         D.betsIndex++;
     } // }
+
+    /**
+     * @dev Calculate ticket power
+     *
+    function getPower(uint _amount) view public returns (uint _power,uint) {
+        require(_amount>=3*uint(betMin));
+        _amount-=2*uint(betMin);
+        for(_power=betPower3;_amount<uint(betMin)*(2**_power) && _power>0;_power--){}
+        return(_power,_amount-(uint(betMin)*(2 + 2**_power)));
+    }
+    */
+
+    /**
+     * @dev Calculate ticket price
+     */
+    function getAmount(uint _power) view public returns (uint) {
+        return(uint(betMin) * (2 + 2**_power));
+    }
 
     /**
      * @dev collect the reward
@@ -202,7 +253,7 @@ contract Lottery {
         require(nullifier[_nullifierHash] == 0, "Incorrect nullifier");
         nullifier[_nullifierHash] = 1;
         require(msg.value == _refund, "Incorrect refund amount received by the contract");
-        uint reward =  betMin * ( (_rewardbits&0x1>0?1:0) * 2**betPower1 + (_rewardbits&0x2>0?1:0) * 2**betPower2 + (_rewardbits&0x4>0?1:0) * 2**betPower3 );
+        uint reward =  uint(betMin) * ( (_rewardbits&0x1>0?1:0) * 2**betPower1 + (_rewardbits&0x2>0?1:0) * 2**betPower2 + (_rewardbits&0x4>0?1:0) * 2**betPower3 );
         reward = reward * (100 - dividendFeePerCent - generatorFeePerCent) / 100;
         require(reward >= _fee, "Insufficient reward");
         require(roots[_root]>0, "Cannot find your merkle root");
@@ -236,10 +287,10 @@ contract Lottery {
                 _withdraw(msg.sender,_fee);}
         }
         if (_refund > 0) {
-          (bool ok,)=_recipient.call{ value: uint(_refund) }("");
-          if(!ok){ (ok,)=generator.call{ value: uint(_refund) }(""); }
-          if(!ok){ (ok,)=owner.call{ value: uint(_refund) }(""); }
-          require(ok,"failed to refund");
+           (bool ok,)=_recipient.call{ value: uint(_refund) }("");
+           if(!ok){ (ok,)=generator.call{ value: uint(_refund) }(""); }
+           if(!ok){ (ok,)=owner.call{ value: uint(_refund) }(""); }
+           require(ok,"failed to refund");
         }
         rememberHash();
         emit LogWin(uint(_nullifierHash),reward,_recipient);

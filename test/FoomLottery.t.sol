@@ -14,11 +14,11 @@ import {Update21G16Verifier} from "src/Update21.sol";
 import {Update44G16Verifier} from "src/Update44.sol";
 import {Update89G16Verifier} from "src/Update89.sol";
 import {Update179G16Verifier} from "src/Update179.sol";
-import {IWithdraw, ICancel, IUpdate1, IUpdate3, IUpdate5, IUpdate11, IUpdate21, IUpdate44, IUpdate89, IUpdate179, IUniswapV2Router02} from "src/Lottery.sol";
-import {EthLottery} from "src/EthLottery.sol";
+import {IWithdraw, ICancel, IUpdate1, IUpdate3, IUpdate5, IUpdate11, IUpdate21, IUpdate44, IUpdate89, IUpdate179, IUniswapV2Router02, IWETH} from "src/Lottery.sol";
+import {FoomLottery} from "src/FoomLottery.sol";
 
-contract EthLotteryTest is Test {
-    EthLottery public lottery;
+contract FoomLotteryTest is Test {
+    FoomLottery public lottery;
     IWithdraw public withdraw;
     ICancel public cancel;
     IUpdate1 public update1;
@@ -38,6 +38,7 @@ contract EthLotteryTest is Test {
     address private constant WETH_ADDRESS = 0x4200000000000000000000000000000000000006;
     address private constant FOOM_ADDRESS = 0x02300aC24838570012027E0A90D3FEcCEF3c51d2;
     address private constant ROUTER_ADDRESS = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24; // Uniswap V2 Router
+    address private router=address(0);
 
     // Test vars
     address public me=payable(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
@@ -52,7 +53,7 @@ contract EthLotteryTest is Test {
     uint public showGas = 1;
     uint constant testsize=5; // test size
 
-    uint public constant betMin = 1; //0.001 ether; // TODO: compute correct value
+    uint public          betMin = 1; //0.001 ether;
     uint public constant betPower1 = 10; // power of the first bet = 1024
     uint public constant betPower2 = 16; // power of the second bet = 65536
     uint public constant betPower3 = 22; // power of the third bet = 4194304
@@ -64,7 +65,18 @@ contract EthLotteryTest is Test {
     uint LogCommit = uint(keccak256(abi.encodePacked("LogCommit(uint256,uint256,uint256)"))); // index,newRand,newRoot
     uint LogHash = uint(keccak256(abi.encodePacked("LogHash(uint256)"))); // commitBlockHash
 
+    function test() public { // can not run tests in parralel because of a common www repo
+        notest2_lottery_single_deposit();
+        //notest1_lottery_cancel();
+        //notest9_179_updates();
+        //notest3_lottery_many_deposits();
+        //notest9_updates();
+        //notest5_ods();
+        //notest0_investments();
+    }
+
     function setUp() public {
+        router=ROUTER_ADDRESS;
         // Deploy Groth16 verifier contracts.
         withdraw = IWithdraw(address(new WithdrawG16Verifier()));
         cancel = ICancel(address(new CancelBetG16Verifier()));
@@ -76,10 +88,22 @@ contract EthLotteryTest is Test {
         update44 = IUpdate44(address(new Update44G16Verifier()));
         update89 = IUpdate89(address(new Update89G16Verifier()));
         update179 = IUpdate179(address(new Update179G16Verifier()));
+        // get some info on Foom
+        vm.createSelectFork(vm.rpcUrl("base")); // use data from Base
+        //uint amount=0.001 ether; liquidity too small on base
+        uint amount=1;
+        IWETH(WETH_ADDRESS).deposit{value: amount}();
+        IERC20(WETH_ADDRESS).approve(router, amount);
+        address[] memory path = new address[](2);
+        path[0] = WETH_ADDRESS;
+        path[1] = address(FOOM_ADDRESS);
+        uint[] memory amounts = IUniswapV2Router02(router).swapExactTokensForTokens(amount,0,path,address(this),block.timestamp);
+        betMin = amounts[1];
+        console.log(betMin,"betMin");
         // Deploy lottery contract.
         vm.roll(++blocknumber);
     	vm.recordLogs();
-        lottery = new EthLottery(withdraw, cancel, update1, update3, update5, update11, update21, update44, update89, update179, IERC20(address(0)), IUniswapV2Router02(address(0)), betMin);
+        lottery = new FoomLottery(withdraw, cancel, update1, update3, update5, update11, update21, update44, update89, update179, IERC20(FOOM_ADDRESS), IUniswapV2Router02(ROUTER_ADDRESS), betMin);
         lottery.changeGenerator(ag);
 	_init();
     }
@@ -294,18 +318,28 @@ contract EthLotteryTest is Test {
         inputs[2] = vm.toString(bytes32(_power));
         bytes memory result = vm.ffi(inputs);
         (secret_power, hash, startIndex, startBlock) = abi.decode(result, (uint, uint, uint, uint));
+        uint amount = betMin * (2 + 2**_power);
         uint gasStart = gasleft();
-        lottery.play{value: betMin * (2 + 2**_power)}(hash,_power);
+        if(router==address(0)){
+            lottery.play{value: amount}(hash,_power);}
+        else{
+            amount=amount+amount>>4; // 4: (1+1/16) 106% ,5: (1+1/32) 103%
+            lottery.playETH{value: amount}(hash,_power);}
         uint gasUsed = gasStart - gasleft();
         if(0<showGas){ console.log("Gas used in _play: %d", gasUsed); }
-        console.log("%x,%x ticket", secret_power,startIndex);
+        console.log("%x,%x ticket (%d)", secret_power,startIndex,amount);
         _getLogs();
         return (secret_power,startIndex);
     }
 
     function _fake_play(uint i) internal {
         uint hash = uint(uint240(uint(keccak256(abi.encode(i))))<<5);
-        lottery.play{value: 3*betMin}(hash,0);
+        uint amount = 3*betMin;
+        if(router==address(0)){
+            lottery.play{value: 3*betMin}(hash,0);}
+        else{
+            amount*=2;
+            lottery.playETH{value: amount}(hash,0);}
         _getLogs();
     }
 
@@ -326,16 +360,6 @@ contract EthLotteryTest is Test {
             console.log("%d wallet: %d,balance: %d",i,wallet,balance);}
         console.log("cBalance: %d sBalance: %d",cbalance,sbalance);
         return(lwallet);
-    }
-
-    function test() public { // can not run tests in parralel because of a common www repo
-        //notest1_lottery_cancel();
-        //notest9_179_updates();
-        //notest3_lottery_many_deposits();
-        //notest2_lottery_single_deposit();
-        //notest9_updates();
-        //notest5_ods();
-        notest0_investments();
     }
 
     function notest0_investments() public {

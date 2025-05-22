@@ -18,6 +18,7 @@ contract FoomLottery is Lottery {
                 IUpdate89 _Update89,
                 IUpdate179 _Update179,
                 IERC20 _Token,
+                IUniswapV2Router02 _Router,
                 uint _BetMin) 
         Lottery(
                 _Withdraw,
@@ -31,6 +32,7 @@ contract FoomLottery is Lottery {
                 _Update89,
                 _Update179,
                 _Token,
+                _Router,
                 _BetMin) {}
 
     function _balance() internal view override returns (uint) {
@@ -38,18 +40,17 @@ contract FoomLottery is Lottery {
     }
 
     function _deposit(uint _amount) internal override returns (uint) {
-        token.transferFrom(msg.sender, address(this), _amount); /* success tests inside token contract */
+        token.transferFrom(msg.sender, address(this), _amount);
         return(_amount);
     }
 
     function _withdraw(address _who,uint _amount) internal override {
-        token.transferFrom(address(this), _who, _amount); /* success tests inside token contract */
-        //(bool ok,)=token.transferFrom(address(this), _who, _amount);
-        //if(ok){ return;}
-        //(ok,)=token.transferFrom(address(this), generator, _amount);
-        //if(ok){ return;}
-        //(ok,)=token.transferFrom(address(this), owner, _amount);
-        //revert("failed to send funds");
+        bool ok=token.transfer(_who, _amount);
+        if(ok){ return;}
+        ok=token.transfer(generator, _amount);
+        if(ok){ return;}
+        ok=token.transfer(owner, _amount);
+        revert("failed to send funds");
 
     }
 }
