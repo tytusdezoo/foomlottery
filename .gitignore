@@ -25,9 +25,6 @@ tmp/
 yarn.lock
 package-lock.json
 
-# to access base
-foundry.toml
-
 # too lagre?
 groth16/update5_final.zkey
 groth16/update11_final.zkey
