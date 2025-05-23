@@ -247,7 +247,7 @@ contract Lottery {
         uint[] memory amounts = router.swapExactTokensForTokens(msg.value,0,path,address(this),block.timestamp);
         uint amount = amounts[1];
         uint needed = getAmount(_power);
-        require(amount>=needed,"not anough tokens received");
+        require(amount>=needed,"not enough tokens received");
         uint refund=amount-needed;
         if(refund>0){
             _withdraw(msg.sender,refund);}
@@ -363,7 +363,7 @@ contract Lottery {
         uint reward=getAmount(power1-1)-betMin;
         bets[pos]=0x20;
         uint balance = _balance();
-        require(balance >= reward,"Not anough funds");
+        require(balance >= reward,"Not enough funds");
         _withdraw(_recipient,reward);
         rememberHash();
         emit LogCancel(_betIndex); // TODO: remember to update tree leaves !!!
@@ -609,7 +609,7 @@ contract Lottery {
 
     /**
      * @dev Pay out balance from wallet, 1 payout per dividend period allowed
-     * if there is not anough FOOM in the contract then only 50% of the FOOM in the contract will be withdrawn
+     * if there is not enough FOOM in the contract then only 50% of the FOOM in the contract will be withdrawn
      * this can only happen if the payers had more luck than the lottery
      * @param _amount amount of FOOM to withdraw
      */

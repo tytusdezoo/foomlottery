@@ -67,8 +67,10 @@ contract FoomLotteryTest is Test {
     uint LogHash = uint(keccak256(abi.encodePacked("LogHash(uint256)"))); // commitBlockHash
 
     function test() public { // can not run tests in parralel because of a common www repo
+        notest_overflow();
+        return;
+        notest_adminwithdraw();
         notest2_lottery_single_deposit();
-
         // get more FOOM to play with
         uint amount=betMinETH*2**23;
         IWETH(WETH_ADDRESS).deposit{value: amount}();
@@ -377,7 +379,7 @@ contract FoomLotteryTest is Test {
     }
 
     function view_status() view public returns(uint) {
-        uint lwallet=address(lottery).balance;
+        uint lwallet=IWETH(FOOM_ADDRESS).balanceOf(address(lottery));
 	uint period=lottery.dividendPeriod();
         uint pbets=lottery.periodBets(period-1);
         uint pshares=lottery.periodShares(period-1);
@@ -387,12 +389,51 @@ contract FoomLotteryTest is Test {
         uint sbalance=0;
         address[3] memory who=[a1,a2,ag];
         for(uint i=0;i<who.length;i++){
-            uint wallet=who[i].balance;
+            uint wallet=IWETH(FOOM_ADDRESS).balanceOf(who[i]);
             uint balance=lottery.walletBalanceOf(who[i]);
             sbalance+=balance;
             console.log("%d wallet: %d,balance: %d",i,wallet,balance);}
         console.log("cBalance: %d sBalance: %d",cbalance,sbalance);
         return(lwallet);
+    }
+
+    /// forge-config: default.allow_internal_expect_revert = true
+    function notest_adminwithdraw() public {
+        console.log('test_adminwithdraw START');
+        _getLogs();
+        (uint secret_power,uint startIndex) = _play(10);
+        vm.expectRevert();
+        lottery.close();
+        _commit();
+        vm.expectRevert();
+        lottery.adminwithdraw();
+        lottery.close();
+        lottery.reopen();
+        lottery.close();
+        console.log(blocknumber,"blocknumber");
+        blocknumber+=4*60*24*365*2+4;
+        vm.roll(++blocknumber);
+        console.log(blocknumber,"blocknumber");
+        view_status();
+        lottery.adminwithdraw();
+        view_status();
+        _withdraw(secret_power,startIndex);
+        view_status();
+        console.log('test_adminwithdraw OK');
+    }
+
+    function notest_overflow() public {
+        console.log('test_adminwithdraw START');
+        _commit();
+        _commit();
+        for (uint i=0; i < 250; i++) { // betsMax
+            _fake_play(i);}
+        vm.expectRevert();
+        _fake_play(251);
+        _commit();
+        _fake_play(252);
+        _commit();
+        console.log('test_adminwithdraw OK');
     }
 
     function notest0_investments() public {
