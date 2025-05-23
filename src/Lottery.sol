@@ -79,7 +79,7 @@ contract Lottery {
         uint64 periodStartBlock;
         uint64 commitBlock;
         uint32 nextIndex;
-        uint32 dividendPeriod; // current dividend period
+        uint16 dividendPeriod; // current dividend period
         uint8 betsStart; // index of last commited bet
         uint8 betsIndex; // index of the next slot in bet queue (>=1)
         uint8 commitIndex; // number of bets to insert into tree + 1 (>=1)
@@ -143,7 +143,7 @@ contract Lottery {
         owner = msg.sender;
         generator = msg.sender;
         D.periodStartBlock = uint64(block.number);
-        D.dividendPeriod = uint32(1);
+        D.dividendPeriod = uint16(1);
         D.status = uint8(_open);
         D.nextIndex = uint32(1);
         commitHash = _open;
@@ -213,7 +213,7 @@ contract Lottery {
      */
     function play(uint _secrethash,uint _power) payable external { // unchecked {
         require(msg.value==0 || address(token)==address(0), "Use playETH to play with ETH");
-        require(D.nextIndex < 2 ** merkleTreeLevels - 1 - betsMax, "No more bets allowed");
+        require(D.betsIndex<betsMax && D.nextIndex < 2 ** merkleTreeLevels - 1 - betsMax, "No more bets allowed");
         require(0<_secrethash && _secrethash < FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
         require(_power<=betPower3, "Invalid bet amount");
         _deposit(getAmount(_power));
@@ -234,7 +234,7 @@ contract Lottery {
     function playETH(uint _secrethash,uint _power) payable external nonReentrant { // unchecked {
         //(uint _power,uint _invest)=getPower(amount);
         require(msg.value>0 && address(token)!=address(0), "Use play to play with FOOM");
-        require(D.nextIndex < 2 ** merkleTreeLevels - 1 - betsMax, "No more bets allowed");
+        require(D.betsIndex<betsMax && D.nextIndex < 2 ** merkleTreeLevels - 1 - betsMax, "No more bets allowed");
         require(0<_secrethash && _secrethash<FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
         require(_power<=betPower3, "Invalid bet amount");
         IWETH(WETH_ADDRESS).deposit{value: msg.value}();
@@ -369,6 +369,8 @@ contract Lottery {
 
     /**
      * @dev commit the generator secret
+     * commit to reveal within 256 blocks a secret random number to be mixed with the block hash
+     * only the random number generator can call this function
      */
     function commit(uint _commitHash,uint _maxUpdate) external onlyGenerator {
         require(D.betsIndex >0 , "No bets");
@@ -385,6 +387,7 @@ contract Lottery {
 
     /**
      * @dev remember commitBlockHash
+     * store the block hash in case the generator is late
      */
     function rememberHash() public {
         if(D.commitBlock != 0 && commitBlockHash == _open){
@@ -398,6 +401,8 @@ contract Lottery {
 
     /**
      * @dev reveal the generator secret without updating the tree
+     * if the generator can not calculate the update then the secret can be revealed without the update
+     * in this case anybody can compute the update and collect the 1% reward
      */
     function secret(uint _revealSecret) public {
         rememberHash();
@@ -407,6 +412,8 @@ contract Lottery {
 
     /**
      * @dev reveal the generator secret
+     * show the the update has been computed correclty, store the new merkleTree root and collect 1% reward
+     * also check for dividend updates
      */
     function reveal( // unchecked {
         uint _revealSecret,
@@ -554,6 +561,7 @@ contract Lottery {
 
     /**
      * @dev Update dividend period
+     * check if we are in a new dividend period
      */
     function updateDividendPeriod() public {
         if(block.number >= D.periodStartBlock + periodBlocks || periods[D.dividendPeriod].bets > maxBalance) {
@@ -566,6 +574,7 @@ contract Lottery {
 
     /**
      * @dev Commit remaining dividends before balance changes
+     * @param _who The address of the investor
      */
     function collectDividend(address _who) public {
         updateDividendPeriod();
@@ -590,7 +599,10 @@ contract Lottery {
     }
 
     /**
-     * @dev Pay out balance from wallet, 1 payout per period allowed
+     * @dev Pay out balance from wallet, 1 payout per dividend period allowed
+     * if there is not anough FOOM in the contract then only 50% of the FOOM in the contract will be withdrawn
+     * this can only happen if the payers had more luck than the lottery
+     * @param _amount amount of FOOM to withdraw
      */
     function payOut(uint _amount) public nonReentrant {
         collectDividend(msg.sender);
@@ -636,7 +648,10 @@ contract Lottery {
     }*/
 
     /**
-     * @dev value of bets scheduled for inclusion
+     * @dev value of bets scheduled for processing by random number generator
+     * tickets in the group can not be canceled and can not be collected
+     * after commit() the generator has 256 blocks to reveal the secret random number and to process these tickets
+     * if this fails the tickets can not be recovered and the lottery contract is dead
      */
     function betSum() view public returns (uint){
         uint betsum=0;
@@ -650,8 +665,10 @@ contract Lottery {
 
     /**
      * @dev deposit security deposit to reset commit
+     * to reincarnate the lottery the price of the tickets in the failed commit group must be paid again
+     * after this they can be processed again with a new random number
      */
-    function resetcommit() payable external onlyOwner {
+    function resetcommit() payable external {
         uint betsum=betSum();
         _deposit(betsum);
         D.commitIndex = 0;
@@ -663,6 +680,7 @@ contract Lottery {
 
     /**
      * @dev close the lottery
+     * the admin can close the lottery if there are no pending tickets to withdraw remaining funds after 2 years
      */
     function close() external onlyOwner {
         require(D.betsIndex==0, "Open bets");
@@ -674,6 +692,7 @@ contract Lottery {
 
     /**
      * @dev reopen the lottery again
+     * the admin can reopen the lottery anytime
      */
     function reopen() external onlyOwner {
         require(commitHash==_closed, "Lottery open");
@@ -685,6 +704,7 @@ contract Lottery {
 
     /**
      * @dev withdraw the remaining balance long after closing the lottery
+     * withdraw remaining funds 2 years after closing the lottery
      */
     function adminwithdraw() external onlyOwner {
         require(commitHash==_closed, "Lottery open");
@@ -698,6 +718,9 @@ contract Lottery {
         emit LogWithdraw(msg.sender);
     }
 
+    /**
+     * @dev pray with us
+     */
     receive() external payable {
         bytes memory _prayerb = bytes(prayer);
         bytes32 _prayer32;
@@ -709,6 +732,9 @@ contract Lottery {
         pray(_prayer);
     }
 
+    /**
+     * @dev pray with us
+     */
     fallback() payable external {
         bytes memory _prayerb = bytes(prayer);
         bytes32 _prayer32;
@@ -769,7 +795,7 @@ contract Lottery {
 /* getters */
     
     /**
-     * @dev Show current balance eligible for dividend.
+     * @dev Show current balance eligible for dividend calculation
      * @param _owner The address of the account.
      */
     function walletSharesOf(address _owner) public view returns (uint) {
@@ -796,7 +822,7 @@ contract Lottery {
     }
 
     /**
-     * @dev Show last dividend period processed.
+     * @dev Show last dividend period processed for this account.
      * @param _owner The address of the account.
      */
     function walletDividendPeriodOf(address _owner) public view returns (uint) {
