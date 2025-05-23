@@ -26,7 +26,7 @@ async function main() {
   const newRoot = await getNewRoot(nextIndex,newLeaves);
   const hashes = new Array(hashesLength).fill(null).map((x,j) => (j<commitIndex?newHashes[j]:0n));
 
-  const pathElements = await getPath(nextIndex-1);
+  const pathElements = await getLastPath(nextIndex-1);
 
   const input = {
     // Public inputs

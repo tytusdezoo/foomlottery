@@ -81,10 +81,10 @@ function findBet(inHash,startindex) {
   for(;startindex<nextIndex;startindex+=0xff) {
     [betIndex,betRand] = getIndexRand(hashstr,startindex);
     if(betIndex>0) {
-      return [betIndex,betRand];
+      return [betIndex,betRand,nextIndex];
     }
   }
-  return getIndexWaiting(hashstr);
+  return [...getIndexWaiting(hashstr),nextIndex];
 }
 
 function getWaitingList(nextIndex,hashesLength){
@@ -102,63 +102,88 @@ function getWaitingList(nextIndex,hashesLength){
 }
 
 function getLeaves(path){
-  let lastindex=-1;
   const lines = getLines(path);
   const leaves = lines.map((line) => {
     const [index,hash] = line.split(',');
-    const indexnum = parseInt(index,16);
-    if(indexnum>lastindex){
-      lastindex=indexnum;
-    }
     return hexToBigint(hash);
   });
-  return [lastindex, leaves];
+  return [leaves];
 }
 
-async function getPath(index){
+async function getLastPath(index){
   const path = sprintfjs.sprintf("%08x",index);
-  const path1 = path.slice(0,2);
-  const path2 = path.slice(2,4); 
-  const path3 = path.slice(4,6);
-  const path4 = path.slice(6,8);
+  const path1 = path.slice(0,2); const path1i=parseInt(path1,16);
+  const path2 = path.slice(2,4); const path2i=parseInt(path2,16);
+  const path3 = path.slice(4,6); const path3i=parseInt(path3,16);
+  const path4 = path.slice(6,8); const path4i=parseInt(path4,16);
 
-  const [lastindex1,leaves1] = getLeaves("www/index.csv");
-  if(lastindex1<0 && path1!="00"){
-    return [];
-  }
-  const [lastindex2,leaves2] = getLeaves("www/"+path1+"/index.csv");
-  if(lastindex2<0 && path2!="00"){
-    return [];
-  }
-  const [lastindex3,leaves3] = getLeaves("www/"+path1+"/"+path2+"/index.csv");
-  if(lastindex3<0 && path3!="00"){
-    return [];
-  }
-  const [lastindex4,leaves4] = getLeaves("www/"+path1+"/"+path2+"/"+path3+".csv");
-  if(lastindex4<0){
-    return [];
-  }
-  //console.log(index.toString(16),path1,path2,path3,path4);
-  //console.log(leaves3.map((x)=>bigintToHex(x)));
+  const [leaves1] = getLeaves("www/index.csv");
+  const [leaves2] = getLeaves("www/"+path1+"/index.csv");
+  const [leaves3] = getLeaves("www/"+path1+"/"+path2+"/index.csv");
+  const [leaves4] = getLeaves("www/"+path1+"/"+path2+"/"+path3+".csv");
+
   const tree4 = await mimicMerkleTree(hexToBigint(zeros[0]),leaves4,8);
+  const mpath4 = tree4.path(path4i);
   const root4 = tree4.root;
-  const mpath4 = tree4.path(parseInt(path4,16));
-  // append root4 to leaves3
-  leaves3.push(root4);
-  //console.log(leaves3.map((x)=>bigintToHex(x)));
+  if(leaves3.length==path3i){
+    leaves3.push(root4);}
   const tree3 = await mimicMerkleTree(hexToBigint(zeros[1]),leaves3,8);
   const root3 = tree3.root;
-  const mpath3 = tree3.path(parseInt(path3,16)); 
-  // append root3 to leaves2
-  leaves2.push(root3);
+  const mpath3 = tree3.path(path3i);
+  if(leaves2.length==path2i){
+    leaves2.push(root3);}
   const tree2 = await mimicMerkleTree(hexToBigint(zeros[2]),leaves2,8);
   const root2 = tree2.root;
-  const mpath2 = tree2.path(parseInt(path2,16));
-  // append root2 to leaves1
+  const mpath2 = tree2.path(path2i);
+  if(leaves1.length==path1i){
+    leaves1.push(root2);}
+  const tree1 = await mimicMerkleTree(hexToBigint(zeros[3]),leaves1,8);
+  const newroot = tree1.root;
+  const mpath1 = tree1.path(path1i);
+  const pathElements = [...mpath4.pathElements, ...mpath3.pathElements, ...mpath2.pathElements, ...mpath1.pathElements];
+  return [...pathElements,newroot];
+}
+
+async function getPath(index,nextIndex){
+  const path = sprintfjs.sprintf("%08x",index);
+  const path1 = path.slice(0,2); const path1i=parseInt(path1,16);
+  const path2 = path.slice(2,4); const path2i=parseInt(path2,16);
+  const path3 = path.slice(4,6); const path3i=parseInt(path3,16);
+  const path4 = path.slice(6,8); const path4i=parseInt(path4,16);
+  const npath = sprintfjs.sprintf("%08x",nextIndex);
+  const npath1 = npath.slice(0,2); const npath1i=parseInt(npath1,16);
+  const npath2 = npath.slice(2,4); const npath2i=parseInt(npath2,16);
+  const npath3 = npath.slice(4,6); const npath3i=parseInt(npath3,16);
+
+  const [leaves1] = getLeaves("www/index.csv");
+  const [leaves2] = getLeaves("www/"+path1+"/index.csv");
+  const [leaves3] = getLeaves("www/"+path1+"/"+path2+"/index.csv");
+  const [leaves4] = getLeaves("www/"+path1+"/"+path2+"/"+path3+".csv");
+
+  let tree4 = await mimicMerkleTree(hexToBigint(zeros[0]),leaves4,8);
+  const mpath4 = tree4.path(path4i);
+  if((index&0xFFFFFF00)!=(nextIndex&0xFFFFFF00)){
+    const [nleaves4] = getLeaves("www/"+npath1+"/"+npath2+"/"+npath3+".csv");
+    tree4 = await mimicMerkleTree(hexToBigint(zeros[0]),nleaves4,8);}
+  const root4 = tree4.root;
+  leaves3.push(root4);
+  let tree3 = await mimicMerkleTree(hexToBigint(zeros[1]),leaves3,8);
+  const mpath3 = tree3.path(path3i);
+  if((index&0xFFFF0000)!=(nextIndex&0xFFFF0000)){
+    const [nleaves3] = getLeaves("www/"+npath1+"/"+npath2+"/index.csv");
+    tree3 = await mimicMerkleTree(hexToBigint(zeros[1]),nleaves3,8);}
+  const root3 = tree3.root;
+  leaves2.push(root3);
+  let tree2 = await mimicMerkleTree(hexToBigint(zeros[2]),leaves2,8);
+  const mpath2 = tree2.path(path2i);
+  const root2 = tree2.root;
+  if((index&0xFF000000)!=(nextIndex&0xFF000000)){
+    const [nleaves2] = getLeaves("www/"+npath1+"/index.csv");
+    tree2 = await mimicMerkleTree(hexToBigint(zeros[2]),nleaves2,8);}
   leaves1.push(root2);
   const tree1 = await mimicMerkleTree(hexToBigint(zeros[3]),leaves1,8);
   const newroot = tree1.root;
-  const mpath1 = tree1.path(parseInt(path1,16));
+  const mpath1 = tree1.path(path1i);
   const pathElements = [...mpath4.pathElements, ...mpath3.pathElements, ...mpath2.pathElements, ...mpath1.pathElements];
   return [...pathElements,newroot];
 }
@@ -169,10 +194,10 @@ async function getNewRoot(lastindex,newLeaves){
   const path2 = path.slice(2,4); 
   const path3 = path.slice(4,6);
 
-  const [lastindex1,leaves1] = getLeaves("www/index.csv");
-  const [lastindex2,leaves2] = getLeaves("www/"+path1+"/index.csv");
-  const [lastindex3,leaves3] = getLeaves("www/"+path1+"/"+path2+"/index.csv");
-  const [lastindex4,leaves4] = getLeaves("www/"+path1+"/"+path2+"/"+path3+".csv");
+  const [leaves1] = getLeaves("www/index.csv");
+  const [leaves2] = getLeaves("www/"+path1+"/index.csv");
+  const [leaves3] = getLeaves("www/"+path1+"/"+path2+"/index.csv");
+  const [leaves4] = getLeaves("www/"+path1+"/"+path2+"/"+path3+".csv");
 
   const roots = new Array(2);
   leaves4.push(...newLeaves);

@@ -17,7 +17,7 @@ async function main() {
   const hash = await pedersenHash(leBigintToBuffer(secret, 31));
   const hash_power1 = hash + power + 1n;
   const startIndex = parseInt(inputs[1].replace(/^0x0*/, ''),16); // could be int instead of hex later
-  const [betIndex,betRand] = findBet(hash_power1,startIndex); // use startIndex !!! TODO: refactor
+  const [betIndex,betRand,nextIndex] = findBet(hash_power1,startIndex); // use startIndex !!! TODO: refactor
   if(betIndex>0 && betRand>0n){
     throw("bet already processed for "+bigintToHex(hash_power1)+" starting at "+startIndex.toString(16));}
   if(betIndex==0){
