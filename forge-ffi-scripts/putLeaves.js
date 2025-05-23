@@ -78,9 +78,6 @@ async function appendtofile(pathlast,text,hash) {
     touchfile("www/"+path1+"/"+path2+"/index.csv");
     if(path2=="00"){
       touchfile("www/"+path1+"/index.csv");
-      if(path1=="00") {
-        touchfile("www/index.csv");
-      }
     }
   }
   writeFileSync("www/"+path1+"/"+path2+"/"+path3+".csv", text, { flag: 'a' });
@@ -128,7 +125,7 @@ async function main() { // TODO: test if update is correct
     }
     text+=sprintfjs.sprintf("%x,%s,%s,%s\n",(nextIndex+i)&0xFF,no0x(bigintToHex(newLeaves[i])),no0x(bigintToHex(newHashes[i])),no0x(bigintToHex(newRand))); // index, leaf, hash, rand
   }
-  await appendtofile(pathlast,text,(nextIndex+commitIndex)&0xff==0?true:false);
+  await appendtofile(pathlast,text,((nextIndex+commitIndex)&0xff)==0?true:false);
   writeLast(nextIndex+commitIndex,blockNumber,newRoot,newLeaves[commitIndex-1]);
   cleanwaiting(nextIndex+commitIndex);
 }
