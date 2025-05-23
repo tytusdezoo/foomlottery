@@ -8,8 +8,8 @@ const { hexToBigint, bigintToHex, leBufferToBigint } = require("./utils/bigint.j
 const { getNewRoot, getWaitingList, readLast, getLastPath } = require("./utils/mimcMerkleTree.js");
 const circomlibjs = require("circomlibjs");
 ////////////////////////////// MAIN ///////////////////////////////////////////
-// ./forge-ffi-scripts/update.js 0x0000000000000000000000000000000000000000000000000000000000000001 0x000000000000000000000000000000009691a9866228f0e680fe3c605b14a165 0x0000000000000000000000000000000000000000000000000000000000000000 0x24d599883f039a5cb553f9ec0e5998d58d8816e823bd556164f72aef0ef7d9c0
-// forge-ffi-scripts/update.js 1 0x0000000000000000000000000000000007a723530a3ee4727fca6baed148b971 0x26f89aa76d0adcac0bf2c4631dc404ca4056f72d91119df55aea4f9e1f5831ab 0x24d599883f039a5cb553f9ec0e5998d58d8816e823bd556164f72aef0ef7d9c0
+// forge-ffi-scripts/update.js 0x03 0x03 0x087ae54410521f087a91019b67e454920
+// forge-ffi-scripts/update.js 0x0b3 0x0b3 0x075ef19b72f2af417e241fa1583e26ee9
 
 
 async function main() {

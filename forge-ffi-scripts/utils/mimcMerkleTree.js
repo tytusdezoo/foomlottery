@@ -110,12 +110,13 @@ function getLeaves(path){
   return [leaves];
 }
 
-async function getLastPath(index){
-  const path = sprintfjs.sprintf("%08x",index);
+async function getLastPath(lastIndex){
+  const path = sprintfjs.sprintf("%08x",lastIndex);
   const path1 = path.slice(0,2); const path1i=parseInt(path1,16);
   const path2 = path.slice(2,4); const path2i=parseInt(path2,16);
   const path3 = path.slice(4,6); const path3i=parseInt(path3,16);
   const path4 = path.slice(6,8); const path4i=parseInt(path4,16);
+//console.log(path);
 
   const [leaves1] = getLeaves("www/index.csv");
   const [leaves2] = getLeaves("www/"+path1+"/index.csv");
@@ -125,7 +126,9 @@ async function getLastPath(index){
   const tree4 = await mimicMerkleTree(hexToBigint(zeros[0]),leaves4,8);
   const mpath4 = tree4.path(path4i);
   const root4 = tree4.root;
+//console.log(bigintToHex(root4));
   if(leaves3.length==path3i){
+//console.log(path3i);
     leaves3.push(root4);}
   const tree3 = await mimicMerkleTree(hexToBigint(zeros[1]),leaves3,8);
   const root3 = tree3.root;
@@ -188,8 +191,8 @@ async function getPath(index,nextIndex){
   return [...pathElements,newroot];
 }
 
-async function getNewRoot(lastindex,newLeaves){
-  const path = sprintfjs.sprintf("%08x",lastindex-1);
+async function getNewRoot(nextIndex,newLeaves){
+  const path = sprintfjs.sprintf("%08x",nextIndex-1);
   const path1 = path.slice(0,2);
   const path2 = path.slice(2,4); 
   const path3 = path.slice(4,6);
@@ -200,18 +203,25 @@ async function getNewRoot(lastindex,newLeaves){
   const [leaves4] = getLeaves("www/"+path1+"/"+path2+"/"+path3+".csv");
 
   const roots = new Array(2);
+
+  const leaves2length=leaves2.length;
+  const leaves3length=leaves3.length;
+  const leaves4length=leaves4.length;
   leaves4.push(...newLeaves);
   if(leaves4.length>256){
     const tree4a = await mimicMerkleTree(hexToBigint(zeros[0]),leaves4.slice(0,256),8);
-    roots[0] = tree4a.root;  
+    roots[0] = tree4a.root;
     const tree4b = await mimicMerkleTree(hexToBigint(zeros[0]),leaves4.slice(256,leaves4.length),8);
-    roots[1] = tree4b.root;  
+    roots[1] = tree4b.root;
   } else {
     const tree4a = await mimicMerkleTree(hexToBigint(zeros[0]),leaves4,8);
     roots[0] = tree4a.root;
     roots[1] = hexToBigint(zeros[1]);
   }
-  leaves3.push(...roots);
+  if(leaves4length==256){
+    leaves3.push(roots[1]);}
+  else{
+    leaves3.push(...roots);}
   if(leaves3.length>256){
     const tree3a = await mimicMerkleTree(hexToBigint(zeros[1]),leaves3.slice(0,256),8);
     roots[0] = tree3a.root;  
@@ -222,7 +232,10 @@ async function getNewRoot(lastindex,newLeaves){
     roots[0] = tree3a.root;
     roots[1] = hexToBigint(zeros[2]);
   }
-  leaves2.push(...roots);
+  if(leaves3length==256){
+    leaves2.push(roots[1]);}
+  else{
+    leaves2.push(...roots);}
   if(leaves2.length>256){
     const tree2a = await mimicMerkleTree(hexToBigint(zeros[2]),leaves2.slice(0,256),8);
     roots[0] = tree2a.root;  
@@ -233,10 +246,10 @@ async function getNewRoot(lastindex,newLeaves){
     roots[0] = tree2a.root;
     roots[1] = hexToBigint(zeros[3]);
   }
-  leaves1.push(...roots);
-  if(leaves1.length>256){
-    leaves1.pop();
-  }
+  if(leaves2length==256){
+    leaves1.push(roots[1]);}
+  else{
+    leaves1.push(...roots);}
   const tree1 = await mimicMerkleTree(hexToBigint(zeros[3]),leaves1,8);
   const newRoot = tree1.root;
   return newRoot;
