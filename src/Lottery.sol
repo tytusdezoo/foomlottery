@@ -360,7 +360,7 @@ contract Lottery {
         uint power1=bets[pos]&0x1f;
         require(power1>0);
         require(cancel.verifyProof( _pA, _pB, _pC, [uint(bets[pos]-power1)]), "Invalid cancel proof");
-        uint reward=getAmount(power1-1)-_betMin;
+        uint reward=getAmount(power1-1)-betMin;
         bets[pos]=0x20;
         uint balance = _balance();
         require(balance >= reward,"Not anough funds");
