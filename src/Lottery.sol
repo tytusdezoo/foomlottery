@@ -80,6 +80,7 @@ contract Lottery {
         uint64 commitBlock;
         uint32 nextIndex;
         uint16 dividendPeriod; // current dividend period
+        uint8 betsLimit; // Limit bets when closing the lottery
         uint8 betsStart; // index of last commited bet
         uint8 betsIndex; // index of the next slot in bet queue (>=1)
         uint8 commitIndex; // number of bets to insert into tree + 1 (>=1)
@@ -144,6 +145,7 @@ contract Lottery {
         generator = msg.sender;
         D.periodStartBlock = uint64(block.number);
         D.dividendPeriod = uint16(1);
+        D.betsLimit = uint8(betsMax);
         D.status = uint8(_open);
         D.nextIndex = uint32(1);
         commitHash = _open;
@@ -213,7 +215,7 @@ contract Lottery {
      */
     function play(uint _secrethash,uint _power) payable external { // unchecked {
         require(msg.value==0 || address(token)==address(0), "Use playETH to play with ETH");
-        require(D.betsIndex<betsMax && D.nextIndex < 2 ** merkleTreeLevels - 1 - betsMax, "No more bets allowed");
+        require(D.betsIndex<D.betsLimit, "No more bets allowed");
         require(0<_secrethash && _secrethash < FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
         require(_power<=betPower3, "Invalid bet amount");
         _deposit(getAmount(_power));
@@ -234,7 +236,7 @@ contract Lottery {
     function playETH(uint _secrethash,uint _power) payable external nonReentrant { // unchecked {
         //(uint _power,uint _invest)=getPower(amount);
         require(msg.value>0 && address(token)!=address(0), "Use play to play with FOOM");
-        require(D.betsIndex<betsMax && D.nextIndex < 2 ** merkleTreeLevels - 1 - betsMax, "No more bets allowed");
+        require(D.betsIndex<D.betsLimit, "No more bets allowed");
         require(0<_secrethash && _secrethash<FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
         require(_power<=betPower3, "Invalid bet amount");
         IWETH(WETH_ADDRESS).deposit{value: msg.value}();
@@ -543,6 +545,9 @@ contract Lottery {
         D.nextIndex+=D.commitIndex;
         D.betsStart =uint8((uint(D.betsStart)+uint(D.commitIndex)) % betsMax);
         D.betsIndex-=D.commitIndex;
+        if(D.nextIndex >= 2 ** merkleTreeLevels - 1 - betsMax || D.dividendPeriod >= 2 ** 16 - 4){
+            D.betsLimit=D.betsIndex; // start closing the lottery
+        }
         D.commitIndex = 0;
         D.commitBlock = 0;
         commitHash = _open;
@@ -564,6 +569,8 @@ contract Lottery {
      * check if we are in a new dividend period
      */
     function updateDividendPeriod() public {
+        if(D.dividendPeriod >= 2 ** 16 - 2 ){
+            return;}
         if(block.number >= D.periodStartBlock + periodBlocks || periods[D.dividendPeriod].bets > maxBalance) {
             currentBalance += uint128(uint(periods[D.dividendPeriod].bets)*dividendFeePerCent/100);
             D.periodStartBlock = uint64(block.number);
@@ -609,7 +616,9 @@ contract Lottery {
         if(_amount==0 || _amount >= wallets[msg.sender].balance){
             _amount=wallets[msg.sender].balance;}
         require(D.dividendPeriod >= wallets[msg.sender].nextWithdrawPeriod, "Wait till the next dividend period");
-        wallets[msg.sender].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // 1 payout per period
+        if(D.dividendPeriod < 2 ** 16 - 2 ){
+            wallets[msg.sender].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // 1 payout per period
+        }
         uint balance = _balance();
         if(_amount > balance) {
             _amount = balance/2;
