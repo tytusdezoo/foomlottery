@@ -19,12 +19,14 @@ function getLines(path){
   let fileold;
   let textold;
   try {
-    if(existsSync(path+".gz")){
+    if(existsSync(path)){
+      fileold = openSync(path, "r");
+      textold = readFileSync(fileold, "utf8");
+    } else if(existsSync(path+".gz")) {
       fileold = openSync(path+".gz", "r"); // decompress the file
       textold = zlib.gunzipSync(readFileSync(fileold)).toString();
     } else {
-      fileold = openSync(path, "r");
-      textold = readFileSync(fileold, "utf8");
+      return [];
     }
     closeSync(fileold);
   } catch(e) {
