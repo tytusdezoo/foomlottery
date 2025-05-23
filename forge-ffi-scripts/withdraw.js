@@ -25,9 +25,6 @@ async function main() {
     throw("bet not processed yet for "+bigintToHex(hash_power1)+" starting at "+startindex.toString(16));}
   if(betIndex==0){
     throw("bet not found for "+bigintToHex(hash_power1)+" starting at "+startindex.toString(16));}
-  console.log(betIndex.toString(16));
-  console.log(betRand.toString(16));
-  console.log(hash_power1.toString(16));
   const bigindex = BigInt(betIndex);
   const dice = await leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([secret,betRand,bigindex])));
 
@@ -48,8 +45,6 @@ async function main() {
   const nullifierHash = await pedersenHash(leBigintToBuffer(terces, 31));
 
   const pathElements = await getPath(betIndex,nextIndex);
-  //console.log(bigintToHex(pathElements[32]));
-  console.log(pathElements.map(x=>bigintToHex(x)));
 
   // 4. Format witness input to exactly match circuit expectations
   const input = {
