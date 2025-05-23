@@ -9,6 +9,7 @@ const circomlibjs = require("circomlibjs");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 // forge-ffi-scripts/withdraw.js 0x3beeeb6bffb83c559c3c63c9d0049ec50286776b2517c6d6ec2e0f00660d7309 0x1e0 0x1 0x0 0x0 0x0
+// forge-ffi-scripts/withdraw.js 0x03f6600c7331bd61106b32556f2676d57e81cf2b0bf6df800e6fcb4c53f56b009 0x01e0 0x01 0x0 0x0 0x0
 
 async function main() {
   const mimcsponge = await circomlibjs.buildMimcSponge();
@@ -24,6 +25,8 @@ async function main() {
     throw("bet not processed yet for "+bigintToHex(hash_power1)+" starting at "+startindex.toString(16));}
   if(betIndex==0){
     throw("bet not found for "+bigintToHex(hash_power1)+" starting at "+startindex.toString(16));}
+  //console.log(betIndex.toString(16));
+  //console.log(betRand.toString(16));
   const bigindex = BigInt(betIndex);
   const dice = await leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([secret,betRand,bigindex])));
 

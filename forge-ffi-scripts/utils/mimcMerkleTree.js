@@ -49,10 +49,13 @@ function getIndexRand(hashstr,betIndex) {
   const path2 = path.slice(2,4); 
   const path3 = path.slice(4,6);
   const lines = getLines("www/"+path1+"/"+path2+"/"+path3+".csv");
+  //console.log(hashstr);
   for(let i=0;i<lines.length;i++) {
     const [index,skip,hash,myrand] = lines[i].split(',');
     if(hash==hashstr) {
-      const newIndex=betIndex&0xffffff00+parseInt(index,16);
+      //console.log(hash);
+      const newIndex=(betIndex&0xffffff00) + parseInt(index,16);
+      //console.log(newIndex.toString(16),index);
       return [newIndex,hexToBigint(myrand)];
     }
   }
@@ -70,7 +73,7 @@ function getIndexWaiting(hashstr) {
   return [0,0n];
 }
 
-function findBet(inHash,startindex) { // TODO ... look also in waiting list
+function findBet(inHash,startindex) {
   const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();  // add lastLeaf
   const hashstr = bigintToHex(inHash).replace(/^0x0*/, '');
   for(;startindex<nextIndex;startindex+=0xff) {
