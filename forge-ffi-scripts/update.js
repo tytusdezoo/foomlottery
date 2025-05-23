@@ -5,7 +5,7 @@ const path = require("path");
 const snarkjs = require("snarkjs");
 const { ethers } = require("ethers");
 const { hexToBigint, bigintToHex, leBufferToBigint } = require("./utils/bigint.js");
-const { getNewRoot, getWaitingList, readLast, getPath } = require("./utils/mimcMerkleTree.js");
+const { getNewRoot, getWaitingList, readLast, getLastPath } = require("./utils/mimcMerkleTree.js");
 const circomlibjs = require("circomlibjs");
 ////////////////////////////// MAIN ///////////////////////////////////////////
 // ./forge-ffi-scripts/update.js 0x0000000000000000000000000000000000000000000000000000000000000001 0x000000000000000000000000000000009691a9866228f0e680fe3c605b14a165 0x0000000000000000000000000000000000000000000000000000000000000000 0x24d599883f039a5cb553f9ec0e5998d58d8816e823bd556164f72aef0ef7d9c0

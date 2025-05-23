@@ -260,6 +260,7 @@ module.exports = {
   readLast,
   getLeaves,
   getPath,
+  getLastPath,
   getIndexWaiting,
   getIndexRand,
   findBet,
