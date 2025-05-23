@@ -423,7 +423,7 @@ contract FoomLotteryTest is Test {
     }
 
     function notest_overflow() public {
-        console.log('test_adminwithdraw START');
+        console.log('test_overflow START');
         _commit();
         _commit();
         for (uint i=0; i < 250; i++) { // betsMax
@@ -433,7 +433,7 @@ contract FoomLotteryTest is Test {
         _commit();
         _fake_play(252);
         _commit();
-        console.log('test_adminwithdraw OK');
+        console.log('test_overflow OK');
     }
 
     function notest0_investments() public {
