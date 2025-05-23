@@ -174,9 +174,9 @@ contract Lottery {
 
     /**
      * @dev Play in lottery
-     *	There are 3 jackpots: 1024, 65536, 4194304.
+     *	There are 3 jackpots: 1024, 65536, 4194304 (all values in betMin units).
      *  You can win all 3.
-     *  You have the odds below (all values in betMin units):
+     *  You have the odds below:
      *	rewards		1024	65536	4194304
      *	price	power	odds	odds	odds
      *	3	0	1/1024	1/65536	1/4194304
@@ -202,6 +202,9 @@ contract Lottery {
      *	1048578	20	1/1024	1/65536	1/4
      *	2097154	21	1/1024	1/65536	1/2
      *	4194306	22	1/1024	1/65536	1/1
+     *	lottery charges 5% when collecting rewards
+     *	1% goes to the random number generator (or whoever executes _reveal())
+     *	4% goes to investors
      */
     function play(uint _secrethash,uint _power) payable external { // unchecked {
         require(msg.value==0 || address(token)==address(0), "Use playETH to play with ETH");
