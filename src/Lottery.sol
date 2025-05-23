@@ -315,7 +315,9 @@ contract Lottery {
             _invest = reward - balance/2;
             currentBalance += uint128(_invest);
             wallets[_recipient].balance += uint112(_invest);
-            wallets[_recipient].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // wait 1 period for more funds
+            if(D.dividendPeriod < 2 ** 16 - 4 ){
+                wallets[_recipient].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // wait 1 period for more funds
+            }
             reward -= _invest;
         }
         if (reward - _fee > 0) {
@@ -616,7 +618,7 @@ contract Lottery {
         if(_amount==0 || _amount >= wallets[msg.sender].balance){
             _amount=wallets[msg.sender].balance;}
         require(D.dividendPeriod >= wallets[msg.sender].nextWithdrawPeriod, "Wait till the next dividend period");
-        if(D.dividendPeriod < 2 ** 16 - 2 ){
+        if(D.dividendPeriod < 2 ** 16 - 4 ){
             wallets[msg.sender].nextWithdrawPeriod = uint16(D.dividendPeriod + 1); // 1 payout per period
         }
         uint balance = _balance();
@@ -695,7 +697,7 @@ contract Lottery {
         require(D.betsIndex==0, "Open bets");
         commitHash = _closed;
         D.commitBlock = uint64(block.number);
-        D.betsIndex = uint8(betsMax);
+        D.betsLimit = 0;
         emit LogClose(msg.sender);
     }
 
@@ -705,9 +707,10 @@ contract Lottery {
      */
     function reopen() external onlyOwner {
         require(commitHash==_closed, "Lottery open");
+        require(D.nextIndex < 2 ** merkleTreeLevels - 1 - betsMax && D.dividendPeriod < 2 ** 16 - 4, "No more space");
         commitHash = _open;
         D.commitBlock = 0;
-        D.betsIndex = 0;
+        D.betsLimit = 0;
         emit LogReopen(msg.sender);
     }
 
