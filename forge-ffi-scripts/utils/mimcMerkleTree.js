@@ -52,7 +52,8 @@ function getIndexRand(hashstr,betIndex) {
   for(let i=0;i<lines.length;i++) {
     const [index,skip,hash,myrand] = lines[i].split(',');
     if(hash==hashstr) {
-      return [parseInt(index,16),hexToBigint(myrand)];
+      const newIndex=betIndex&0xffffff00+parseInt(index,16);
+      return [newIndex,hexToBigint(myrand)];
     }
   }
   return [0,0n];
@@ -132,11 +133,14 @@ async function getPath(index){
   if(lastindex4<0){
     return [];
   }
+  //console.log(index.toString(16),path1,path2,path3,path4);
+  //console.log(leaves3.map((x)=>bigintToHex(x)));
   const tree4 = await mimicMerkleTree(hexToBigint(zeros[0]),leaves4,8);
   const root4 = tree4.root;
   const mpath4 = tree4.path(parseInt(path4,16));
   // append root4 to leaves3
   leaves3.push(root4);
+  //console.log(leaves3.map((x)=>bigintToHex(x)));
   const tree3 = await mimicMerkleTree(hexToBigint(zeros[1]),leaves3,8);
   const root3 = tree3.root;
   const mpath3 = tree3.path(parseInt(path3,16)); 

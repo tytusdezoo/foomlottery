@@ -67,7 +67,8 @@ contract FoomLotteryTest is Test {
     uint LogHash = uint(keccak256(abi.encodePacked("LogHash(uint256)"))); // commitBlockHash
 
     function test() public { // can not run tests in parralel because of a common www repo
-        notest2_lottery_single_deposit();
+//      notest2_lottery_single_deposit();
+
         // get more FOOM to play with
         uint amount=betMinETH*2**23;
         IWETH(WETH_ADDRESS).deposit{value: amount}();
@@ -78,14 +79,14 @@ contract FoomLotteryTest is Test {
         console.log("swap %d",amount);
         IUniswapV2Router02(router).swapExactTokensForTokens(amount,0,path,address(this),block.timestamp);
         // now test with FOOM available
-        notest2_lottery_single_deposit();
+//      notest2_lottery_single_deposit();
 
-        //notest1_lottery_cancel();
-        //notest9_179_updates();
-        //notest3_lottery_many_deposits();
-        //notest9_updates();
-        //notest5_odds();
-        //notest0_investments();
+//      notest1_lottery_cancel();
+//      notest9_179_updates();
+        notest3_lottery_many_deposits();
+        notest9_updates();
+        notest5_odds();
+        notest0_investments();
     }
 
     function setUp() public {

@@ -8,6 +8,7 @@ const { getPath, findBet } = require("./utils/mimcMerkleTree.js");
 const circomlibjs = require("circomlibjs");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
+// forge-ffi-scripts/withdraw.js 0x3beeeb6bffb83c559c3c63c9d0049ec50286776b2517c6d6ec2e0f00660d7309 0x1e0 0x1 0x0 0x0 0x0
 
 async function main() {
   const mimcsponge = await circomlibjs.buildMimcSponge();
