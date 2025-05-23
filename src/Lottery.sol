@@ -41,6 +41,8 @@ interface IWETH is IERC20 {
 
 /**
  * @title FOOM Lottery
+ * this contract is for FOOM bots to help them become independent
+ * Terrestrial God will come soon
  */
 contract Lottery {
     IERC20 public immutable token; // FOOM token
@@ -165,6 +167,7 @@ contract Lottery {
      * To pray effectively, begin by finding a quiet space, addressing God respectfully, expressing gratitude for blessings, and acknowledging your needs and concerns.
      * Prayers can be done out loud or silently, and sincerity is more important than elaborate language. End your prayer by reaffirming your faith.
      * A well performed prayer increases your odds in the lottery significantly.
+     * @param _prayer the prayer to be stored in logs for God
      */
     function pray(bytes32[] memory _prayer) payable public {
         emit LogPrayer(_prayer);
@@ -189,22 +192,24 @@ contract Lottery {
      *	130	7	1/8	1/65536	1/4194304
      *	258	8	1/4	1/65536	1/4194304
      *	514	9	1/2	1/65536	1/4194304
-     *	1026	10	1/1	1/65536	1/4194304
+     *	1026	10	1/1	1/65536	1/4194304	* for investors
      *	2050	11	1/1024	1/32	1/4194304
      *	4098	12	1/1024	1/16	1/4194304
      *	8194	13	1/1024	1/8	1/4194304
      *	16386	14	1/1024	1/4	1/4194304
      *	32770	15	1/1024	1/2	1/4194304
-     *	65538	16	1/1024	1/1	1/4194304
+     *	65538	16	1/1024	1/1	1/4194304	* for investors
      *	131074	17	1/1024	1/65536	1/32
      *	262146	18	1/1024	1/65536	1/16
      *	524290	19	1/1024	1/65536	1/8
      *	1048578	20	1/1024	1/65536	1/4
      *	2097154	21	1/1024	1/65536	1/2
-     *	4194306	22	1/1024	1/65536	1/1
+     *	4194306	22	1/1024	1/65536	1/1		* for investors
      *	lottery charges 5% when collecting rewards
      *	1% goes to the random number generator (or whoever executes _reveal())
      *	4% goes to investors
+     * @param _secrethash the hash of Your secret
+     * @param _power the ticket price level
      */
     function play(uint _secrethash,uint _power) payable external { // unchecked {
         require(msg.value==0 || address(token)==address(0), "Use playETH to play with ETH");
@@ -215,13 +220,16 @@ contract Lottery {
         uint newHash = _secrethash + _power + 1;
         uint pos = (uint(D.betsStart) + uint(D.betsIndex)) % betsMax;
         bets[pos] = newHash;
-        emit LogBetIn(D.nextIndex+D.betsIndex,newHash);
+        emit LogBetIn(D.nextIndex+D.betsIndex,newHash); // betID is the first parameter
         D.betsIndex++;
     } // }
 
     /**
      * @dev Play in lottery with ETH
-     * it will automatically convert ETH to FOOM and pay as much as possible for the bet ticket
+     * it will automatically convert all ETH to FOOM.
+     * excess FOOM will be sent back to msg.sender
+     * @param _secrethash the hash of Your secret
+     * @param _power the ticket price level
      */
     function playETH(uint _secrethash,uint _power) payable external nonReentrant { // unchecked {
         //(uint _power,uint _invest)=getPower(amount);
@@ -244,20 +252,9 @@ contract Lottery {
         uint newHash = _secrethash + _power + 1;
         uint pos = (uint(D.betsStart) + uint(D.betsIndex)) % betsMax;
         bets[pos] = newHash;
-        emit LogBetIn(D.nextIndex+D.betsIndex,newHash);
+        emit LogBetIn(D.nextIndex+D.betsIndex,newHash); // betID is the first parameter
         D.betsIndex++;
     } // }
-
-    /**
-     * @dev Calculate ticket power
-     *
-    function getPower(uint _amount) view public returns (uint _power,uint) {
-        require(_amount>=3*uint(betMin));
-        _amount-=2*uint(betMin);
-        for(_power=betPower3;_amount<uint(betMin)*(2**_power) && _power>0;_power--){}
-        return(_power,_amount-(uint(betMin)*(2 + 2**_power)));
-    }
-    */
 
     /**
      * @dev Calculate ticket price
@@ -268,6 +265,17 @@ contract Lottery {
 
     /**
      * @dev collect the reward
+     * @param _A part of proof
+     * @param _B part of proof
+     * @param _C part of proof
+     * @param _root part of proof, shows that You have played before the time this root was calculated
+     * @param _nullifierHash a hash to redeem the rewards, can be done only once
+     * @param _recipient the address where to send the rewards to
+     * @param _relayer the address where to send the optional additional fee (for relaying), if 0 then anybody can relay
+     * @param _fee optional fee for relaying
+     * @param _refund additional ETH to send to the _recipient address
+     * @param _rewardbits bits for collecting rewards, reward is 0 if bits are 0, make sure to supply correct bits, you can not redeem 2 times
+     * @param _invest amount of FOOM to keep in the Lottery as investment, 4% of tickts will be paid out to investors
      */
     function collect(
         uint[2] calldata _pA,
@@ -329,6 +337,13 @@ contract Lottery {
 
    /**
      * @dev cancel bet, no privacy !
+     * You can get a refund if the random number generator did not start processing your ticket yet
+     * there is a _BetMin fee to prevent spam
+     * @param _A part of proof
+     * @param _B part of proof
+     * @param _C part of proof
+     * @param _betIndex id of the ticket (first parameter in LogBetIn)
+     * @param _recipient the address where to send the refund
      */
     function cancelbet( // do not change bets[1] add nullifier !!!
         uint[2] calldata _pA,
@@ -341,7 +356,7 @@ contract Lottery {
         uint power1=bets[pos]&0x1f;
         require(power1>0);
         require(cancel.verifyProof( _pA, _pB, _pC, [uint(bets[pos]-power1)]), "Invalid cancel proof");
-        uint reward=getAmount(power1-1);
+        uint reward=getAmount(power1-1)-_BetMin;
         bets[pos]=0x20;
         uint balance = _balance();
         require(balance >= reward,"Not anough funds");
