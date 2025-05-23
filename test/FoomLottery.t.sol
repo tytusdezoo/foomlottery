@@ -68,7 +68,6 @@ contract FoomLotteryTest is Test {
 
     function test() public { // can not run tests in parralel because of a common www repo
         notest_overflow();
-        return;
         notest_adminwithdraw();
         notest2_lottery_single_deposit();
         // get more FOOM to play with
@@ -82,7 +81,6 @@ contract FoomLotteryTest is Test {
         IUniswapV2Router02(router).swapExactTokensForTokens(amount,0,path,address(this),block.timestamp);
         // now test with FOOM available
         notest2_lottery_single_deposit();
-
         notest1_lottery_cancel();
         notest9_179_updates();
         notest3_lottery_many_deposits();
@@ -419,6 +417,7 @@ contract FoomLotteryTest is Test {
         view_status();
         _withdraw(secret_power,startIndex);
         view_status();
+        lottery.reopen();
         console.log('test_adminwithdraw OK');
     }
 

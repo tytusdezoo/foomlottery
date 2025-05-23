@@ -710,7 +710,7 @@ contract Lottery {
         require(D.nextIndex < 2 ** merkleTreeLevels - 1 - betsMax && D.dividendPeriod < 2 ** 16 - 4, "No more space");
         commitHash = _open;
         D.commitBlock = 0;
-        D.betsLimit = 0;
+        D.betsLimit = uint8(betsMax);
         emit LogReopen(msg.sender);
     }
 
