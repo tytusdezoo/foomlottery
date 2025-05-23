@@ -84,7 +84,7 @@ contract FoomLotteryTest is Test {
         //notest9_179_updates();
         //notest3_lottery_many_deposits();
         //notest9_updates();
-        //notest5_ods();
+        //notest5_odds();
         //notest0_investments();
     }
 
@@ -517,7 +517,7 @@ contract FoomLotteryTest is Test {
         _commit();
     }
 
-    function notest5_ods() public {
+    function notest5_odds() public {
         _getLogs();
         uint[testsize][3] memory secret; // reverse order of dimensions in solidity :-)
         uint[testsize][3] memory startIndex;

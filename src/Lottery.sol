@@ -173,6 +173,50 @@ contract Lottery {
 /* lottery functions */
 
     /**
+     * @dev Play in lottery
+     *	There are 3 jackpots: 1024, 65536, 4194304.
+     *  You can win all 3.
+     *  You have the odds below (all values in betMin units):
+     *	rewards		1024	65536	4194304
+     *	price	power	odds	odds	odds
+     *	3	0	1/1024	1/65536	1/4194304
+     *	4	1	1/512	1/65536	1/4194304
+     *	6	2	1/256	1/65536	1/4194304
+     *	10	3	1/128	1/65536	1/4194304
+     *	18	4	1/64	1/65536	1/4194304
+     *	34	5	1/32	1/65536	1/4194304
+     *	66	6	1/16	1/65536	1/4194304
+     *	130	7	1/8	1/65536	1/4194304
+     *	258	8	1/4	1/65536	1/4194304
+     *	514	9	1/2	1/65536	1/4194304
+     *	1026	10	1/1	1/65536	1/4194304
+     *	2050	11	1/1024	1/32	1/4194304
+     *	4098	12	1/1024	1/16	1/4194304
+     *	8194	13	1/1024	1/8	1/4194304
+     *	16386	14	1/1024	1/4	1/4194304
+     *	32770	15	1/1024	1/2	1/4194304
+     *	65538	16	1/1024	1/1	1/4194304
+     *	131074	17	1/1024	1/65536	1/32
+     *	262146	18	1/1024	1/65536	1/16
+     *	524290	19	1/1024	1/65536	1/8
+     *	1048578	20	1/1024	1/65536	1/4
+     *	2097154	21	1/1024	1/65536	1/2
+     *	4194306	22	1/1024	1/65536	1/1
+     */
+    function play(uint _secrethash,uint _power) payable external { // unchecked {
+        require(msg.value==0 || address(token)==address(0), "Use playETH to play with ETH");
+        require(D.nextIndex < 2 ** merkleTreeLevels - 1 - betsMax, "No more bets allowed");
+        require(0<_secrethash && _secrethash < FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
+        require(_power<=betPower3, "Invalid bet amount");
+        _deposit(getAmount(_power));
+        uint newHash = _secrethash + _power + 1;
+        uint pos = (uint(D.betsStart) + uint(D.betsIndex)) % betsMax;
+        bets[pos] = newHash;
+        emit LogBetIn(D.nextIndex+D.betsIndex,newHash);
+        D.betsIndex++;
+    } // }
+
+    /**
      * @dev Play in lottery with ETH
      * it will automatically convert ETH to FOOM and pay as much as possible for the bet ticket
      */
@@ -194,22 +238,6 @@ contract Lottery {
         uint refund=amount-needed;
         if(refund>0){
             _withdraw(msg.sender,refund);}
-        uint newHash = _secrethash + _power + 1;
-        uint pos = (uint(D.betsStart) + uint(D.betsIndex)) % betsMax;
-        bets[pos] = newHash;
-        emit LogBetIn(D.nextIndex+D.betsIndex,newHash);
-        D.betsIndex++;
-    } // }
-
-    /**
-     * @dev Play in lottery
-     */
-    function play(uint _secrethash,uint _power) payable external { // unchecked {
-        require(msg.value==0 || address(token)==address(0), "Use playETH to play with ETH");
-        require(D.nextIndex < 2 ** merkleTreeLevels - 1 - betsMax, "No more bets allowed");
-        require(0<_secrethash && _secrethash < FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
-        require(_power<=betPower3, "Invalid bet amount");
-        _deposit(getAmount(_power));
         uint newHash = _secrethash + _power + 1;
         uint pos = (uint(D.betsStart) + uint(D.betsIndex)) % betsMax;
         bets[pos] = newHash;
