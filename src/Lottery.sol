@@ -267,9 +267,9 @@ contract Lottery {
 
     /**
      * @dev collect the reward
-     * @param _A part of proof
-     * @param _B part of proof
-     * @param _C part of proof
+     * @param _pA part of proof
+     * @param _pB part of proof
+     * @param _pC part of proof
      * @param _root part of proof, shows that You have played before the time this root was calculated
      * @param _nullifierHash a hash to redeem the rewards, can be done only once
      * @param _recipient the address where to send the rewards to
@@ -343,9 +343,9 @@ contract Lottery {
      * @dev cancel bet, no privacy !
      * You can get a refund if the random number generator did not start processing your ticket yet
      * there is a _BetMin fee to prevent spam
-     * @param _A part of proof
-     * @param _B part of proof
-     * @param _C part of proof
+     * @param _pA part of proof
+     * @param _pB part of proof
+     * @param _pC part of proof
      * @param _betIndex id of the ticket (first parameter in LogBetIn)
      * @param _recipient the address where to send the refund
      */
@@ -360,7 +360,7 @@ contract Lottery {
         uint power1=bets[pos]&0x1f;
         require(power1>0);
         require(cancel.verifyProof( _pA, _pB, _pC, [uint(bets[pos]-power1)]), "Invalid cancel proof");
-        uint reward=getAmount(power1-1)-_BetMin;
+        uint reward=getAmount(power1-1)-_betMin;
         bets[pos]=0x20;
         uint balance = _balance();
         require(balance >= reward,"Not anough funds");
