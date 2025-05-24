@@ -61,7 +61,7 @@ contract FoomLottery {
     string public constant prayer = "Praise the Terrestrial God";
     address private constant WETH_ADDRESS = address(0x4200000000000000000000000000000000000006);
     uint private constant FIELD_SIZE = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
-    uint private constant merkleTreeLevels = 32 ; // number of Merkle Tree levels
+    uint private constant merkleTreeLevels = 32 ; // number of Merkle Tree levels, should be 40 in the future
     uint public constant periodBlocks = 16384 ; // number of blocks in a period
     uint public constant betPower1 = 10; // power of the first bet = 1024
     uint public constant betPower2 = 16; // power of the second bet = 65536
@@ -78,7 +78,7 @@ contract FoomLottery {
     struct Data {
         uint64 periodStartBlock; // current dividend period started there
         uint64 commitBlock; // generator provided the random number secret in this block and will reaveal it soon
-        uint32 nextIndex; // id of the next ticket
+        uint32 nextIndex; // id of the next ticket, could be uint40 in the future
         uint16 dividendPeriod; // current dividend period
         uint8 betsLimit; // Limit bets when closing the lottery
         uint8 betsStart; // index of start of the queue of bets in buffer
@@ -235,6 +235,7 @@ contract FoomLottery {
         require(msg.value>0, "Use play to play with FOOM");
         require(D.betsIndex<D.betsLimit, "No more bets allowed in playETH");
         require(0<_secrethash && _secrethash<FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
+        uint needed = getAmount(_power);
         IWETH(WETH_ADDRESS).deposit{value: msg.value}();
         IERC20(WETH_ADDRESS).approve(address(router), msg.value);
         address[] memory path = new address[](2);
@@ -242,7 +243,6 @@ contract FoomLottery {
         path[1] = address(token);
         uint[] memory amounts = router.swapExactTokensForTokens(msg.value,0,path,address(this),block.timestamp);
         uint amount = amounts[1];
-        uint needed = getAmount(_power);
         require(amount>=needed,"not enough FOOM received");
         uint refund=amount-needed;
         if(refund>0){
@@ -357,7 +357,7 @@ contract FoomLottery {
         require(D.nextIndex+D.commitIndex<=_betIndex && _betIndex<D.nextIndex+D.betsIndex, "Bet probably processed");
         uint pos = (uint(D.betsStart)+(_betIndex-D.nextIndex)) % betsMax;
         uint power1=bets[pos]&0x1f;
-        require(power1>0);
+        require(power1>0,"Bet already canceled");
         require(cancel.verifyProof( _pA, _pB, _pC, [uint(bets[pos]-power1)]), "Invalid cancel proof");
         uint reward=getAmount(power1-1)-betMin;
         bets[pos]=0x20;
@@ -377,7 +377,7 @@ contract FoomLottery {
      */
     function commit(uint _commitHash,uint _maxUpdate) external onlyGenerator {
         require(D.betsIndex >0 , "No bets");
-        require(_commitHash > _closed, "Commit hash already set");
+        require(_commitHash > _closed, "Bad commit hash");
         require(commitHash == _open, "Commit hash already set");
         require(D.commitBlock == 0, "Commit block already set");
         require(_maxUpdate<=maxUpdate, "Commit size too large");
@@ -687,7 +687,7 @@ contract FoomLottery {
      * to reincarnate the lottery the price of the tickets in the failed commit group must be paid again
      * after this they can be processed again with a new random number
      */
-    function resetcommit() payable external {
+    function resetcommit() payable external onlyOwner {
         uint betsum=betSum();
         _deposit(betsum);
         D.commitIndex = 0;
@@ -725,6 +725,7 @@ contract FoomLottery {
     /**
      * @dev withdraw the remaining balance long after closing the lottery
      * withdraw remaining funds 2 years after closing the lottery
+     * this enables to continue the lottery with a larger tree that contains the old one
      */
     function adminwithdraw() external onlyOwner {
         require(commitHash==_closed, "Lottery open");
