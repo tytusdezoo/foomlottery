@@ -70,7 +70,6 @@ contract FoomLotteryTest is Test {
     uint LogHash = uint(keccak256(abi.encodePacked("LogHash(uint256)"))); // commitBlockHash
 
     function test() public { // can not run tests in parralel because of a common www repo
-        check_pray();
         check_changes();
         check_funds();
         check_investments(); // with ETH
@@ -503,6 +502,13 @@ contract FoomLotteryTest is Test {
         lottery.resetcommit();
         console.log("commit");
         commit();
+        fakeplayETH(1);
+        vm.prank(ag);
+        lottery.commit(3,1);
+        blocknumber+=4*60*24*365+1;
+        vm.roll(++blocknumber);
+        lottery.resetcommit();
+        commit();
         console.log('check_reset OK');
     }
 
@@ -756,6 +762,7 @@ contract FoomLotteryTest is Test {
         uint vol=2*(2**10+2)+2*(2**16+2)+3;
         console.log("\nvol: %d, lot: %d, fee: %d/10000",vol,ballot,ballot*10000/vol);
         console.log('check_dividends OK');
+        showGas=0;
     }
 
     function check_adminwithdraw() public {
@@ -777,7 +784,10 @@ contract FoomLotteryTest is Test {
         vm.roll(++blocknumber);
         console.log(blocknumber,"blocknumber");
         view_status();
+        console.log(address(lottery).balance,"ETH balance");
+        console.log(IWETH(FOOM_ADDRESS).balanceOf(address(lottery)),"FOOM balance");
         lottery.adminwithdraw();
+        console.log("try reopen");
         lottery.reopen();
         view_status();
         (uint secret_power2,uint startIndex2) = play(16);

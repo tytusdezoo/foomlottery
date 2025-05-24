@@ -686,10 +686,12 @@ contract FoomLottery {
      * @dev deposit security deposit to reset commit
      * to reincarnate the lottery the price of the tickets in the failed commit group must be paid again
      * after this they can be processed again with a new random number
+     * alternatively the admin can wait 1 year and not cover the tickets
      */
     function resetcommit() payable external onlyOwner {
         uint betsum=betSum();
-        _deposit(betsum);
+        if(block.number < D.commitBlock + 4*60*24*365){ // Admin can reset the secret after 1 year
+            _deposit(betsum);}
         D.commitIndex = 0;
         D.commitBlock = 0;
         commitHash = _open;
@@ -731,7 +733,9 @@ contract FoomLottery {
         require(commitHash==_closed, "Lottery open");
         require(block.number > D.commitBlock + 4*60*24*365*2, "Not enough blocks passed"); // wait 2 years (in Ethereum)
         if(address(this).balance > 0){
-            payable(msg.sender).transfer(address(this).balance);
+            (bool ok,)=payable(msg.sender).call{value: address(this).balance}("");
+            if(!ok){ // this will ignore the warning
+                emit LogWithdraw(address(0));}
         }
         if(token.balanceOf(address(this)) > 0){
             _withdraw(msg.sender,uint(token.balanceOf(address(this))));
