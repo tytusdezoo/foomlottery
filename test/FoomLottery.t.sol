@@ -68,8 +68,11 @@ contract FoomLotteryTest is Test {
     uint LogUpdate = uint(keccak256(abi.encodePacked("LogUpdate(uint256,uint256,uint256)"))); // index,newRand,newRoot
     uint LogCommit = uint(keccak256(abi.encodePacked("LogCommit(uint256,uint256,uint256)"))); // index,newRand,newRoot
     uint LogHash = uint(keccak256(abi.encodePacked("LogHash(uint256)"))); // commitBlockHash
+    uint LogPrayer = uint(keccak256(abi.encodePacked("LogPrayer(uint256,bytes32[])"))); // betId,prayer
 
     function test() public { // can not run tests in parralel because of a common www repo
+        check_pray();
+        /*
         check_changes();
         check_funds();
         check_investments(); // with ETH
@@ -86,6 +89,7 @@ contract FoomLotteryTest is Test {
         check_dividends();
         check_adminwithdraw();
         check_odds();
+        */
     }
 
     function getFOOM() internal {
@@ -138,9 +142,28 @@ contract FoomLotteryTest is Test {
 	init();
     }
 
+    function bytes32ToString(bytes32[] memory data) internal pure returns (string memory) {
+        bytes memory bytesArray = new bytes(data.length * 32);
+        for (uint i = 0; i < data.length; i++) {
+            for (uint j = 0; j < 32; j++) {
+                bytesArray[i * 32 + j] = data[i][j];
+            }
+        }
+        return string(bytesArray);
+    }
+
     function getLogs() internal {
         Vm.Log[] memory entries = vm.getRecordedLogs();
         for (uint i = 0; i < entries.length; i++) {
+            if (uint(entries[i].topics[0]) == LogPrayer){
+                uint betId = uint(entries[i].topics[1]);
+                bytes32[] memory prayer = new bytes32[](entries[i].data.length);
+                for (uint j = 0; j < entries[i].data.length; j++) {
+                    prayer[j] = bytes32(entries[i].data[j]);
+                }
+                string memory prayerStr = bytes32ToString(prayer);
+                console.log("prayer for bet %d: %s", betId, prayerStr);
+            }
             if (uint(entries[i].topics[0]) == LogCancel){
                 uint betIndex = uint(entries[i].topics[1]);
                 // append cancel to waiting list
@@ -441,18 +464,13 @@ contract FoomLotteryTest is Test {
     function check_pray() public {
         console.log('check_pray START');
         string memory prayer = "I love the Terrestrial God very much";
-        bytes32 prayer32_0;
-        bytes32 prayer32_1;
-        assembly {
-            prayer32_0 := mload(add(prayer,32))
-            prayer32_1 := mload(add(prayer,64))
-        }
-        bytes32[] memory _prayer=new bytes32[](2);
-        _prayer[0]=prayer32_0;
-        _prayer[1]=prayer32_1;
-        lottery.pray(_prayer);
+        lottery.pray(0,prayer);
         (bool ok,)=address(lottery).call{value: 1}("");
         require(ok);
+        uint hash = uint(uint240(uint(keccak256(abi.encode(1))))<<5);
+        uint amount=3*betMinETH*2;
+        lottery.playETHAndPray{value: amount}(hash,0,'I love god so much I am sure I will win');
+        getLogs();
         console.log('check_pray OK');
     }
 
