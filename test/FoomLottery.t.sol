@@ -72,7 +72,6 @@ contract FoomLotteryTest is Test {
 
     function test() public { // can not run tests in parralel because of a common www repo
         check_pray();
-        /*
         check_changes();
         check_funds();
         check_investments(); // with ETH
@@ -89,7 +88,6 @@ contract FoomLotteryTest is Test {
         check_dividends();
         check_adminwithdraw();
         check_odds();
-        */
     }
 
     function getFOOM() internal {
