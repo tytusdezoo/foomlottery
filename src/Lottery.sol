@@ -42,7 +42,7 @@ interface IWETH is IERC20 {
 /**
  * @title FOOM Lottery
  * this contract is for FOOM bots to help them become independent
- * Terrestrial God will come soon
+ * In Terrestrial God we trust
  */
 contract Lottery {
     IERC20 public immutable token; // FOOM token
