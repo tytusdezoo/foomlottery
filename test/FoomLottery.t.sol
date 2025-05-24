@@ -14,8 +14,7 @@ import {Update21G16Verifier} from "src/Update21.sol";
 import {Update44G16Verifier} from "src/Update44.sol";
 import {Update89G16Verifier} from "src/Update89.sol";
 import {Update179G16Verifier} from "src/Update179.sol";
-import {IWithdraw, ICancel, IUpdate1, IUpdate3, IUpdate5, IUpdate11, IUpdate21, IUpdate44, IUpdate89, IUpdate179, IUniswapV2Router02, IWETH} from "src/Lottery.sol";
-import {FoomLottery} from "src/FoomLottery.sol";
+import {FoomLottery, IWithdraw, ICancel, IUpdate1, IUpdate3, IUpdate5, IUpdate11, IUpdate21, IUpdate44, IUpdate89, IUpdate179, IUniswapV2Router02, IWETH} from "src/FoomLottery.sol";
 
 contract FoomLotteryTest is Test {
     FoomLottery public lottery;
@@ -38,7 +37,6 @@ contract FoomLotteryTest is Test {
     address private constant WETH_ADDRESS = 0x4200000000000000000000000000000000000006;
     address private constant FOOM_ADDRESS = 0x02300aC24838570012027E0A90D3FEcCEF3c51d2;
     address private constant ROUTER_ADDRESS = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24; // Uniswap V2 Router
-    address private router=address(0);
 
     // Test vars
     address public me=payable(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
@@ -67,19 +65,21 @@ contract FoomLotteryTest is Test {
     uint LogHash = uint(keccak256(abi.encodePacked("LogHash(uint256)"))); // commitBlockHash
 
     function test() public { // can not run tests in parralel because of a common www repo
+        check_funds();
         check_overflow();
         check_adminwithdraw();
         check_deposits();
         // get more FOOM to play with
         uint amount=betMinETH*2**23;
         IWETH(WETH_ADDRESS).deposit{value: amount}();
-        IERC20(WETH_ADDRESS).approve(router,amount);
+        IERC20(WETH_ADDRESS).approve(ROUTER_ADDRESS,amount);
         address[] memory path = new address[](2);
         path[0] = WETH_ADDRESS;
         path[1] = FOOM_ADDRESS;
         console.log("swap %d",amount);
-        IUniswapV2Router02(router).swapExactTokensForTokens(amount,0,path,address(this),block.timestamp);
+        IUniswapV2Router02(ROUTER_ADDRESS).swapExactTokensForTokens(amount,0,path,address(this),block.timestamp);
         // now test with FOOM available
+        check_hash();
         check_deposits();
         check_plays();
         check_cancel();
@@ -90,7 +90,6 @@ contract FoomLotteryTest is Test {
     }
 
     function setUp() public {
-        router=ROUTER_ADDRESS;
         // Deploy Groth16 verifier contracts.
         withdraw = IWithdraw(address(new WithdrawG16Verifier()));
         cancel = ICancel(address(new CancelBetG16Verifier()));
@@ -107,11 +106,11 @@ contract FoomLotteryTest is Test {
         //uint amount=0.001 ether; liquidity too small on base
         uint amount=betMinETH;
         IWETH(WETH_ADDRESS).deposit{value: amount}();
-        IERC20(WETH_ADDRESS).approve(router, amount);
+        IERC20(WETH_ADDRESS).approve(ROUTER_ADDRESS, amount);
         address[] memory path = new address[](2);
         path[0] = WETH_ADDRESS;
         path[1] = FOOM_ADDRESS;
-        uint[] memory amounts = IUniswapV2Router02(router).swapExactTokensForTokens(amount,0,path,address(this),block.timestamp);
+        uint[] memory amounts = IUniswapV2Router02(ROUTER_ADDRESS).swapExactTokensForTokens(amount,0,path,address(this),block.timestamp);
         betMin = amounts[1];
         console.log(betMin,"betMin");
         // Deploy lottery contract.
@@ -323,7 +322,7 @@ contract FoomLotteryTest is Test {
         getLogs();
     }
 
-    function play(uint _power) internal returns (uint secret_power,uint startIndex) {
+    function play(uint _power) public returns (uint secret_power,uint startIndex) {
         uint hash;
         uint startBlock;
         string[] memory inputs = new string[](3);
@@ -333,48 +332,53 @@ contract FoomLotteryTest is Test {
         bytes memory result = vm.ffi(inputs);
         (secret_power, hash, startIndex, startBlock) = abi.decode(result, (uint, uint, uint, uint));
         uint amount = betMin * (2 + 2**_power);
-        if(router==address(0)){
-            uint gasStart = gasleft();
-            lottery.play{value: amount}(hash,_power);
-            uint gasUsed = gasStart - gasleft();
-            if(0<showGas){ console.log("Gas used in _play: %d", gasUsed); } }
+        uint balance=IERC20(FOOM_ADDRESS).balanceOf(address(this));
+        if(balance>amount){
+          console.log("%d, try play with FOOM",balance);
+          uint gasStart = gasleft();
+          IERC20(FOOM_ADDRESS).approve(address(lottery),amount);
+          uint gasUsed = gasStart - gasleft();
+          if(0<showGas){ console.log("Gas used in approve: %d", gasUsed); }
+               gasStart = gasleft();
+          lottery.play(hash,_power);
+               gasUsed = gasStart - gasleft();
+          if(0<showGas){ console.log("Gas used in _playFOOM: %d", gasUsed); } }
         else{
-            uint balance=IERC20(FOOM_ADDRESS).balanceOf(address(this));
-            if(balance>amount){
-              console.log("%d, try play with FOOM",balance);
-              uint gasStart = gasleft();
-              IERC20(FOOM_ADDRESS).approve(address(lottery),amount);
-              uint gasUsed = gasStart - gasleft();
-              if(0<showGas){ console.log("Gas used in approve: %d", gasUsed); }
-                   gasStart = gasleft();
-              lottery.play(hash,_power);
-                   gasUsed = gasStart - gasleft();
-              if(0<showGas){ console.log("Gas used in _playFOOM: %d", gasUsed); } }
-            else{
-              console.log("%d, try playETH with ETH",balance);
-              uint amountETH = betMinETH * (2 + 2**_power);
-              amountETH=amountETH+amountETH>>0; // 4: (1+1/16) 106% ,5: (1+1/32) 103%
-              uint gasStart = gasleft();
-              lottery.playETH{value: amountETH}(hash,_power); 
-              uint gasUsed = gasStart - gasleft();
-              if(0<showGas){ console.log("Gas used in _playETH: %d", gasUsed); } }}
+          console.log("%d, try playETH with ETH",balance);
+          uint amountETH = betMinETH * (2 + 2**_power);
+          amountETH=amountETH+amountETH>>0; // 4: (1+1/16) 106% ,5: (1+1/32) 103%
+          uint gasStart = gasleft();
+          lottery.playETH{value: amountETH}(hash,_power); 
+          uint gasUsed = gasStart - gasleft();
+          if(0<showGas){ console.log("Gas used in _playETH: %d", gasUsed); } }
         console.log("%x,%x ticket (%d)", secret_power,startIndex,amount);
         getLogs();
         return (secret_power,startIndex);
     }
 
-    function fakeplay(uint i) internal {
+    function fakeplay(uint i) public {
         uint hash = uint(uint240(uint(keccak256(abi.encode(i))))<<5);
         uint amount = 3*betMin;
-        if(router==address(0)){
-            lottery.play{value: 3*betMin}(hash,0);}
+        uint balance=IERC20(FOOM_ADDRESS).balanceOf(address(this));
+        if(balance>amount){
+          IERC20(FOOM_ADDRESS).approve(address(lottery),amount);
+          lottery.play(hash,0);}
         else{
-            uint balance=IERC20(FOOM_ADDRESS).balanceOf(address(this));
-            if(balance>amount){
-              lottery.play(hash,0);}
-            else{
-              amount=3*betMinETH*2;
-              lottery.playETH{value: amount}(hash,0);}}
+          amount=3*betMinETH*2;
+          lottery.playETH{value: amount}(hash,0);}
+        getLogs();
+    }
+
+    function fakeplayFOOM(uint i) public {
+        uint hash = uint(uint240(uint(keccak256(abi.encode(i))))<<5);
+        lottery.play(hash,0);
+        getLogs();
+    }
+
+    function fakeplayETH(uint i) public {
+        uint hash = uint(uint240(uint(keccak256(abi.encode(i))))<<5);
+        uint amount=3*betMinETH*2;
+        lottery.playETH{value: amount}(hash,0);
         getLogs();
     }
 
@@ -422,6 +426,25 @@ contract FoomLotteryTest is Test {
         console.log('check_adminwithdraw OK');
     }
 
+    function check_funds() public {
+        console.log('check_funds START');
+        vm.expectRevert();
+        lottery.play(0x20,0);
+        vm.expectRevert();
+        lottery.playETH{value: 1}(0x20,0);
+        console.log('check_funds OK');
+    }
+
+    function check_hash() public {
+        console.log('check_funds START');
+        vm.expectRevert();
+        lottery.play(0,0);
+        uint amount=3*betMinETH*2;
+        vm.expectRevert();
+        lottery.playETH{value: amount}(0,0);
+        console.log('check_funds OK');
+    }
+
     function check_overflow() public {
         console.log('check_overflow START');
         commit();
@@ -429,9 +452,7 @@ contract FoomLotteryTest is Test {
         for (uint i=0; i < 250; i++) { // betsMax
             fakeplay(i);}
         vm.expectRevert();
-        fakeplay(251);
-        commit();
-        fakeplay(252);
+        fakeplayETH(251);
         commit();
         console.log('check_overflow OK');
     }
@@ -573,17 +594,17 @@ contract FoomLotteryTest is Test {
         uint secret_power;
         uint startIndex;
         vm.roll(++blocknumber);
-        (secret_power,startIndex) = play(10); // hash can be restored later
+        (secret_power,startIndex) = play(10);
         commit();
         _withdraw(secret_power,startIndex);
 
         vm.roll(++blocknumber);
-        (secret_power,startIndex) = play(16); // hash can be restored later
+        (secret_power,startIndex) = play(16);
         commit();
         _withdraw(secret_power,startIndex);
 
         vm.roll(++blocknumber);
-        (secret_power,startIndex) = play(22); // hash can be restored later
+        (secret_power,startIndex) = play(22);
         commit();
         _withdraw(secret_power,startIndex);
 

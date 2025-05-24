@@ -1,11 +1,9 @@
 const circomlibjs = require("circomlibjs");
 const { MerkleTree } = require("fixed-merkle-tree");
-
 const { leBufferToBigint, hexToBigint, bigintToHex } = require("./bigint.js");
 const { openSync, readFileSync, closeSync, existsSync } = require("fs");
 const sprintfjs = require('sprintf-js');
 const zlib = require('zlib');
-// Constants from MerkleTreeWithHistory.sol
 const MERKLE_TREE_HEIGHT = 32;
 
 const zeros = [
@@ -76,9 +74,9 @@ function getIndexWaiting(hashstr) {
 }
 
 function findBet(inHash,startindex) {
-  const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();  // add lastLeaf
+  const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();
   const hashstr = bigintToHex(inHash).replace(/^0x0*/, '');
-  for(;startindex<nextIndex;startindex+=0xff) {
+  for(;(startindex&0xFFFFFF00)<nextIndex;startindex+=0xff) {
     [betIndex,betRand] = getIndexRand(hashstr,startindex);
     if(betIndex>0) {
       return [betIndex,betRand,nextIndex];
@@ -257,7 +255,6 @@ async function getNewRoot(nextIndex,newLeaves){
 
 async function mimicMerkleTree(zero,leaves = [],hight=MERKLE_TREE_HEIGHT) {
   const mimcsponge = await circomlibjs.buildMimcSponge();
-  //const leaf = (zero==0n)?16660660614175348086322821347366010925591495133565739687589833680199500683712n:zero;
   const mimcspongeMultiHash = (left, right) =>
     leBufferToBigint(
       mimcsponge.F.fromMontgomery(mimcsponge.multiHash([left, right]))
