@@ -40,6 +40,7 @@ contract FoomLotteryTest is Test {
 
     // Test vars
     address public me;
+    address public owner;
     address public a1=payable(address(0x01));
     address public a2=payable(address(0x02));
     address public ag=payable(address(0x03));
@@ -51,6 +52,9 @@ contract FoomLotteryTest is Test {
     uint public invest = 0;
     uint public showGas = 1;
     uint constant testsize=5; // test size
+    uint testwithdrawrevert=0;
+    uint testcommitrevert=0;
+    uint testcancelrevert=0;
 
     uint public          betMinETH = 1; //0.001 ether;
     uint public          betMin;
@@ -125,7 +129,12 @@ contract FoomLotteryTest is Test {
         // Deploy lottery contract.
         vm.roll(++blocknumber);
     	vm.recordLogs();
+        console.log(msg.sender,"sender");
         lottery = new FoomLottery(iwithdraw, icancel, iupdate1, iupdate3, iupdate5, iupdate11, iupdate21, iupdate44, iupdate89, iupdate179, IERC20(FOOM_ADDRESS), IUniswapV2Router02(ROUTER_ADDRESS), betMin);
+        owner=lottery.owner();
+        //console.log(lottery.owner(),"first owner");
+        //console.log("owner balance %d",lottery.walletBalanceOf(lottery.owner()));
+        //console.log("my    balance %d",lottery.walletBalanceOf(msg.sender));
         lottery.changeGenerator(ag);
 	init();
     }
@@ -192,9 +201,14 @@ contract FoomLotteryTest is Test {
         if(0<showGas){ console.log("Gas used in cancel.verifyProof: %d", gasUsed); }
         gasStart = gasleft();
         console.log(index,"cancel index");
+        if(testcancelrevert>1){
+            vm.expectRevert();}
         lottery.cancelbet(pA,pB,pC,index,recipient);
         gasUsed = gasStart - gasleft();
         if(0<showGas){ console.log("Gas used in _cancelbet: %d", gasUsed); }
+        if(testcancelrevert>0){
+            vm.expectRevert();
+            lottery.cancelbet(pA,pB,pC,index,recipient);}
     }
 
     function withdraw(uint secret_power, uint lastindex) internal {
@@ -223,6 +237,9 @@ contract FoomLotteryTest is Test {
         lottery.collect( pA, pB, pC, root, nullifierHash, recipient, relayer, 0, 0, rewardbits, invest);
         gasUsed = gasStart - gasleft();
         if(0<showGas){ console.log("Gas used in _withdraw: %d", gasUsed); }
+        if(testwithdrawrevert>0){
+            vm.expectRevert();
+            lottery.collect( pA, pB, pC, root, nullifierHash, recipient, relayer, 0, 0, rewardbits, invest);}
     }
 
     function updateSize(uint commitSize) pure public returns (uint) {
@@ -270,9 +287,10 @@ contract FoomLotteryTest is Test {
         if(0<showGas){ console.log("Gas used in _commit: %d", commitGasUsed); }
         vm.roll(++blocknumber);
         vm.setBlockhash(blocknumber-1,bytes32(keccak256(abi.encodePacked(blocknumber-1))));
-        vm.expectRevert();
-        vm.prank(ag);
-        lottery.commit(_commitHash,maxUpdate);
+        if(testcommitrevert>0){
+            vm.expectRevert();
+            vm.prank(ag);
+            lottery.commit(_commitHash,maxUpdate);}
         vm.roll(++blocknumber);
         lottery.secret(revealSecret);
         vm.roll(++blocknumber);
@@ -441,12 +459,23 @@ contract FoomLotteryTest is Test {
 
     function check_changes() public {
         console.log('check_changes START');
+        //console.log(me,"me");
+        //console.log(msg.sender,"sender");
+        //console.log(lottery.owner(),"old owner");
+        //assert(me==msg.sender);
         vm.prank(a2);
         vm.expectRevert();
         lottery.changeOwner(a2);
         lottery.changeOwner(ag);
+        //console.log(lottery.owner(),"ag owner");
         vm.prank(ag);
         lottery.changeOwner(me);
+        //console.log(lottery.owner(),"me owner");
+        vm.prank(me);
+        lottery.changeOwner(ag);
+        vm.prank(ag);
+        lottery.changeOwner(owner);
+        //console.log(lottery.owner(),"old owner");
         console.log('check_changes OK');
     }
 
@@ -464,14 +493,15 @@ contract FoomLotteryTest is Test {
         fakeplayETH(1);
         vm.prank(ag);
         lottery.commit(3,1);
-        console.log('try reset');
         vm.prank(an);
         vm.expectRevert();
-        lottery.resetcommit(); // not enougt funds
-        uint amount=lottery.betSum();
-        console.log("pay %d to reset",amount);
-        IERC20(FOOM_ADDRESS).approve(address(lottery),amount);
         lottery.resetcommit();
+        uint amount=lottery.betSum();
+        console.log("approve %d to reset",amount);
+        IERC20(FOOM_ADDRESS).approve(address(lottery),amount);
+        console.log("pay %d to reset",amount);
+        lottery.resetcommit();
+        console.log("commit");
         commit();
         console.log('check_reset OK');
     }
@@ -504,10 +534,12 @@ contract FoomLotteryTest is Test {
         vm.expectRevert();
         lottery.playETH{value: 0}(0x20,0);
         (uint secret_power,uint startIndex) = play(0); // hash can be restored later
+        testcommitrevert=1;
         commit();
+        testcommitrevert=0;
+        testwithdrawrevert=1;
         withdraw(secret_power,startIndex);
-        vm.expectRevert();
-        withdraw(secret_power,startIndex);
+        testwithdrawrevert=1;
         console.log('check_play OK');
     }
 
@@ -519,9 +551,9 @@ contract FoomLotteryTest is Test {
         commit();
         (uint secret_power,uint startIndex) = play(4); // hash can be restored later
         fakeplay(0);
+        testcancelrevert=1;
         cancelbet(secret_power,startIndex);
-        vm.expectRevert();
-        cancelbet(secret_power,startIndex);
+        testcancelrevert=0;
         fakeplay(0);
         commit();
         console.log('check_cancel OK');
@@ -751,8 +783,9 @@ contract FoomLotteryTest is Test {
         (uint secret_power2,uint startIndex2) = play(16);
         withdraw(secret_power,startIndex);
         view_status();
-        vm.expectRevert();
-        cancelbet(secret_power2,startIndex2);
+        testcancelrevert=2;
+        cancelbet(secret_power2,startIndex2); // no funds
+        testcancelrevert=0;
         commit();
         withdraw(secret_power2,startIndex2);
         view_status();
