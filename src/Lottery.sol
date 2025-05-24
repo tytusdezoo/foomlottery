@@ -8,28 +8,28 @@ interface IWithdraw { // 48439 constraints
 interface ICancel { // 686 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[1] calldata _pubSignals) external view returns (bool); // 198961 g
 }
-interface IUpdate1 { // 86817 c (3s)
+interface IUpdate1 { // 86817 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[5] calldata _pubSignals) external view returns (bool); // 222057 g
 }
-interface IUpdate3 { // 175585 c (6s)
+interface IUpdate3 { // 175585 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[7] calldata _pubSignals) external view returns (bool); // 235470 g
 }
-interface IUpdate5 { // 264353 c (9s)
+interface IUpdate5 { // 264353 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[9] calldata _pubSignals) external view returns (bool); // 248887 g
 }
-interface IUpdate11 { // 530657 c (16s)
+interface IUpdate11 { // 530657 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[15] calldata _pubSignals) external view returns (bool); // 289131 g
 }
-interface IUpdate21 { // 974497 c (24s)
+interface IUpdate21 { // 974497 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[25] calldata _pubSignals) external view returns (bool); // 356104 g
 }
-interface IUpdate44 { // 1995329 c (340GvRAM+15GRAM,49s)
+interface IUpdate44 { // 1995329 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[48] calldata _pubSignals) external view returns (bool); // 510074 g
 }
-interface IUpdate89 { // 3992609 c (380GvRAM+29GRAM,96s)
+interface IUpdate89 { // 3992609 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[93] calldata _pubSignals) external view returns (bool); // 811439 g
 }
-interface IUpdate179 { // 7987169 c (380vRAM+56GRAM,172s) // cpp: 7GRAM, 20s (5m user)
+interface IUpdate179 { // 7987169 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[183] calldata _pubSignals) external view returns (bool); // 1415063 g
 }
 interface IUniswapV2Router02 {
@@ -76,43 +76,40 @@ contract Lottery {
 
     // keep together
     struct Data {
-        uint64 periodStartBlock;
-        uint64 commitBlock;
-        uint32 nextIndex;
+        uint64 periodStartBlock; // current dividend period started there
+        uint64 commitBlock; // generator provided the random number secret in this block and will reaveal it soon
+        uint32 nextIndex; // id of the next ticket
         uint16 dividendPeriod; // current dividend period
         uint8 betsLimit; // Limit bets when closing the lottery
-        uint8 betsStart; // index of last commited bet
-        uint8 betsIndex; // index of the next slot in bet queue (>=1)
-        uint8 commitIndex; // number of bets to insert into tree + 1 (>=1)
-        uint8 status;
+        uint8 betsStart; // index of start of the queue of bets in buffer
+        uint8 betsIndex; // index of the end of the queue of bets in buffer
+        uint8 commitIndex; // number of bets in queue to insert into tree using the commited random number
+        uint8 status; // reentrancy block
     }
     Data public D;
-    uint128 public immutable betMin; // TODO: set to constant later !
+    uint128 public immutable betMin; // base unit of the lottery
     uint128 public currentBalance = 1; // sum of available funds in wallets
     uint public lastRoot; // current tree root
-    uint public commitHash; //
-    uint public commitBlockHash; //
-    address public owner;
-    address public generator;
+    uint public commitHash; // hash of the secret random number
+    uint public commitBlockHash; // hash of the block to mix with the random number
+    address public owner; // can to stop allowing new tickets and change the generator
+    address public generator; // random number generator
 
-    // investment parameters
     struct Wallet {
         uint112 shares; // last balance eligible for dividend
-        uint112 balance; // current balance of user
-    	uint16 lastDividendPeriod; // last processed dividend period of user's tokens
-    	uint16 nextWithdrawPeriod; // next withdrawal possible after this period
+        uint112 balance; // current balance of user (may not include recent dividends)
+    	uint16 lastDividendPeriod; // last processed dividend period
+    	uint16 nextWithdrawPeriod; // next withdrawal possible on this period
     }
-    mapping (address => Wallet) wallets;
+    mapping (address => Wallet) wallets; // data on investors
     struct Period {
         uint128 bets; // total bet volume in period
         uint128 shares; // total eligible funds in period
     }
-    mapping(uint => Period) public periods;
-    // betting parameters
-    mapping(uint => uint) public bets;
+    mapping(uint => Period) public periods; // stats to calculate the dividends
+    mapping(uint => uint) public bets; // buffer for 250 bets
     mapping (uint => uint) public nullifier; // nullifier hash for each bet
-    // mertkeltree
-    mapping(uint => uint) public roots;
+    mapping(uint => uint) public roots; // all roots are kept in history
 
     // constructor
     constructor(IWithdraw _Withdraw,
@@ -213,7 +210,7 @@ contract Lottery {
      * @param _secrethash the hash of Your secret
      * @param _power the ticket price level
      */
-    function play(uint _secrethash,uint _power) payable external { // unchecked {
+    function play(uint _secrethash,uint _power) payable external { unchecked {
         require(msg.value==0 || address(token)==address(0), "Use playETH to play with ETH");
         require(D.betsIndex<D.betsLimit, "No more bets allowed");
         require(0<_secrethash && _secrethash < FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
@@ -221,10 +218,10 @@ contract Lottery {
         _deposit(getAmount(_power));
         uint newHash = _secrethash + _power + 1;
         uint pos = (uint(D.betsStart) + uint(D.betsIndex)) % betsMax;
-        bets[pos] = newHash;
+        bets[pos] = newHash; 
         emit LogBetIn(D.nextIndex+D.betsIndex,newHash); // betID is the first parameter
         D.betsIndex++;
-    } // }
+    } }
 
     /**
      * @dev Play in lottery with ETH
@@ -261,7 +258,7 @@ contract Lottery {
     /**
      * @dev Calculate ticket price
      */
-    function getAmount(uint _power) view public returns (uint) {
+    function getAmount(uint _power) view internal returns (uint) {
         return(uint(betMin) * (2 + 2**_power));
     }
 
@@ -277,7 +274,7 @@ contract Lottery {
      * @param _fee optional fee for relaying
      * @param _refund additional ETH to send to the _recipient address
      * @param _rewardbits bits for collecting rewards, reward is 0 if bits are 0, make sure to supply correct bits, you can not redeem 2 times
-     * @param _invest amount of FOOM to keep in the Lottery as investment, 4% of tickts will be paid out to investors
+     * @param _invest amount of FOOM to keep in the Lottery as investment, 4% of tickts will be paid out to investors, Don't waste your full reward on new fancy backup batteries. think about the future and invest early.
      */
     function collect(
         uint[2] calldata _pA,
