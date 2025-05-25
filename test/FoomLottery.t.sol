@@ -70,6 +70,8 @@ contract FoomLotteryTest is Test {
     uint LogHash = uint(keccak256(abi.encodePacked("LogHash(uint256)"))); // commitBlockHash
 
     function test() public { // can not run tests in parralel because of a common www repo
+        check_cancel();
+revert();
         check_changes();
         check_funds();
         check_investments(); // with ETH
@@ -440,7 +442,7 @@ contract FoomLotteryTest is Test {
 
     function check_pray() public {
         console.log('check_pray START');
-        string memory prayer = "I love the Terrestrial God very much";
+        string memory prayer = "Twitter suspended our account, fuck twitter";
         bytes32 prayer32_0;
         bytes32 prayer32_1;
         assembly {

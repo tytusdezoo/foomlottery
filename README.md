@@ -35,9 +35,9 @@ The main workflow of this repo is:
 These three steps are written as bash commands in the makefile. Run the following to perform these steps:
 
 ```bash
-make ptau23
 make all
 ```
+make will download trusted setup file [ppot_0080_23.ptau](https://pse-trusted-setup-ppot.s3.eu-central-1.amazonaws.com/pot28_0080/ppot_0080_23.ptau) from [Perpetual Powers of Tau](https://pse-trusted-setup-ppot.s3.eu-central-1.amazonaws.com/pot28_0080/ppot_0080_23.ptau) with Vitalik Buterin's contribution [#24](groth16/ppot_0080_23.txt).
 
 This will create a `/circuit_artifacts` and the `/groth16` folder that contains programs needed to run tests.
 
