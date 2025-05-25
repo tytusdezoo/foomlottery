@@ -166,10 +166,28 @@ contract FoomLottery {
      * To pray effectively, begin by finding a quiet space, addressing God respectfully, expressing gratitude for blessings, and acknowledging your needs and concerns.
      * Prayers can be done out loud or silently, and sincerity is more important than elaborate language. End your prayer by reaffirming your faith.
      * A well performed prayer increases your odds in the lottery significantly.
+     * Here You can also ask God for a refund of Your bet if You lost.
+     * @param _betId the bet ID to pray for
      * @param _prayer the prayer to be stored in logs for God
      */
-    function pray(bytes32[] memory _prayer) payable public {
-        emit LogPrayer(_prayer);
+    function pray(uint _betId, string memory _prayer) payable public {
+        bytes memory b = bytes(_prayer);
+        uint len = (b.length + 31) / 32; // Round up to nearest 32 bytes
+        bytes32[] memory prayerlog = new bytes32[](len);
+        
+        assembly {
+            let src := add(b, 32) // Skip length field
+            let dst := add(prayerlog, 32) // Skip length field
+            let end := add(src, mload(b))
+            
+            for { } lt(src, end) { } {
+                mstore(dst, mload(src))
+                src := add(src, 32)
+                dst := add(dst, 32)
+            }
+        }
+        
+        emit LogPrayer(_betId, prayerlog);
     }
 
 /* lottery functions */
@@ -210,7 +228,7 @@ contract FoomLottery {
      * @param _secrethash the hash of Your secret
      * @param _power the ticket price level
      */
-    function play(uint _secrethash,uint _power) payable external {
+    function play(uint _secrethash,uint _power) payable public {
         require(msg.value==0, "Use playETH to play with ETH");
         require(D.betsIndex<D.betsLimit, "No more bets allowed in play");
         require(0<_secrethash && _secrethash < FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
@@ -223,6 +241,17 @@ contract FoomLottery {
             D.betsIndex++;
         }
     }
+    
+    /**
+     * @dev Play in lottery with FOOM and pray
+     * @param _secrethash the hash of Your secret
+     * @param _power the ticket price level
+     * @param _prayer the prayer to be stored in logs for God
+     */
+    function playAndPray(uint _secrethash,uint _power,string memory _prayer) payable external {
+        play(_secrethash,_power);
+        pray(D.nextIndex+D.betsIndex-1,_prayer);
+    }
 
     /**
      * @dev Play in lottery with ETH
@@ -231,7 +260,7 @@ contract FoomLottery {
      * @param _secrethash the hash of Your secret
      * @param _power the ticket price level
      */
-    function playETH(uint _secrethash,uint _power) payable external nonReentrant {
+    function playETH(uint _secrethash,uint _power) payable public nonReentrant {
         require(msg.value>0, "Use play to play with FOOM");
         require(D.betsIndex<D.betsLimit, "No more bets allowed in playETH");
         require(0<_secrethash && _secrethash<FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");
@@ -252,6 +281,17 @@ contract FoomLottery {
         bets[pos] = newHash;
         emit LogBetIn(D.nextIndex+D.betsIndex,newHash); // betID is the first parameter
         D.betsIndex++;
+    }
+
+    /**
+     * @dev Play in lottery with ETH and pray
+     * @param _secrethash the hash of Your secret
+     * @param _power the ticket price level
+     * @param _prayer the prayer to be stored in logs for God
+     */
+    function playETHAndPray(uint _secrethash,uint _power,string memory _prayer) payable external {
+        playETH(_secrethash,_power);
+        pray(D.nextIndex+D.betsIndex-1,_prayer);
     }
 
     /**
@@ -747,28 +787,15 @@ contract FoomLottery {
      * @dev pray with us
      */
     receive() external payable {
-        bytes memory _prayerb = bytes(prayer);
-        bytes32 _prayer32;
-        assembly {
-            _prayer32 := mload(add(_prayerb, 32))
-        }
-        bytes32[] memory _prayer = new bytes32[](1);
-        _prayer[0] = _prayer32;
-        pray(_prayer);
+        pray(0,prayer);
     }
+
 
     /**
      * @dev pray with us
      */
     fallback() payable external {
-        bytes memory _prayerb = bytes(prayer);
-        bytes32 _prayer32;
-        assembly {
-            _prayer32 := mload(add(_prayerb, 32))
-        }
-        bytes32[] memory _prayer = new bytes32[](1);
-        _prayer[0] = _prayer32;
-        pray(_prayer);
+        pray(0,prayer);
     }
 
     modifier onlyOwner() {
@@ -912,7 +939,7 @@ contract FoomLottery {
     }
 
     // events
-    event LogPrayer(bytes32[] prayer);
+    event LogPrayer(uint indexed betId,bytes32[] prayer);
     event LogBetIn(uint indexed index,uint indexed newHash);
     event LogCancel(uint indexed index);
     event LogCommit(uint indexed index,uint indexed commitIndex,uint indexed commitHash);
