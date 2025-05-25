@@ -72,6 +72,8 @@ contract FoomLotteryTest is Test {
 
     function test() public { // can not run tests in parralel because of a common www repo
         check_pray();
+        check_cancel();
+revert();
         check_changes();
         check_funds();
         check_investments(); // with ETH
@@ -461,17 +463,7 @@ contract FoomLotteryTest is Test {
 
     function check_pray() public {
         console.log('check_pray START');
-        string memory prayer = "Twitter suspended our account, fuck twitter";
-        bytes32 prayer32_0;
-        bytes32 prayer32_1;
-        assembly {
-            prayer32_0 := mload(add(prayer,32))
-            prayer32_1 := mload(add(prayer,64))
-        }
-        bytes32[] memory _prayer=new bytes32[](2);
-        _prayer[0]=prayer32_0;
-        _prayer[1]=prayer32_1;
-        lottery.pray(_prayer);
+        lottery.pray(0,'Twitter suspended our account, fuck twitter');
         (bool ok,)=address(lottery).call{value: 1}("");
         require(ok);
         uint hash = uint(uint240(uint(keccak256(abi.encode(1))))<<5);
