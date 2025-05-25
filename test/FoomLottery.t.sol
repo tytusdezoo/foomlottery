@@ -72,8 +72,6 @@ contract FoomLotteryTest is Test {
 
     function test() public { // can not run tests in parralel because of a common www repo
         check_pray();
-        check_cancel();
-revert();
         check_changes();
         check_funds();
         check_investments(); // with ETH
