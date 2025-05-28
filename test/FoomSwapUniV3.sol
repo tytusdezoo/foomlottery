@@ -39,7 +39,6 @@ interface ISwapRouter {
         address tokenOut;
         uint24 fee;
         address recipient;
-        uint256 deadline;
         uint256 amountIn;
         uint256 amountOutMinimum;
         uint160 sqrtPriceLimitX96;
@@ -52,11 +51,11 @@ interface ISwapRouter {
 
 contract UniswapV3SwapTest is Test {
     ISwapRouter public constant swapRouter =
-        ISwapRouter(0x6fF5693b99212Da76ad316178A184AB56D299b43); 
+        ISwapRouter(0x2626664c2603336E57B271c5C0b26F421741e481);
 
     address public constant WETH = 0x4200000000000000000000000000000000000006;
-    address public constant FOOM_BASE =
-        0x02300aC24838570012027E0A90D3FEcCEF3c51d2;
+    address public constant FOOM_BASE = 0x02300aC24838570012027E0A90D3FEcCEF3c51d2;
+     //dai   0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb; 
 
     IWETH public weth = IWETH(WETH);
     IERC20 public foom_base = IERC20(FOOM_BASE);
@@ -71,9 +70,20 @@ contract UniswapV3SwapTest is Test {
         console.log("ETH balance of address this:", address(this).balance);
     }
 
-    function test() public payable {
-        require(address(this).balance >= 1 ether, "Not enough ETH");
-        swapFoom(0.1 ether);
+    function test() public {
+        // Upewnij się, że masz ETH na adresie kontraktu
+        vm.deal(address(this), 10 ether);
+
+        // Wywołaj funkcję test jako zewnętrzne wywołanie z wartością ETH
+        (bool success, ) = address(this).call{value: 0.015 ether}(
+            abi.encodeWithSignature("swapEthForFoom()")
+        );
+        require(success, "External call to test() failed");
+    }
+
+    function swapEthForFoom() public payable {
+        require(address(this).balance >= 0.015 ether, "Not enough ETH");
+        swapFoom(msg.value); // Przekazujemy msg.value jako amountIn
     }
 
     function swapFoom(uint256 amountIn) public payable {
@@ -85,7 +95,7 @@ contract UniswapV3SwapTest is Test {
         // Approve Uniswap V3 router to spend WETH
         weth.approve(address(swapRouter), amountIn);
 
-        console.log("WETH balance:", weth.balanceOf(address(this)));
+        console.log("WETH balance before swap:", weth.balanceOf(address(this)));
 
         // Prepare swap parameters
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
@@ -94,7 +104,6 @@ contract UniswapV3SwapTest is Test {
                 tokenOut: FOOM_BASE,
                 fee: 3000,
                 recipient: address(this),
-                deadline: block.timestamp + 1 hours,
                 amountIn: amountIn,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0
