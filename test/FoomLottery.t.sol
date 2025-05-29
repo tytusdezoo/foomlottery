@@ -72,9 +72,9 @@ contract FoomLotteryTest is Test {
     uint LogPrayer = uint(keccak256(abi.encodePacked("LogPrayer(uint256,bytes32[])"))); // betId,prayer
 
     function test() public { // can not run tests in parralel because of a common www repo
-        getFOOM(betMinETH*2**23);
-        check_overflow();
-        return;
+        //getFOOM(betMinETH*2**23);
+        //check_overflow();
+        //return;
 
         check_pray();
         check_changes();
