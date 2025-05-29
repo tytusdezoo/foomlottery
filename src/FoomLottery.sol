@@ -32,8 +32,12 @@ interface IUpdate89 { // 3992609 c
 interface IUpdate179 { // 7987169 c
   function verifyProof( uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[183] calldata _pubSignals) external view returns (bool); // 1415063 g
 }
-interface IUniswapV2Router02 {
-  function swapExactTokensForTokens( uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts);
+//interface IUniswapV2Router02 {
+//  function swapExactTokensForTokens( uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts);
+//}
+interface ISwapRouter {
+  struct ExactInputSingleParams { address tokenIn; address tokenOut; uint24 fee; address recipient; uint256 amountIn; uint256 amountOutMinimum; uint160 sqrtPriceLimitX96; }
+  function exactInputSingle( ExactInputSingleParams calldata params) external payable returns (uint256 amountOut);
 }
 interface IWETH is IERC20 {
   function deposit() external payable;
@@ -46,7 +50,7 @@ interface IWETH is IERC20 {
  */
 contract FoomLottery {
     IERC20 public immutable token; // FOOM token
-    IUniswapV2Router02 public immutable router; // FOOM dex
+    //IUniswapV2Router02 public router; // V2FOOM dex
     IWithdraw public immutable withdraw;
     ICancel public immutable cancel;
     IUpdate1 public immutable update1;
@@ -57,6 +61,8 @@ contract FoomLottery {
     IUpdate44 public immutable update44;
     IUpdate89 public immutable update89;
     IUpdate179 public immutable update179;
+
+    ISwapRouter public router; // V3FOOM dex, can change
 
     string public constant prayer = "Praise the Terrestrial God";
     address private constant WETH_ADDRESS = address(0x4200000000000000000000000000000000000006);
@@ -123,7 +129,7 @@ contract FoomLottery {
                 IUpdate89 _Update89,
                 IUpdate179 _Update179,
                 IERC20 _Token,
-                IUniswapV2Router02 _Router,
+                ISwapRouter _Router,
                 uint _BetMin) {
         withdraw = _Withdraw;
         cancel = _Cancel;
@@ -267,11 +273,20 @@ contract FoomLottery {
         uint needed = getAmount(_power);
         IWETH(WETH_ADDRESS).deposit{value: msg.value}();
         IERC20(WETH_ADDRESS).approve(address(router), msg.value);
-        address[] memory path = new address[](2);
-        path[0] = WETH_ADDRESS;
-        path[1] = address(token);
-        uint[] memory amounts = router.swapExactTokensForTokens(msg.value,0,path,address(this),block.timestamp);
-        uint amount = amounts[1];
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+            .ExactInputSingleParams({
+                tokenIn: WETH_ADDRESS,
+                tokenOut: address(token),
+                fee: 3000, //100 for dai
+                recipient: address(this),
+                amountIn: msg.value,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            });
+        uint start=_balance();
+        /*uint maybegot =*/ router.exactInputSingle(params); // do not trust V3 router
+        uint end=_balance();
+        uint amount=end-start;
         require(amount>=needed,"not enough FOOM received");
         uint refund=amount-needed;
         if(refund>0){
@@ -813,6 +828,15 @@ contract FoomLottery {
         D.status = uint8(_closed);
         _;
         D.status = uint8(_open);
+    }
+
+    /**
+     * @dev Change router.
+     * @param _router The address of a new V3 router.
+     */
+    function changeRouter(address _router) external onlyOwner {
+        assert(_router != address(0));
+        router=ISwapRouter(_router); // FOOM dex
     }
 
     /**

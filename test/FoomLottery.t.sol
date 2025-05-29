@@ -14,7 +14,7 @@ import {Update21G16Verifier} from "src/Update21.sol";
 import {Update44G16Verifier} from "src/Update44.sol";
 import {Update89G16Verifier} from "src/Update89.sol";
 import {Update179G16Verifier} from "src/Update179.sol";
-import {FoomLottery, IWithdraw, ICancel, IUpdate1, IUpdate3, IUpdate5, IUpdate11, IUpdate21, IUpdate44, IUpdate89, IUpdate179, IUniswapV2Router02, IWETH} from "src/FoomLottery.sol";
+import {FoomLottery, IWithdraw, ICancel, IUpdate1, IUpdate3, IUpdate5, IUpdate11, IUpdate21, IUpdate44, IUpdate89, IUpdate179, /*IUniswapV2Router02,*/ ISwapRouter, IWETH} from "src/FoomLottery.sol";
 
 contract FoomLotteryTest is Test {
     FoomLottery public lottery;
@@ -36,7 +36,8 @@ contract FoomLotteryTest is Test {
 
     address private constant WETH_ADDRESS = 0x4200000000000000000000000000000000000006;
     address private constant FOOM_ADDRESS = 0x02300aC24838570012027E0A90D3FEcCEF3c51d2;
-    address private constant ROUTER_ADDRESS = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24; // Uniswap V2 Router
+    //address private constant V2ROUTER_ADDRESS = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24; // Uniswap V2 Router
+    address private constant V3ROUTER_ADDRESS = 0x2626664c2603336E57B271c5C0b26F421741e481; // Uniswap V3 Router
 
     // Test vars
     address public me;
@@ -56,7 +57,7 @@ contract FoomLotteryTest is Test {
     uint testcommitrevert=0;
     uint testcancelrevert=0;
 
-    uint public          betMinETH = 1; //0.001 ether;
+    uint public          betMinETH = 0.00005 ether; //0.001 ether;
     uint public          betMin;
     uint public constant betPower1 = 10; // power of the first bet = 1024
     uint public constant betPower2 = 16; // power of the second bet = 65536
@@ -76,7 +77,7 @@ contract FoomLotteryTest is Test {
         check_funds();
         check_investments(); // with ETH
         // get more FOOM to play with
-        getFOOM();
+        getFOOM(betMinETH*2**23);
         check_reset();
         check_overflow();
         check_play();
@@ -90,8 +91,7 @@ contract FoomLotteryTest is Test {
         check_odds();
     }
 
-    function getFOOM() internal {
-        uint amount=betMinETH*2**23;
+    /*function getFOOMV2(uint amount) internal returns (uint) {
         IWETH(WETH_ADDRESS).deposit{value: amount}();
         IERC20(WETH_ADDRESS).approve(ROUTER_ADDRESS,amount);
         address[] memory path = new address[](2);
@@ -100,7 +100,30 @@ contract FoomLotteryTest is Test {
         uint[] memory amounts = IUniswapV2Router02(ROUTER_ADDRESS).swapExactTokensForTokens(amount,0,path,address(this),block.timestamp);
         uint got = amounts[1];
         console.log("swap %d -> %d",amount,got);
+        return got;
+    }*/
+
+    function getFOOM(uint amount) internal returns (uint) {
+        IWETH(WETH_ADDRESS).deposit{value: amount}();
+        IERC20(WETH_ADDRESS).approve(V3ROUTER_ADDRESS,amount);
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+            .ExactInputSingleParams({
+                tokenIn: WETH_ADDRESS,
+                tokenOut: FOOM_ADDRESS,
+                fee: 3000, //100 for dai
+                recipient: address(this), 
+                amountIn: amount,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            });
+        uint start=IERC20(FOOM_ADDRESS).balanceOf(address(this));
+        uint maybegot = ISwapRouter(V3ROUTER_ADDRESS).exactInputSingle(params);
+        uint end=IERC20(FOOM_ADDRESS).balanceOf(address(this));
+        uint got=end-start;
+        console.log("swap %d -> %d (%d)",amount,got,maybegot);
+        return got;
     }
+
 
     function setUp() public {
         me=payable(msg.sender);
@@ -118,20 +141,13 @@ contract FoomLotteryTest is Test {
         // get some info on Foom
         vm.createSelectFork(vm.rpcUrl("base")); // use data from Base
         //uint amount=0.001 ether; liquidity too small on base
-        uint amount=betMinETH;
-        IWETH(WETH_ADDRESS).deposit{value: amount}();
-        IERC20(WETH_ADDRESS).approve(ROUTER_ADDRESS, amount);
-        address[] memory path = new address[](2);
-        path[0] = WETH_ADDRESS;
-        path[1] = FOOM_ADDRESS;
-        uint[] memory amounts = IUniswapV2Router02(ROUTER_ADDRESS).swapExactTokensForTokens(amount,0,path,address(this),block.timestamp);
-        betMin = amounts[1];
+        betMin=getFOOM(betMinETH);
         console.log(betMin,"betMin");
         // Deploy lottery contract.
         vm.roll(++blocknumber);
     	vm.recordLogs();
         console.log(msg.sender,"sender");
-        lottery = new FoomLottery(iwithdraw, icancel, iupdate1, iupdate3, iupdate5, iupdate11, iupdate21, iupdate44, iupdate89, iupdate179, IERC20(FOOM_ADDRESS), IUniswapV2Router02(ROUTER_ADDRESS), betMin);
+        lottery = new FoomLottery(iwithdraw, icancel, iupdate1, iupdate3, iupdate5, iupdate11, iupdate21, iupdate44, iupdate89, iupdate179, IERC20(FOOM_ADDRESS), ISwapRouter(V3ROUTER_ADDRESS), betMin);
         owner=lottery.owner();
         //console.log(lottery.owner(),"first owner");
         //console.log("owner balance %d",lottery.walletBalanceOf(lottery.owner()));
@@ -489,6 +505,10 @@ contract FoomLotteryTest is Test {
         lottery.changeOwner(ag);
         vm.prank(ag);
         lottery.changeOwner(owner);
+        lottery.changeRouter(me);
+        vm.expectRevert();
+        lottery.changeRouter(address(0));
+        lottery.changeRouter(V3ROUTER_ADDRESS);
         //console.log(lottery.owner(),"old owner");
         console.log('check_changes OK');
     }
