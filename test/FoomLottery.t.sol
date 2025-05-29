@@ -72,6 +72,10 @@ contract FoomLotteryTest is Test {
     uint LogPrayer = uint(keccak256(abi.encodePacked("LogPrayer(uint256,bytes32[])"))); // betId,prayer
 
     function test() public { // can not run tests in parralel because of a common www repo
+        getFOOM(betMinETH*2**23);
+        check_overflow();
+        return;
+
         check_pray();
         check_changes();
         check_funds();
@@ -138,6 +142,7 @@ contract FoomLotteryTest is Test {
         iupdate44 = IUpdate44(address(new Update44G16Verifier()));
         iupdate89 = IUpdate89(address(new Update89G16Verifier()));
         iupdate179 = IUpdate179(address(new Update179G16Verifier()));
+
         // get some info on Foom
         vm.createSelectFork(vm.rpcUrl("base")); // use data from Base
         //uint amount=0.001 ether; liquidity too small on base

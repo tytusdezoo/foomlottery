@@ -21,6 +21,9 @@ docs/
 # 
 tmp/
 
+# base chain
+base
+
 # why yarn ?
 yarn.lock
 package-lock.json
