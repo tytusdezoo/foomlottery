@@ -57,8 +57,8 @@ contract FoomLotteryTest is Test {
     uint testcommitrevert=0;
     uint testcancelrevert=0;
 
-    uint public          betMinETH = 0.00005 ether; //0.001 ether;
-    uint public          betMin;
+    uint public          betMinETH = 0.00005 ether / 1000; // -> 1262983 535 080 994 143 212 633 FOOM there is not anough FOOM now in the contract
+    uint public          betMin; // we should start with 1M FOOM 1000000.000 000 000 000 000 000
     uint public constant betPower1 = 10; // power of the first bet = 1024
     uint public constant betPower2 = 16; // power of the second bet = 65536
     uint public constant betPower3 = 22; // power of the third bet = 4194304
