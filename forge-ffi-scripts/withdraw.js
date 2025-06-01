@@ -78,7 +78,7 @@ async function main() {
   const pC = proof.pi_c.slice(0, 2);
 
   // 6. Return abi encoded witness
-  const witness = ethers.AbiCoder.defaultAbiCoder().encode(
+  const witness = ethers.utils.defaultAbiCoder.encode(
     ["uint256[2]", "uint256[2][2]", "uint256[2]", "uint[7]"],
     [
       pA,

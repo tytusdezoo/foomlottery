@@ -1,7 +1,8 @@
 const circomlibjs = require("circomlibjs");
 const { MerkleTree } = require("fixed-merkle-tree");
 const { leBufferToBigint, hexToBigint, bigintToHex } = require("./bigint.js");
-const { openSync, readFileSync, closeSync, existsSync } = require("fs");
+const { openSync, readFileSync, closeSync, existsSync, writeFileSync, mkdirSync } = require("fs");
+const { execSync } = require('child_process');
 const sprintfjs = require('sprintf-js');
 const zlib = require('zlib');
 const MERKLE_TREE_HEIGHT = 32;
@@ -12,6 +13,16 @@ const zeros = [
   "0x255da7d5316310ad81de31bfd5b8272b30ce70c742685ac9696446f618399317",
   "0x1dd4b847fd5bdd5d53a661d8268eb5dd6629669922e8a0dcbbeedc8d6a966aaf"
 ];
+
+function no0x(str) {
+  return str.replace(/^0x0*/, '');
+}
+
+function touchfile(path) {
+  if(!existsSync(path)) {
+    writeFileSync(path, '');
+  }
+}
 
 function getLines(path){
   let fileold;
@@ -37,10 +48,49 @@ function getLines(path){
   return textold.split("\n").filter((line) => line.trim() !== "");
 }
 
+function writeLast(nextIndex,blockNumber,lastRoot,lastLeaf){
+  writeFileSync("www/last.csv", sprintfjs.sprintf("%x,%x,%s,%s\n",nextIndex,blockNumber,no0x(bigintToHex(lastRoot)),no0x(bigintToHex(lastLeaf))));
+}
+
 function readLast(){
   const lines = getLines("www/last.csv");
   const [nextIndex,blockNumber,lastRoot,lastLeaf] = lines[0].split(',');
   return [parseInt(nextIndex,16), parseInt(blockNumber,16), hexToBigint(lastRoot), hexToBigint(lastLeaf)];
+}
+
+function writeLastLog(blockNumber,transactionIndex){
+  writeFileSync("www/logs.csv", sprintfjs.sprintf("%d,%d\n",blockNumber,transactionIndex), { flag: 'w' });
+}
+
+function readLastLog(){
+  const lines = getLines("www/logs.csv");
+  const [blockNumber,transactionIndex] = lines[0].split(',');
+  return [parseInt(blockNumber,10), parseInt(transactionIndex,10)];
+}
+
+function writeRevealLock(nextIndex){
+  writeFileSync("www/reveallock.csv", sprintfjs.sprintf("%d\n",nextIndex), { flag: 'w' });
+}
+
+function readRevealLock(){
+  const lines = getLines("www/reveallock.csv");
+  if(lines.length==0) {
+    return 0;
+  }
+  return parseInt(lines[0],10);
+}
+
+function writeWaiting(index,hash,blocknumber){
+  writeFileSync("www/waiting.csv", sprintfjs.sprintf("%s,%s,%d\n",no0x(index.toHexString()),no0x(hash.toHexString()),blocknumber), { flag: 'a' });
+}
+
+function readWaitingBlocknumber(){
+  const lines = getLines("www/waiting.csv");
+  const values = lines[0].split(',');
+  if(values.length==0) {
+    return 0;
+  }
+  return parseInt(values[2],10);
 }
 
 function getIndexRand(hashstr,betIndex) {
@@ -77,7 +127,7 @@ function findBet(inHash,startindex) {
   const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();
   const hashstr = bigintToHex(inHash).replace(/^0x0*/, '');
   for(;(startindex&0xFFFFFF00)<nextIndex;startindex+=0xff) {
-    [betIndex,betRand] = getIndexRand(hashstr,startindex);
+    const [betIndex,betRand] = getIndexRand(hashstr,startindex);
     if(betIndex>0) {
       return [betIndex,betRand,nextIndex];
     }
@@ -265,6 +315,159 @@ async function mimicMerkleTree(zero,leaves = [],hight=MERKLE_TREE_HEIGHT) {
   });
 }
 
+async function computeRoot(path,zero) {
+  const hashes = new Array(256);
+  // leave if file does not exists or is gzipped
+  let needfix=0;
+  const leafs = getLines(path);
+  for(let i=0;i<leafs.length;i++) {
+    const [numStr, leafStr] = leafs[i].split(',');
+    const num = parseInt(numStr, 16);
+    const leaf = hexToBigint(leafStr);    
+    hashes[num] = leaf;
+    if(num!=i){
+      needfix++;
+    }
+  }
+  if(needfix>0){
+    writeFileSync("www/fix.csv", sprintfjs.sprintf("%s\n",path), { flag: 'a' }); // TODO, write block number too
+  } else {
+    execSync("gzip -9 "+path);
+  }
+  const tree = await mimicMerkleTree(zeros[zero],hashes,8);
+  return tree.root;
+}
+
+function cleanwaiting(nextIndex) {
+  const lines = getLines("www/waiting.csv");
+  let textnew='';
+  for(let i=0;i<lines.length;i++) {
+    const [index] = lines[i].split(',');
+    const indexnum = parseInt(index,16);
+    if(indexnum>=nextIndex) {
+      textnew+=lines[i]+"\n";
+    }
+  }
+  writeFileSync("www/waiting.csv", textnew);
+}
+
+async function appendtofile(pathlast,text,hash) {
+  // leave if file is gzipped
+  const path = sprintfjs.sprintf("%06x",pathlast);
+  const path1 = path.slice(0,2);
+  const path2 = path.slice(2,4); 
+  const path3 = path.slice(4,6);
+  mkdirSync("www/"+path1+"/"+path2, { recursive: true });
+  if(path3=="00") {
+    touchfile("www/"+path1+"/"+path2+"/index.csv");
+    if(path2=="00"){
+      touchfile("www/"+path1+"/index.csv");
+    }
+  }
+  writeFileSync("www/"+path1+"/"+path2+"/"+path3+".csv", text, { flag: 'a' });
+  if(hash) {
+    const root = await computeRoot("www/"+path1+"/"+path2+"/"+path3+".csv",0);
+    writeFileSync("www/"+path1+"/"+path2+"/index.csv", sprintfjs.sprintf("%s,%s\n",path3,no0x(bigintToHex(root))), { flag: 'a' });
+    if(path3=="ff"){
+      const root = await computeRoot("www/"+path1+"/"+path2+"/index.csv",1);
+      writeFileSync("www/"+path1+"/index.csv", sprintfjs.sprintf("%s,%s\n",path2,no0x(bigintToHex(root))), { flag: 'a' });
+      if(path2=="ff"){
+        const root = await computeRoot("www/"+path1+"/index.csv",2);
+        writeFileSync("www/index.csv", sprintfjs.sprintf("%s,%s\n",path1,no0x(bigintToHex(root))), { flag: 'a' });
+      }
+    }
+  }
+}
+
+async function putLeaves(newIndex,newRand,newRoot,blockNumber) {
+  const mimcsponge = await circomlibjs.buildMimcSponge();
+
+  const [nextIndex,lastBlockNumber,lastRoot,lastLeaf] = readLast();  // add lastLeaf
+  if(newIndex<=nextIndex){
+    return;}
+  const commitIndex=newIndex-nextIndex;
+  const newHashes = getWaitingList(nextIndex,commitIndex);
+  const newLeaves = newHashes.slice(0, commitIndex).map((h,j) => leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([h,newRand,BigInt(nextIndex)+BigInt(j)]))));
+  const testRoot = await getNewRoot(nextIndex,newLeaves);
+  if(testRoot!=newRoot){
+    throw("root mismatch");}
+
+  let pathlast=nextIndex>>8;
+  let text='';
+  for (let i=0;i<commitIndex;i++) {
+    const pathnew = (nextIndex+i)>>8;
+    if(pathnew!=pathlast) {
+      await appendtofile(pathlast,text,true);
+      text='';
+      pathlast=pathnew;
+    }
+    text+=sprintfjs.sprintf("%x,%s,%s,%s\n",(nextIndex+i)&0xFF,no0x(bigintToHex(newLeaves[i])),no0x(bigintToHex(newHashes[i])),no0x(bigintToHex(newRand))); // index, leaf, hash, rand
+  }
+  await appendtofile(pathlast,text,((nextIndex+commitIndex)&0xff)==0?true:false);
+  writeLast(nextIndex+commitIndex,blockNumber,newRoot,newLeaves[commitIndex-1]);
+  cleanwaiting(nextIndex+commitIndex);
+}
+
+async function update(commitIndex,hashesLength,newRand){
+  const mimcsponge = await circomlibjs.buildMimcSponge();
+  const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();  // add lastLeaf
+  const newHashes = getWaitingList(nextIndex,commitIndex);
+  const newLeaves = newHashes.slice(0, commitIndex).map((h,j) => leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([h,newRand,BigInt(nextIndex)+BigInt(j)]))));
+  const newRoot = await getNewRoot(nextIndex,newLeaves);
+  const hashes = new Array(hashesLength).fill(null).map((x,j) => (j<commitIndex?newHashes[j]:0n));
+
+  const pathElements = await getLastPath(nextIndex-1);
+
+  const input = {
+    // Public inputs
+    oldRoot: lastRoot,
+    newRoot: newRoot,
+    index: nextIndex-1,
+    newRand: newRand,
+    newhashes: hashes,
+    // Private inputs
+    oldLeaf: lastLeaf,
+    pathElements: pathElements.slice(0,32),
+  };
+
+  // Write input to input.json
+  BigInt.prototype.toJSON = function () { return this.toString(); };
+  writeFileSync('groth16/update'+hashesLength+'_input.json', JSON.stringify(input, null, 2));
+  //console.log(JSON.stringify(input));
+
+  let proof;
+  if(existsSync('groth16/prover')){
+    // 5. Create groth16 proof for witness with rapidsnark
+    let stdout = execSync("cd groth16 && "+
+      "./update"+hashesLength+" update"+hashesLength+"_input.json update"+hashesLength+"_output.wtns && "+
+      "./prover update"+hashesLength+"_final.zkey update"+hashesLength+"_output.wtns update"+hashesLength+"_proof.json "+
+      "update"+hashesLength+"_public.json && "+
+      "sed -i 's/}.*/}/g' update"+hashesLength+"_proof.json && "+
+      "sed -i 's/].*/]/g' update"+hashesLength+"_public.json" );
+    // read proof.json and parse to json object
+    proof = JSON.parse(readFileSync('groth16/update'+hashesLength+'_proof.json', 'utf8'));
+  } else {
+  // 5. Create groth16 proof for witness with snarkjs
+    proof = await snarkjs.groth16.fullProve(input,"groth16/update"+hashesLength+".wasm","groth16/update"+hashesLength+"_final.zkey");
+  }
+
+  const pA = proof.pi_a.slice(0, 2);
+  const pB = proof.pi_b.slice(0, 2);
+  const pC = proof.pi_c.slice(0, 2);
+
+  const output = {
+    pA: pA,
+    pB: [[pB[0][1], pB[0][0]],[pB[1][1], pB[1][0]]], // Swap x coordinates for proof verification with the Solidity precompile for EC Pairings, and not required for verification with e.g. snarkJS.
+    pC: pC,
+    lastRoot: lastRoot,
+    newRoot: newRoot,
+    index: nextIndex-1,
+    newRand: newRand,
+    hashes: hashes,
+  }
+  return output;
+}
+
 module.exports = {
   mimicMerkleTree,
   readLast,
@@ -276,5 +479,14 @@ module.exports = {
   findBet,
   getNewRoot,
   getWaitingList,
-  getLines
+  getLines,
+  readLastLog,
+  writeLastLog,
+  writeWaiting,
+  readRevealLock,
+  writeRevealLock,
+  no0x,
+  putLeaves,
+  readWaitingBlocknumber,
+  update,
 };

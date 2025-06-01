@@ -74,6 +74,7 @@ contract FoomLotteryTest is Test {
     function test() public { // can not run tests in parralel because of a common www repo
         //getFOOM(betMinETH*2**23);
         //check_overflow();
+        //check_play();
         //return;
 
         check_pray();

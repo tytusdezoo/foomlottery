@@ -34,7 +34,7 @@ async function main() {
   const pA = proof.pi_a.slice(0, 2);
   const pB = proof.pi_b.slice(0, 2);
   const pC = proof.pi_c.slice(0, 2);
-  const witness = ethers.AbiCoder.defaultAbiCoder().encode(
+  const witness = ethers.utils.defaultAbiCoder.encode(
     ["uint256[2]", "uint256[2][2]", "uint256[2]", "uint[1]", "uint"], // send index back
     [ pA,
       [ // swap

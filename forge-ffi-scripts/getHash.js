@@ -32,9 +32,10 @@ async function main() {
   }
 
   // 3. Return abi encoded hash, secret+power
-  const res = ethers.AbiCoder.defaultAbiCoder().encode(
+  // console.log(bigintToHex(secret_power), bigintToHex(hash), bigintToHex(nextIndex), bigintToHex(blockNumber));
+  const res = ethers.utils.defaultAbiCoder.encode(
     ["uint", "uint", "uint", "uint"],
-    [bigintToHex(secret_power), bigintToHex(hash), bigintToHex(nextIndex),bigintToHex(blockNumber)]
+    [bigintToHex(secret_power), bigintToHex(hash), bigintToHex(nextIndex), bigintToHex(blockNumber)]
   );
   return res;
 }

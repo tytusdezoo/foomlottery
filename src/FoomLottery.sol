@@ -234,7 +234,7 @@ contract FoomLottery {
      * @param _secrethash the hash of Your secret
      * @param _power the ticket price level
      */
-    function play(uint _secrethash,uint _power) public {
+    function play(uint _secrethash,uint _power) payable public { // TODO: remove payable after tests
         require(msg.value==0, "Use playETH to play with ETH");
         require(D.betsIndex<D.betsLimit, "No more bets allowed in play");
         require(0<_secrethash && _secrethash < FIELD_SIZE && _secrethash & 0x1F == 0, "illegal hash");

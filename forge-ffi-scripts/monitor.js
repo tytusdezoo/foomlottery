@@ -3,7 +3,7 @@
 
 const dotenv = require("dotenv");
 const { ethers } = require("ethers");
-const { readLastLog, writeLastLog, writeWaiting, readRevealLock, readWaitingBlocknumber } = require("./utils/mimcMerkleTree.js");
+const { readLast, readLastLog, writeLastLog, writeWaiting, readRevealLock, readWaitingBlocknumber } = require("./utils/mimcMerkleTree.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 
@@ -81,7 +81,7 @@ async function readLogs(provider,lottery,generator,walletAddress) {
     const logs = await lottery.queryFilter({}, currentBlock, endBlock);
     for(let i=0;i<logs.length;i++) {
       const log = logs[i];
-      if(log.removed || log.blockNumber < logsBlockNumber || (log.blockNumber == logsBlockNumber && log.transactionIndex <= transactionIndex)) {
+      if(log.removed || log.blockNumber < logsBlockNumber || (log.blockNumber == logsBlockNumber && log.transactionIndex <= logsTransactionIndex)) {
         continue;
       }
       console.log("Log:", log);
@@ -119,7 +119,7 @@ async function readLogs(provider,lottery,generator,walletAddress) {
       logsTransactionIndex = log.transactionIndex;
     }
     writeLastLog(logsBlockNumber,logsTransactionIndex);
-    break; // TODO: remove this after tests
+    //break; // TODO: remove this after tests
   }
   // write blockNumber to logs.csv
   return generator;
