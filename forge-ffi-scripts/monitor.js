@@ -49,9 +49,9 @@ async function reveal(lottery,index,commitIndex,commitHash,commitBlockHash) {
   const nextIndex = await lottery.nextIndex();
   if(index == nextIndex) { // TODO: check if this is needed
     const revealSecretInput = process.env.PRIVATE_KEY+'_FOOM_'+nextIndex.toString();
-    console.log(revealSecretInput,"reveal secret input");
     const revealSecret = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(revealSecretInput));
     const revealSecretHash = ethers.utils.keccak256(revealSecret);
+    console.log(revealSecretInput,"reveal secret input");
     console.log(revealSecretHash,"reveal secret hash");
     console.log(commitHash,"commitHash");
     if(revealSecretHash == commitHash.toHexString()) {
@@ -60,21 +60,31 @@ async function reveal(lottery,index,commitIndex,commitHash,commitBlockHash) {
       }
       writeRevealLock(index); 
       const hashesLength=updateSize(commitIndex);
-      const newRand = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(revealSecret+commitBlockHash));
+      //const newRand = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(revealSecret+commitBlockHash));
+      const newRand = ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["bytes32","bytes32"],[revealSecret,commitBlockHash]));
       const newRandUint128 = ethers.BigNumber.from(newRand).toBigInt() & 0xffffffffffffffffffffffffffffffffn;
       console.log(revealSecret,"revealSecret");
       console.log(commitBlockHash,"commitBlockHash");
-      console.log(commitIndex.toHexString(),"commitIndex");
-      console.log(hashesLength.toHexString(),"hashesLength");
-      console.log(newRandUint128.toHexString(),"newRand");
-      const output = await update(commitIndex,hashesLength,newRandUint128);
-      const tx = await lottery.reveal(revealSecret,output.pA,output.pB,output.pC,output.newRoot);
-      const receipt = await tx.wait();
-      console.log("Reveal transaction receipt:", receipt);
-      if(receipt.status == 1) {
-        writeRevealLock(0);
-      } else {
-        console.log("Reveal transaction failed");
+      console.log(revealSecret+commitBlockHash,"revealSecret+commitBlockHash");
+      console.log(commitIndex.toString(16),"commitIndex");
+      console.log(hashesLength.toString(16),"hashesLength");
+      console.log(newRandUint128.toString(16),"newRand");
+      try {
+        const output = await update(commitIndex,hashesLength,newRandUint128);
+        const tx = await lottery.reveal(revealSecret,output.pA,output.pB,output.pC,output.newRoot);
+        const receipt = await tx.wait();
+        console.log("Reveal transaction receipt:", receipt);
+        if(receipt.status == 1) {
+            writeRevealLock(0);
+        } else {
+          console.log("Reveal transaction failed");
+          // publish secret to the network
+          const tx = await lottery.secret(revealSecret);
+          const receipt = await tx.wait();
+          console.log("Publish secret transaction receipt:", receipt);
+        }
+      } catch(error) {
+        console.log("Reveal transaction failed:", error);
         // publish secret to the network
         const tx = await lottery.secret(revealSecret);
         const receipt = await tx.wait();
