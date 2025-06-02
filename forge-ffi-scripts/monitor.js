@@ -3,13 +3,15 @@
 
 const dotenv = require("dotenv");
 const { ethers } = require("ethers");
-const { readLast, readLastLog, writeLastLog, writeWaiting, readRevealLock, readWaitingBlocknumber } = require("./utils/mimcMerkleTree.js");
+const { readLast, readLastLog, writeLastLog, writeWaiting, writeRevealLock, readRevealLock, readWaitingBlocknumber, update, updateSize } = require("./utils/mimcMerkleTree.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 
 async function rememberHash(lottery) {
+  const _open=1n;
   const commitIndex = await lottery.commitIndex();
-  if(commitIndex > 0n) {
+  const commitBlockHash = await lottery.commitBlockHash();
+  if(commitIndex > 0n && commitBlockHash == _open) {
     const tx = await lottery.rememberHash();
     console.log("Remember hash transaction:", tx);
     const receipt = await tx.wait();
@@ -20,6 +22,7 @@ async function rememberHash(lottery) {
 async function commit(provider,lottery) {
   const minBets = 8;
   const minBlocks = 30*60; // 60 minutes on Base
+  const maxUpdate = 179;
   const blockNumber = await provider.getBlockNumber();
   const nextIndex = await lottery.nextIndex();
   const betsIndex = await lottery.betsIndex();
@@ -29,10 +32,12 @@ async function commit(provider,lottery) {
     const waitingBlocknumber = readWaitingBlocknumber();
     if((waitingBlocknumber > 0 && waitingBlocknumber <= blockNumber - minBlocks) || (betsIndex >= minBets)) {
       // commit if betsIndex is not 0 and enough time has passed
-      const revealSecretInput = process.env.PRIVATE_KEY+'_FOOM_'+nextIndex.toString(16);
-      const revealSecret = ethers.utils.keccak256(revealSecretInput);
+      const revealSecretInput = process.env.PRIVATE_KEY+'_FOOM_'+nextIndex.toString();
+      console.log(revealSecretInput,"reveal secret input");
+      const revealSecret = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(revealSecretInput));
       const revealSecretHash = ethers.utils.keccak256(revealSecret);
-      const tx = await lottery.commit(revealSecretHash);
+      console.log(revealSecretHash,"reveal secret hash");
+      const tx = await lottery.commit(revealSecretHash,maxUpdate);
       console.log("Commit transaction:", tx);
       const receipt = await tx.wait();
       console.log("Commit transaction receipt:", receipt);
@@ -43,15 +48,26 @@ async function commit(provider,lottery) {
 async function reveal(lottery,index,commitIndex,commitHash,commitBlockHash) {
   const nextIndex = await lottery.nextIndex();
   if(index == nextIndex) { // TODO: check if this is needed
-    const revealSecretInput = process.env.PRIVATE_KEY+'_FOOM_'+nextIndex.toString(16);
-    const revealSecret = ethers.utils.keccak256(revealSecretInput);
+    const revealSecretInput = process.env.PRIVATE_KEY+'_FOOM_'+nextIndex.toString();
+    console.log(revealSecretInput,"reveal secret input");
+    const revealSecret = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(revealSecretInput));
     const revealSecretHash = ethers.utils.keccak256(revealSecret);
-    if(revealSecretHash == commitHash) {
+    console.log(revealSecretHash,"reveal secret hash");
+    console.log(commitHash,"commitHash");
+    if(revealSecretHash == commitHash.toHexString()) {
       if(readRevealLock()==index) {
         return;
       }
       writeRevealLock(index); 
-      const output = await update(commitIndex,commitHash,commitBlockHash);
+      const hashesLength=updateSize(commitIndex);
+      const newRand = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(revealSecret+commitBlockHash));
+      const newRandUint128 = ethers.BigNumber.from(newRand).toBigInt() & 0xffffffffffffffffffffffffffffffffn;
+      console.log(revealSecret,"revealSecret");
+      console.log(commitBlockHash,"commitBlockHash");
+      console.log(commitIndex.toHexString(),"commitIndex");
+      console.log(hashesLength.toHexString(),"hashesLength");
+      console.log(newRandUint128.toHexString(),"newRand");
+      const output = await update(commitIndex,hashesLength,newRandUint128);
       const tx = await lottery.reveal(revealSecret,output.pA,output.pB,output.pC,output.newRoot);
       const receipt = await tx.wait();
       console.log("Reveal transaction receipt:", receipt);
@@ -74,6 +90,7 @@ async function readLogs(provider,lottery,generator,walletAddress) {
   const CHUNK_SIZE = 99;
   let [lastIndex,lastBlockNumber,lastRoot,lastLeaf] = readLast();
   let [logsBlockNumber,logsTransactionIndex] = readLastLog();
+  console.log(logsBlockNumber,"start");
   const blockNumber = await provider.getBlockNumber();
   for(let currentBlock = logsBlockNumber; currentBlock < blockNumber; currentBlock += CHUNK_SIZE) {
     const endBlock = Math.min(currentBlock + CHUNK_SIZE, blockNumber);
@@ -118,7 +135,8 @@ async function readLogs(provider,lottery,generator,walletAddress) {
       logsBlockNumber = log.blockNumber;
       logsTransactionIndex = log.transactionIndex;
     }
-    writeLastLog(logsBlockNumber,logsTransactionIndex);
+    writeLastLog(endBlock,0);
+    //writeLastLog(logsBlockNumber,logsTransactionIndex);
     //break; // TODO: remove this after tests
   }
   // write blockNumber to logs.csv
