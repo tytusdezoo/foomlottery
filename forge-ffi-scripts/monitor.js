@@ -169,11 +169,17 @@ async function main() {
   //const balance = await provider.getBalance(wallet.address);
   //console.log("Wallet balance:", ethers.utils.formatEther(balance));
 
-  await rememberHash(lottery);
-  generator = await readLogs(provider,lottery,generator,wallet.address);
-  if(task == "commit" && generator == wallet.address) { // TODO, update generator if needed
-    await commit(provider,lottery);
+  // run forever
+  while(true) {
+    await rememberHash(lottery);
     generator = await readLogs(provider,lottery,generator,wallet.address);
+    if(task == "commit" && generator == wallet.address) { // TODO, update generator if needed
+      await commit(provider,lottery);
+      generator = await readLogs(provider,lottery,generator,wallet.address);
+    }
+    // wait 30 seconds
+    console.log("Waiting 10 seconds");
+    await new Promise(resolve => setTimeout(resolve, 10000));
   }
 }
 
