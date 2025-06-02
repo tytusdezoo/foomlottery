@@ -19,6 +19,8 @@ function hexToBigint(value) {
 // Converts a Bigint to hex string of specified length
 const bigintToHex = (number, length = 32) =>
   "0x" + number.toString(16).padStart(length * 2, "0");
+//const bigintToHex = (number, length = 32) =>
+//  "0x" + number.toHexString().padStart(length * 2, "0");
 
 // Converts a buffer of bytes into a BigInt, assuming little-endian byte order.
 const leBufferToBigint = (buff) => {

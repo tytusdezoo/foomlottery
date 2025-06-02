@@ -408,7 +408,30 @@ async function putLeaves(newIndex,newRand,newRoot,blockNumber) {
   cleanwaiting(nextIndex+commitIndex);
 }
 
+function updateSize(commitSize){
+  if(commitSize==1){
+    return(1);}
+  if(commitSize<=3){ 
+    return(3);}
+  if(commitSize<=5){
+    return(5);}
+  if(commitSize<=11){
+    return(11);}
+  if(commitSize<=21){
+    return(21);}
+  if(commitSize<=44){
+    return(44);}
+  if(commitSize<=89){
+    return(89);}
+  if(commitSize<=179){
+    return(179);}
+  throw("bad commitSize");
+}
+
 async function update(commitIndex,hashesLength,newRand){
+  if(hashesLength==0) {
+    hashesLength=updateSize(commitIndex);
+  }
   const mimcsponge = await circomlibjs.buildMimcSponge();
   const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();  // add lastLeaf
   const newHashes = getWaitingList(nextIndex,commitIndex);
@@ -468,25 +491,6 @@ async function update(commitIndex,hashesLength,newRand){
   return output;
 }
 
-function updateSize(commitSize){
-  if(commitSize<=1){
-    return(1);}
-  if(commitSize<=3){ 
-    return(3);}
-  if(commitSize<=5){
-    return(5);}
-  if(commitSize<=11){
-    return(11);}
-  if(commitSize<=21){
-    return(21);}
-  if(commitSize<=44){
-    return(44);}
-  if(commitSize<=89){
-    return(89);}
-  if(commitSize<=179){
-    return(179);}
-  throw("bad commitSize");
-}
 
 module.exports = {
   mimicMerkleTree,
@@ -509,5 +513,4 @@ module.exports = {
   putLeaves,
   readWaitingBlocknumber,
   update,
-  updateSize,
 };

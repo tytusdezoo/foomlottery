@@ -3,7 +3,7 @@
 
 const dotenv = require("dotenv");
 const { ethers } = require("ethers");
-const { readLast, readLastLog, writeLastLog, writeWaiting, writeRevealLock, readRevealLock, readWaitingBlocknumber, update, updateSize } = require("./utils/mimcMerkleTree.js");
+const { readLast, readLastLog, writeLastLog, writeWaiting, writeRevealLock, readRevealLock, readWaitingBlocknumber, update, putLeaves } = require("./utils/mimcMerkleTree.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 
@@ -45,13 +45,21 @@ async function commit(provider,lottery) {
   }
 }
 
-async function reveal(lottery,index,commitIndex,commitHash,commitBlockHash) {
+async function reveal(lottery,index,commitIndex,commitHash,commitBlockHash,revealSecret) {
+  const revealed=revealSecret!=0n;
   const nextIndex = await lottery.nextIndex();
-  if(index == nextIndex) { // TODO: check if this is needed
-    const revealSecretInput = process.env.PRIVATE_KEY+'_FOOM_'+nextIndex.toString();
-    const revealSecret = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(revealSecretInput));
+  if(index == nextIndex) {
+    if(revealSecret == 0n) {
+      const revealSecretInput = process.env.PRIVATE_KEY+'_FOOM_'+nextIndex.toString();
+      console.log(revealSecretInput,"reveal secret input");
+      revealSecret = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(revealSecretInput));
+    }
+    if(commitIndex == 0) {
+      commitIndex = await lottery.commitIndex();
+      commitHash = await lottery.commitHash();
+      commitBlockHash = await lottery.commitBlockHash();
+    }
     const revealSecretHash = ethers.utils.keccak256(revealSecret);
-    console.log(revealSecretInput,"reveal secret input");
     console.log(revealSecretHash,"reveal secret hash");
     console.log(commitHash,"commitHash");
     if(revealSecretHash == commitHash.toHexString()) {
@@ -59,36 +67,26 @@ async function reveal(lottery,index,commitIndex,commitHash,commitBlockHash) {
         return;
       }
       writeRevealLock(index); 
-      const hashesLength=updateSize(commitIndex);
-      //const newRand = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(revealSecret+commitBlockHash));
       const newRand = ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["bytes32","bytes32"],[revealSecret,commitBlockHash]));
       const newRandUint128 = ethers.BigNumber.from(newRand).toBigInt() & 0xffffffffffffffffffffffffffffffffn;
-      console.log(revealSecret,"revealSecret");
-      console.log(commitBlockHash,"commitBlockHash");
-      console.log(revealSecret+commitBlockHash,"revealSecret+commitBlockHash");
-      console.log(commitIndex.toString(16),"commitIndex");
-      console.log(hashesLength.toString(16),"hashesLength");
-      console.log(newRandUint128.toString(16),"newRand");
       try {
-        const output = await update(commitIndex,hashesLength,newRandUint128);
+        const output = await update(commitIndex,0,newRandUint128);
         const tx = await lottery.reveal(revealSecret,output.pA,output.pB,output.pC,output.newRoot);
         const receipt = await tx.wait();
         console.log("Reveal transaction receipt:", receipt);
         if(receipt.status == 1) {
             writeRevealLock(0);
         } else {
-          console.log("Reveal transaction failed");
+          throw new Error("Reveal transaction failed");
+        }
+      } catch(error) {
+        console.log("Reveal transaction failed:", error);
+        if(!revealed) {
           // publish secret to the network
           const tx = await lottery.secret(revealSecret);
           const receipt = await tx.wait();
           console.log("Publish secret transaction receipt:", receipt);
         }
-      } catch(error) {
-        console.log("Reveal transaction failed:", error);
-        // publish secret to the network
-        const tx = await lottery.secret(revealSecret);
-        const receipt = await tx.wait();
-        console.log("Publish secret transaction receipt:", receipt);
       }
     } else {
       console.log("Reveal secret hash does not match commit hash");
@@ -99,7 +97,7 @@ async function reveal(lottery,index,commitIndex,commitHash,commitBlockHash) {
 async function readLogs(provider,lottery,generator,walletAddress) {
   const CHUNK_SIZE = 99;
   let [lastIndex,lastBlockNumber,lastRoot,lastLeaf] = readLast();
-  let [logsBlockNumber,logsTransactionIndex] = readLastLog();
+  const [logsBlockNumber,logsTransactionIndex] = readLastLog();
   console.log(logsBlockNumber,"start");
   const blockNumber = await provider.getBlockNumber();
   for(let currentBlock = logsBlockNumber; currentBlock < blockNumber; currentBlock += CHUNK_SIZE) {
@@ -111,43 +109,49 @@ async function readLogs(provider,lottery,generator,walletAddress) {
       if(log.removed || log.blockNumber < logsBlockNumber || (log.blockNumber == logsBlockNumber && log.transactionIndex <= logsTransactionIndex)) {
         continue;
       }
-      console.log("Log:", log);
       if(log.event == "LogChangeGenerator") {
         console.log("Change generator:", log.args);
         generator = log.args.generator;
       }
-      if(log.event == "LogBetIn") {
+      else if(log.event == "LogBetIn") {
         console.log("Bet in:", log.args);
         writeWaiting(log.args.index,log.args.newHash,log.blockNumber);
       }
-      if(log.event == "LogCancel") {
+      else if(log.event == "LogCancel") {
         console.log("Cancel:", log.args);
         writeWaiting(log.args.index,0x20n,log.blockNumber);
       }
-      if(log.event == "LogUpdate") {
+      else if(log.event == "LogUpdate") {
         console.log("LogUpdate:", log.args);
-        const index = Number(log.args.newIndex);
-        if(index > lastIndex) { // newIndex should be smaller than lastIndex + 256, otherwise the update will fail
-          await putLeaves(index,log.args.newRand,log.args.newRoot,log.blockNumber);
+        const index = Number(log.args.index);
+        if(index > lastIndex) {
+          console.log("Put leaves:", index, log.args.newRand, log.args.newRoot, log.blockNumber);
+          await putLeaves(index,BigInt(log.args.newRand),BigInt(log.args.newRoot),log.blockNumber);
           [lastIndex,lastBlockNumber,lastRoot,lastLeaf] = readLast();
+          console.log("lastIndex:", lastIndex);
         }
       }
-      if(log.event == "LogCommit") {
+      else if(log.event == "LogCommit") {
         console.log("LogCommit:", log.args);
         const index = Number(log.args.index);
         if(index == lastIndex) {
           if(generator == walletAddress) {
-            await reveal(lottery,index,Number(log.args.commitIndex),log.args.commitHash,log.blockHash);
+            await reveal(lottery,index,Number(log.args.commitIndex),log.args.commitHash,log.blockHash,0n);
           }
-          // TODO, log data in case secret will be revealed later
         }
       }
-      logsBlockNumber = log.blockNumber;
-      logsTransactionIndex = log.transactionIndex;
+      else if(log.event == "LogSecret") {
+        console.log("LogSecret:", log.args);
+        if(log.args.lastRoot == lastRoot) {
+          await reveal(lottery,lastIndex,0,0n,0n,log.args.revealSecret);
+        }
+      }
+      else {
+        console.log("Log:", log);
+      }
+      writeLastLog(log.blockNumber,log.transactionIndex);
     }
-    writeLastLog(endBlock,0);
-    //writeLastLog(logsBlockNumber,logsTransactionIndex);
-    //break; // TODO: remove this after tests
+    writeLastLog(endBlock,-1);
   }
   // write blockNumber to logs.csv
   return generator;
