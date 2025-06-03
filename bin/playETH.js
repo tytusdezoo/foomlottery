@@ -93,7 +93,7 @@ async function main() {
   if(i >= 10000n) { throw new Error("Failed to create ticket"); }
   secret_power = secret<<8n | BigInt(power);
   const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();
-  console.log("secret: %s.%s\n",bigintToHex(secret_power),nextIndex.toString(16));
+  console.log("secret: %s,%s\n",bigintToHex(secret_power),nextIndex.toString());
 
   // ask for confirmation using readline
   const ask = sprintfjs.sprintf("Are you sure you want to play this ticket and send %s ETH? (y/n): ", ethers.utils.formatEther(amountInETH));
@@ -106,7 +106,7 @@ async function main() {
   // append to tickets.txt
   console.log("writing ticket to tickets.txt...");
   const ticketsFile = fs.openSync("tickets.txt", "a");
-  fs.writeSync(ticketsFile, `${bigintToHex(secret_power)},${nextIndex.toString(16)}\n`);
+  fs.writeSync(ticketsFile, `${bigintToHex(secret_power)},${nextIndex.toString()}\n`);
   fs.closeSync(ticketsFile);
   
   console.log("sending ticket...");
