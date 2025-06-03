@@ -100,7 +100,7 @@ async function readLogs(provider,lottery,generator,walletAddress) {
   const [logsBlockNumber,logsTransactionIndex] = readLastLog();
   console.log(logsBlockNumber,"start");
   const blockNumber = await provider.getBlockNumber();
-  for(let currentBlock = logsBlockNumber; currentBlock < blockNumber; currentBlock += CHUNK_SIZE) {
+  for(let currentBlock = logsBlockNumber; currentBlock < blockNumber; currentBlock += CHUNK_SIZE+1) {
     const endBlock = Math.min(currentBlock + CHUNK_SIZE, blockNumber);
     console.log(`Querying blocks ${currentBlock} to ${endBlock} max ${blockNumber}`);    
     const logs = await lottery.queryFilter({}, currentBlock, endBlock);
@@ -151,7 +151,7 @@ async function readLogs(provider,lottery,generator,walletAddress) {
       }
       writeLastLog(log.blockNumber,log.transactionIndex);
     }
-    writeLastLog(endBlock,-1);
+    writeLastLog(endBlock+1,-1);
   }
   // write blockNumber to logs.csv
   return generator;
