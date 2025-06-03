@@ -87,6 +87,7 @@ async function main() {
     process.exit(0);
   }
   // append to tickets.txt
+  console.log("writing ticket to tickets.txt...");
   const ticketsFile = fs.openSync("tickets.txt", "a");
   fs.writeSync(ticketsFile, `${bigintToHex(secret_power)},${nextIndex.toString(16)}\n`);
   fs.closeSync(ticketsFile);

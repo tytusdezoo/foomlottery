@@ -21,6 +21,7 @@ docs/
 # 
 tmp/
 tickets.txt
+receipts.txt
 
 # base chain
 base
