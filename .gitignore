@@ -20,7 +20,7 @@ docs/
 
 # 
 tmp/
-remember.log
+tickets.txt
 
 # base chain
 base

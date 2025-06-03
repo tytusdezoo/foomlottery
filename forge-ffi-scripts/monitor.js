@@ -20,9 +20,9 @@ async function rememberHash(lottery) {
 }
 
 async function commit(provider,lottery) {
-  const minBets = 8;
-  const minBlocks = 30*60; // 60 minutes on Base
-  const maxUpdate = 179;
+  const minBets = process.env.MIN_BETS ? parseInt(process.env.MIN_BETS) : 8;
+  const minBlocks = process.env.MIN_BLOCKS ? parseInt(process.env.MIN_BLOCKS) : 30*60; // 60 minutes on Base
+  const maxUpdate = process.env.MAX_UPDATE ? parseInt(process.env.MAX_UPDATE) : 179;
   const blockNumber = await provider.getBlockNumber();
   const nextIndex = await lottery.nextIndex();
   const betsIndex = await lottery.betsIndex();
@@ -178,8 +178,8 @@ async function main() {
       generator = await readLogs(provider,lottery,generator,wallet.address);
     }
     // wait 30 seconds
-    console.log("Waiting 10 seconds");
-    await new Promise(resolve => setTimeout(resolve, 10000));
+    console.log("Waiting 17 seconds");
+    await new Promise(resolve => setTimeout(resolve, 17000));
   }
 }
 
