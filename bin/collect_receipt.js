@@ -1,0 +1,94 @@
+#!/usr/bin/node
+const dotenv = require("dotenv");
+const path = require("path");
+const snarkjs = require("snarkjs");
+const { ethers } = require("ethers");
+const readline = require('readline');
+const { hexToBigint, bigintToHex, leBigintToBuffer, reverseBits, leBufferToBigint } = require("./utils/bigint.js");
+const { pedersenHash } = require("./utils/pedersen.js");
+const { getPath, findBet } = require("./utils/mimcMerkleTree.js");
+const circomlibjs = require("circomlibjs");
+const sprintfjs = require("sprintf-js");
+
+// Create readline interface
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+
+// Promise wrapper for readline question
+function question(query) {
+  return new Promise((resolve) => {
+    rl.question(query, resolve);
+  });
+}
+////////////////////////////// MAIN ///////////////////////////////////////////
+// forge-ffi-scripts/withdraw.js 0x3beeeb6bffb83c559c3c63c9d0049ec50286776b2517c6d6ec2e0f00660d7309 0x1e0 0x1 0x0 0x0 0x0
+// forge-ffi-scripts/withdraw.js 0x03f6600c7331bd61106b32556f2676d57e81cf2b0bf6df800e6fcb4c53f56b009 0x01e0 0x01 0x0 0x0 0x0
+// forge-ffi-scripts/withdraw.js 0x09340709afb154bbd3f9ccc089c0d5f2809f63fee47f88f2effe2dfeda432e16 0x0ff 0x01 0x0 0x0 0x0
+// forge-ffi-scripts/withdraw.js 0x0872cabfcaa22225e755412927cc3595379767452f8813f4fa0af1d8b9ce9540a 0x0ff 0x01 0x0 0x0 0x0
+
+async function main() {
+  dotenv.config();
+  const betMin = ethers.utils.parseUnits("1000000", 18);
+  const power1=10;
+  const power2=16;
+  const power3=22;
+  const inputs = process.argv.slice(2, process.argv.length);
+  if(inputs.length == 0) {
+    console.log("Usage: node collect_receipt.js <invest_in_FOOM> <receipt>");
+    process.exit(1);
+  }
+  const invest_in_FOOM = ethers.utils.parseUnits(inputs[0], 18);
+  console.log("decode ...");
+  const d = ethers.utils.defaultAbiCoder.decode(["uint256[2]", "uint256[2][2]", "uint256[2]", "uint[7]"],inputs[1]);
+  console.log("decoded");
+  const nullifierHash = d[3][1];
+  const recipient_address = d[3][2];
+  const relayer_address = d[3][3];
+  const fee_in_FOOM = d[3][4];
+  const refund_in_ETH = d[3][5];
+  const rewardbits = d[3][6];
+
+  console.log("recipient_address:", recipient_address.toHexString());
+  console.log("relayer_address  :", (relayer_address==0n?'0x0000000000000000000000000000000000000000':relayer_address.toHexString()));
+  console.log("fee_in_FOOM:", ethers.utils.formatUnits(fee_in_FOOM, 18));
+  console.log("refund_in_ETH:", ethers.utils.formatEther(refund_in_ETH));
+  console.log("invest_in_FOOM:", ethers.utils.formatUnits(invest_in_FOOM, 18));
+  const rew = rewardbits.toNumber();
+  const rew1 = rew&1;
+  const rew2 = rew&2;
+  const rew3 = rew&4;
+  const reward = betMin.mul(rew1*2**power1+rew2*2**power2+rew3*2**power3);
+  console.log("Reward_in_FOOM: %s %s", ethers.utils.formatUnits(reward, 18), rewardbits.eq(0)?'no need to claim!':'');
+
+  const ask = sprintfjs.sprintf("Do You want to collect the reward at address %s now and invest %s FOOM in the lottery%s? (y/n): ",
+    ethers.utils.getAddress(recipient_address.toHexString()), ethers.utils.formatUnits(invest_in_FOOM, 18),rewardbits.eq(0)?' anyway':'');
+  const answer = await question(ask);
+  if(answer.toLowerCase() !== 'y') {
+    process.exit(0);
+  }
+
+  const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
+  const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+  const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
+  const collected = await lottery.nullifier(nullifierHash);
+  if(collected.gt(0)) {
+    console.log("ticket already collected!");
+    process.exit(1);
+  }
+  const relayer = d[3][3].eq(0)?'0x0000000000000000000000000000000000000000':d[3][3].toHexString();
+  //const tx = await lottery.collect(pA,pB,pC,pathElements[32],nullifierHash,inputs[1],inputs[2],hexToBigint(inputs[3]),hexToBigint(inputs[4]),rewardbits,hexToBigint(inputs[5]));
+  const tx = await lottery.collect(d[0],d[1],d[2],d[3][0],d[3][1],d[3][2].toHexString(),relayer,d[3][4],d[3][5],d[3][6],invest_in_FOOM);
+  const receipt = await tx.wait();
+  console.log("tx hash: %s", receipt.transactionHash);
+}
+
+main()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });

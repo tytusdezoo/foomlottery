@@ -158,7 +158,7 @@ async function main() {
     console.log("tx hash: %s", receipt.transactionHash);
   } else {
     console.log("Use this receipt for collecting later!\n");
-    console.log(`${inputs[0]},${encoded}`);
+    console.log(encoded);
   }
 }
 
