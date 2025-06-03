@@ -5,6 +5,7 @@ const { openSync, readFileSync, closeSync, existsSync, writeFileSync, mkdirSync 
 const { execSync } = require('child_process');
 const sprintfjs = require('sprintf-js');
 const zlib = require('zlib');
+const request = require('sync-request');
 const MERKLE_TREE_HEIGHT = 32;
 
 const zeros = [
@@ -24,24 +25,33 @@ function touchfile(path) {
   }
 }
 
-function getLines(path){
+function getLines(path) {
   let fileold;
   let textold;
+  // collect data via https if FOOM_URL is set
   try {
-    if(existsSync(path)){
-      fileold = openSync(path, "r");
+    if(process.env.FOOM_URL) {
+      const url = process.env.FOOM_URL + "/" + path;
+      const response = request('GET', url);
+      if (response.statusCode !== 200) {
+        return [];
+      }
+      textold = response.getBody('utf8');
+    } else if(existsSync("www/"+path)) {
+      fileold = openSync("www/"+path, "r");
       textold = readFileSync(fileold, "utf8");
-    } else if(existsSync(path+".gz")) {
-      fileold = openSync(path+".gz", "r"); // decompress the file
+      closeSync(fileold);
+    } else if(existsSync("www/"+path+".gz")) {
+      fileold = openSync("www/"+path+".gz", "r"); // decompress the file
       textold = zlib.gunzipSync(readFileSync(fileold)).toString();
+      closeSync(fileold);
     } else {
       return [];
     }
-    closeSync(fileold);
   } catch(e) {
     return [];
   }
-  if(textold.length==0){
+  if(!textold || textold.length==0) {
     return [];
   }
   // remove empty lines
@@ -49,31 +59,34 @@ function getLines(path){
 }
 
 function writeLast(nextIndex,blockNumber,lastRoot,lastLeaf){
-  writeFileSync("www/last.csv", sprintfjs.sprintf("%x,%x,%s,%s\n",nextIndex,blockNumber,no0x(bigintToHex(lastRoot)),no0x(bigintToHex(lastLeaf))));
+  writeFileSync("last.csv", sprintfjs.sprintf("%x,%x,%s,%s\n",nextIndex,blockNumber,no0x(bigintToHex(lastRoot)),no0x(bigintToHex(lastLeaf))));
 }
 
 function readLast(){
-  const lines = getLines("www/last.csv");
+  const lines = getLines("last.csv");
+  if(lines.length==0) {
+    throw new Error("Failed to read tree from "+(process.env.FOOM_URL||"www/")+"last.csv");
+  }
   const [nextIndex,blockNumber,lastRoot,lastLeaf] = lines[0].split(',');
   return [parseInt(nextIndex,16), parseInt(blockNumber,16), hexToBigint(lastRoot), hexToBigint(lastLeaf)];
 }
 
 function writeLastLog(blockNumber,transactionIndex){
-  writeFileSync("www/logs.csv", sprintfjs.sprintf("%d,%d\n",blockNumber,transactionIndex), { flag: 'w' });
+  writeFileSync("logs.csv", sprintfjs.sprintf("%d,%d\n",blockNumber,transactionIndex), { flag: 'w' });
 }
 
 function readLastLog(){
-  const lines = getLines("www/logs.csv");
+  const lines = getLines("logs.csv");
   const [blockNumber,transactionIndex] = lines[0].split(',');
   return [parseInt(blockNumber,10), parseInt(transactionIndex,10)];
 }
 
 function writeRevealLock(nextIndex){
-  writeFileSync("www/reveallock.csv", sprintfjs.sprintf("%d\n",nextIndex), { flag: 'w' });
+  writeFileSync("reveallock.csv", sprintfjs.sprintf("%d\n",nextIndex), { flag: 'w' });
 }
 
 function readRevealLock(){
-  const lines = getLines("www/reveallock.csv");
+  const lines = getLines("reveallock.csv");
   if(lines.length==0) {
     return 0;
   }
@@ -81,11 +94,11 @@ function readRevealLock(){
 }
 
 function writeWaiting(index,hash,blocknumber){
-  writeFileSync("www/waiting.csv", sprintfjs.sprintf("%s,%s,%d\n",no0x(index.toHexString()),no0x(hash.toHexString()),blocknumber), { flag: 'a' });
+  writeFileSync("waiting.csv", sprintfjs.sprintf("%s,%s,%d\n",no0x(index.toHexString()),no0x(hash.toHexString()),blocknumber), { flag: 'a' });
 }
 
 function readWaitingBlocknumber(){
-  const lines = getLines("www/waiting.csv");
+  const lines = getLines("waiting.csv");
   const values = lines[0].split(',');
   if(values.length==0) {
     return 0;
@@ -98,7 +111,7 @@ function getIndexRand(hashstr,betIndex) {
   const path1 = path.slice(0,2);
   const path2 = path.slice(2,4); 
   const path3 = path.slice(4,6);
-  const lines = getLines("www/"+path1+"/"+path2+"/"+path3+".csv");
+  const lines = getLines(""+path1+"/"+path2+"/"+path3+".csv");
   //console.log(hashstr);
   for(let i=0;i<lines.length;i++) {
     const [index,skip,hash,myrand] = lines[i].split(',');
@@ -113,7 +126,7 @@ function getIndexRand(hashstr,betIndex) {
 }
 
 function getIndexWaiting(hashstr) {
-  const lines = getLines("www/waiting.csv");
+  const lines = getLines("waiting.csv");
   for(let i=0;i<lines.length;i++) {
     const [index,hash] = lines[i].split(',');
     if(hash==hashstr) {
@@ -136,7 +149,7 @@ function findBet(inHash,startindex) {
 }
 
 function getWaitingList(nextIndex,hashesLength){
-  const lines = getLines("www/waiting.csv");
+  const lines = getLines("waiting.csv");
   const hashes = new Array(hashesLength);
   lines.forEach((line) => {
     if (!line) return;  // Skip empty lines
@@ -166,10 +179,10 @@ async function getLastPath(lastIndex){
   const path4 = path.slice(6,8); const path4i=parseInt(path4,16);
 //console.log(path);
 
-  const [leaves1] = getLeaves("www/index.csv");
-  const [leaves2] = getLeaves("www/"+path1+"/index.csv");
-  const [leaves3] = getLeaves("www/"+path1+"/"+path2+"/index.csv");
-  const [leaves4] = getLeaves("www/"+path1+"/"+path2+"/"+path3+".csv");
+  const [leaves1] = getLeaves("index.csv");
+  const [leaves2] = getLeaves(""+path1+"/index.csv");
+  const [leaves3] = getLeaves(""+path1+"/"+path2+"/index.csv");
+  const [leaves4] = getLeaves(""+path1+"/"+path2+"/"+path3+".csv");
 
   const tree4 = await mimicMerkleTree(hexToBigint(zeros[0]),leaves4,8);
   const mpath4 = tree4.path(path4i);
@@ -206,22 +219,22 @@ async function getPath(index,nextIndex){
   const npath2 = npath.slice(2,4); const npath2i=parseInt(npath2,16);
   const npath3 = npath.slice(4,6); const npath3i=parseInt(npath3,16);
 
-  const [leaves1] = getLeaves("www/index.csv");
-  const [leaves2] = getLeaves("www/"+path1+"/index.csv");
-  const [leaves3] = getLeaves("www/"+path1+"/"+path2+"/index.csv");
-  const [leaves4] = getLeaves("www/"+path1+"/"+path2+"/"+path3+".csv");
+  const [leaves1] = getLeaves("index.csv");
+  const [leaves2] = getLeaves(""+path1+"/index.csv");
+  const [leaves3] = getLeaves(""+path1+"/"+path2+"/index.csv");
+  const [leaves4] = getLeaves(""+path1+"/"+path2+"/"+path3+".csv");
 
   let tree4 = await mimicMerkleTree(hexToBigint(zeros[0]),leaves4,8);
   const mpath4 = tree4.path(path4i);
   if((index&0xFFFFFF00)!=(nextIndex&0xFFFFFF00)){
-    const [nleaves4] = getLeaves("www/"+npath1+"/"+npath2+"/"+npath3+".csv");
+    const [nleaves4] = getLeaves(""+npath1+"/"+npath2+"/"+npath3+".csv");
     tree4 = await mimicMerkleTree(hexToBigint(zeros[0]),nleaves4,8);}
   const root4 = tree4.root;
   leaves3.push(root4);
   let tree3 = await mimicMerkleTree(hexToBigint(zeros[1]),leaves3,8);
   const mpath3 = tree3.path(path3i);
   if((index&0xFFFF0000)!=(nextIndex&0xFFFF0000)){
-    const [nleaves3] = getLeaves("www/"+npath1+"/"+npath2+"/index.csv");
+    const [nleaves3] = getLeaves(""+npath1+"/"+npath2+"/index.csv");
     tree3 = await mimicMerkleTree(hexToBigint(zeros[1]),nleaves3,8);}
   const root3 = tree3.root;
   leaves2.push(root3);
@@ -229,7 +242,7 @@ async function getPath(index,nextIndex){
   const mpath2 = tree2.path(path2i);
   const root2 = tree2.root;
   if((index&0xFF000000)!=(nextIndex&0xFF000000)){
-    const [nleaves2] = getLeaves("www/"+npath1+"/index.csv");
+    const [nleaves2] = getLeaves(""+npath1+"/index.csv");
     tree2 = await mimicMerkleTree(hexToBigint(zeros[2]),nleaves2,8);}
   leaves1.push(root2);
   const tree1 = await mimicMerkleTree(hexToBigint(zeros[3]),leaves1,8);
@@ -245,10 +258,10 @@ async function getNewRoot(nextIndex,newLeaves){
   const path2 = path.slice(2,4); 
   const path3 = path.slice(4,6);
 
-  const [leaves1] = getLeaves("www/index.csv");
-  const [leaves2] = getLeaves("www/"+path1+"/index.csv");
-  const [leaves3] = getLeaves("www/"+path1+"/"+path2+"/index.csv");
-  const [leaves4] = getLeaves("www/"+path1+"/"+path2+"/"+path3+".csv");
+  const [leaves1] = getLeaves("index.csv");
+  const [leaves2] = getLeaves(""+path1+"/index.csv");
+  const [leaves3] = getLeaves(""+path1+"/"+path2+"/index.csv");
+  const [leaves4] = getLeaves(""+path1+"/"+path2+"/"+path3+".csv");
 
   const roots = new Array(2);
 
@@ -330,7 +343,7 @@ async function computeRoot(path,zero) {
     }
   }
   if(needfix>0){
-    writeFileSync("www/fix.csv", sprintfjs.sprintf("%s\n",path), { flag: 'a' }); // TODO, write block number too
+    writeFileSync("fix.csv", sprintfjs.sprintf("%s\n",path), { flag: 'a' }); // TODO, write block number too
   } else {
     execSync("gzip -9 "+path);
   }
@@ -339,7 +352,7 @@ async function computeRoot(path,zero) {
 }
 
 function cleanwaiting(nextIndex) {
-  const lines = getLines("www/waiting.csv");
+  const lines = getLines("waiting.csv");
   let textnew='';
   for(let i=0;i<lines.length;i++) {
     const [index] = lines[i].split(',');
@@ -348,7 +361,7 @@ function cleanwaiting(nextIndex) {
       textnew+=lines[i]+"\n";
     }
   }
-  writeFileSync("www/waiting.csv", textnew);
+  writeFileSync("waiting.csv", textnew);
 }
 
 async function appendtofile(pathlast,text,hash) {
@@ -357,23 +370,23 @@ async function appendtofile(pathlast,text,hash) {
   const path1 = path.slice(0,2);
   const path2 = path.slice(2,4); 
   const path3 = path.slice(4,6);
-  mkdirSync("www/"+path1+"/"+path2, { recursive: true });
+  mkdirSync(""+path1+"/"+path2, { recursive: true });
   if(path3=="00") {
-    touchfile("www/"+path1+"/"+path2+"/index.csv");
+    touchfile(""+path1+"/"+path2+"/index.csv");
     if(path2=="00"){
-      touchfile("www/"+path1+"/index.csv");
+      touchfile(""+path1+"/index.csv");
     }
   }
-  writeFileSync("www/"+path1+"/"+path2+"/"+path3+".csv", text, { flag: 'a' });
+  writeFileSync(""+path1+"/"+path2+"/"+path3+".csv", text, { flag: 'a' });
   if(hash) {
-    const root = await computeRoot("www/"+path1+"/"+path2+"/"+path3+".csv",0);
-    writeFileSync("www/"+path1+"/"+path2+"/index.csv", sprintfjs.sprintf("%s,%s\n",path3,no0x(bigintToHex(root))), { flag: 'a' });
+    const root = await computeRoot(""+path1+"/"+path2+"/"+path3+".csv",0);
+    writeFileSync(""+path1+"/"+path2+"/index.csv", sprintfjs.sprintf("%s,%s\n",path3,no0x(bigintToHex(root))), { flag: 'a' });
     if(path3=="ff"){
-      const root = await computeRoot("www/"+path1+"/"+path2+"/index.csv",1);
-      writeFileSync("www/"+path1+"/index.csv", sprintfjs.sprintf("%s,%s\n",path2,no0x(bigintToHex(root))), { flag: 'a' });
+      const root = await computeRoot(""+path1+"/"+path2+"/index.csv",1);
+      writeFileSync(""+path1+"/index.csv", sprintfjs.sprintf("%s,%s\n",path2,no0x(bigintToHex(root))), { flag: 'a' });
       if(path2=="ff"){
-        const root = await computeRoot("www/"+path1+"/index.csv",2);
-        writeFileSync("www/index.csv", sprintfjs.sprintf("%s,%s\n",path1,no0x(bigintToHex(root))), { flag: 'a' });
+        const root = await computeRoot(""+path1+"/index.csv",2);
+        writeFileSync("index.csv", sprintfjs.sprintf("%s,%s\n",path1,no0x(bigintToHex(root))), { flag: 'a' });
       }
     }
   }
