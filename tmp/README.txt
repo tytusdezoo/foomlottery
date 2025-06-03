@@ -12,3 +12,9 @@ snarkjs groth16 verify update_verification_key.json update_public.json update_pr
 
 # client
 https://github.com/tornadocash/tornado-core/blob/master/src/cli.js
+
+# monitor
+/etc/systemd/system/lottery.service 
+systemctl enable lottery
+systemctl start lottery.service
+journalctl -fu lottery
