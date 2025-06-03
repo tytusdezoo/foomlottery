@@ -159,6 +159,8 @@ async function readLogs(provider,lottery,generator,walletAddress) {
 
 async function main() {
   dotenv.config();
+  // remove FOOM_URL from process.env
+  delete process.env.FOOM_URL;
   const inputs = process.argv.slice(2, process.argv.length);
   const task = inputs.length > 0 ? inputs[0] : "";
   const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);

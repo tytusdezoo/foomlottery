@@ -59,7 +59,7 @@ function getLines(path) {
 }
 
 function writeLast(nextIndex,blockNumber,lastRoot,lastLeaf){
-  writeFileSync("last.csv", sprintfjs.sprintf("%x,%x,%s,%s\n",nextIndex,blockNumber,no0x(bigintToHex(lastRoot)),no0x(bigintToHex(lastLeaf))));
+  writeFileSync("www/last.csv", sprintfjs.sprintf("%x,%x,%s,%s\n",nextIndex,blockNumber,no0x(bigintToHex(lastRoot)),no0x(bigintToHex(lastLeaf))));
 }
 
 function readLast(){
@@ -72,7 +72,7 @@ function readLast(){
 }
 
 function writeLastLog(blockNumber,transactionIndex){
-  writeFileSync("logs.csv", sprintfjs.sprintf("%d,%d\n",blockNumber,transactionIndex), { flag: 'w' });
+  writeFileSync("www/logs.csv", sprintfjs.sprintf("%d,%d\n",blockNumber,transactionIndex), { flag: 'w' });
 }
 
 function readLastLog(){
@@ -82,7 +82,7 @@ function readLastLog(){
 }
 
 function writeRevealLock(nextIndex){
-  writeFileSync("reveallock.csv", sprintfjs.sprintf("%d\n",nextIndex), { flag: 'w' });
+  writeFileSync("www/reveallock.csv", sprintfjs.sprintf("%d\n",nextIndex), { flag: 'w' });
 }
 
 function readRevealLock(){
@@ -94,7 +94,7 @@ function readRevealLock(){
 }
 
 function writeWaiting(index,hash,blocknumber){
-  writeFileSync("waiting.csv", sprintfjs.sprintf("%s,%s,%d\n",no0x(index.toHexString()),no0x(hash.toHexString()),blocknumber), { flag: 'a' });
+  writeFileSync("www/waiting.csv", sprintfjs.sprintf("%s,%s,%d\n",no0x(index.toHexString()),no0x(hash.toHexString()),blocknumber), { flag: 'a' });
 }
 
 function readWaitingBlocknumber(){
@@ -361,7 +361,7 @@ function cleanwaiting(nextIndex) {
       textnew+=lines[i]+"\n";
     }
   }
-  writeFileSync("waiting.csv", textnew);
+  writeFileSync("www/waiting.csv", textnew);
 }
 
 async function appendtofile(pathlast,text,hash) {
@@ -370,23 +370,23 @@ async function appendtofile(pathlast,text,hash) {
   const path1 = path.slice(0,2);
   const path2 = path.slice(2,4); 
   const path3 = path.slice(4,6);
-  mkdirSync(""+path1+"/"+path2, { recursive: true });
+  mkdirSync("www/"+path1+"/"+path2, { recursive: true });
   if(path3=="00") {
-    touchfile(""+path1+"/"+path2+"/index.csv");
+    touchfile("www/"+path1+"/"+path2+"/index.csv");
     if(path2=="00"){
-      touchfile(""+path1+"/index.csv");
+      touchfile("www/"+path1+"/index.csv");
     }
   }
-  writeFileSync(""+path1+"/"+path2+"/"+path3+".csv", text, { flag: 'a' });
+  writeFileSync("www/"+path1+"/"+path2+"/"+path3+".csv", text, { flag: 'a' });
   if(hash) {
     const root = await computeRoot(""+path1+"/"+path2+"/"+path3+".csv",0);
-    writeFileSync(""+path1+"/"+path2+"/index.csv", sprintfjs.sprintf("%s,%s\n",path3,no0x(bigintToHex(root))), { flag: 'a' });
+    writeFileSync("www/"+path1+"/"+path2+"/index.csv", sprintfjs.sprintf("%s,%s\n",path3,no0x(bigintToHex(root))), { flag: 'a' });
     if(path3=="ff"){
       const root = await computeRoot(""+path1+"/"+path2+"/index.csv",1);
-      writeFileSync(""+path1+"/index.csv", sprintfjs.sprintf("%s,%s\n",path2,no0x(bigintToHex(root))), { flag: 'a' });
+      writeFileSync("www/"+path1+"/index.csv", sprintfjs.sprintf("%s,%s\n",path2,no0x(bigintToHex(root))), { flag: 'a' });
       if(path2=="ff"){
         const root = await computeRoot(""+path1+"/index.csv",2);
-        writeFileSync("index.csv", sprintfjs.sprintf("%s,%s\n",path1,no0x(bigintToHex(root))), { flag: 'a' });
+        writeFileSync("www/index.csv", sprintfjs.sprintf("%s,%s\n",path1,no0x(bigintToHex(root))), { flag: 'a' });
       }
     }
   }
