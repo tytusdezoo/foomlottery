@@ -66,10 +66,10 @@ async function main() {
   const slot0 = await foomdex.slot0();
   const price = ethers.BigNumber.from(slot0.sqrtPriceX96).mul(ethers.BigNumber.from(slot0.sqrtPriceX96)).mul(10n**18n).div(2n**192n);
   console.log("DEX FOOM price in ETH: %s", ethers.utils.formatEther(price));
-  const amountInETH = price.mul(foom_needed).div(10n**18n).mul(200n).div(100n);
-  console.log("DEX amountInETH: %s (200%%)", ethers.utils.formatEther(amountInETH));
-  //const amountInETH = price.mul(foom_needed).div(10n**18n).mul(105n).div(100n);
-  //console.log("DEX amountInETH: %s (105%%)", ethers.utils.formatEther(amountInETH));
+  //const amountInETH = price.mul(foom_needed).div(10n**18n).mul(200n).div(100n);
+  //console.log("DEX amountInETH: %s (200%%)", ethers.utils.formatEther(amountInETH));
+  const amountInETH = price.mul(foom_needed).div(10n**18n).mul(105n).div(100n);
+  console.log("DEX amountInETH: %s (105%%)", ethers.utils.formatEther(amountInETH));
   
   if(balance.lt(amountInETH)) {
     console.log("Not enough ETH for this ticket power. You need %s ETH. You have %s ETH.",

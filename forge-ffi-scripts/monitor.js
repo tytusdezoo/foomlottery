@@ -119,7 +119,7 @@ async function readLogs(provider,lottery,generator,walletAddress) {
       }
       else if(log.event == "LogCancel") {
         console.log("Cancel:", log.args);
-        writeWaiting(log.args.index,0x20n,log.blockNumber);
+        writeWaiting(log.args.index,BigNumber.from(0x20n),log.blockNumber);
       }
       else if(log.event == "LogUpdate") {
         console.log("LogUpdate:", log.args);
