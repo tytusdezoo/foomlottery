@@ -36,7 +36,12 @@ function getLines(path) {
       if (response.statusCode !== 200) {
         return [];
       }
-      textold = response.getBody('utf8');
+      // ungzip response if octet-stream
+      if(response.headers['content-type'] === 'application/octet-stream') {
+        textold = zlib.gunzipSync(response.getBody()).toString();
+      } else {
+        textold = response.getBody('utf8');
+      }
     } else if(existsSync("www/"+path)) {
       fileold = openSync("www/"+path, "r");
       textold = readFileSync(fileold, "utf8");
