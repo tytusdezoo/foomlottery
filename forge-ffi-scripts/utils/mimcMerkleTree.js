@@ -31,7 +31,7 @@ function getLines(path) {
   // collect data via https if FOOM_URL is set
   try {
     if(process.env.FOOM_URL) {
-      const url = process.env.FOOM_URL + "/" + path;
+      const url = process.env.FOOM_URL + "/" + path + "?nocache=" + Date.now();
       const response = request('GET', url);
       if (response.statusCode !== 200) {
         return [];
