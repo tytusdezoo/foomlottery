@@ -78,6 +78,9 @@ function readLast(){
 
 function readFees(){
   const lines = getLines("fees.csv");
+  if(lines.length==0) {
+    return ["0","0"];
+  }
   const [fee_in_FOOM,refund_in_ETH] = lines[0].split(',');
   return [fee_in_FOOM,refund_in_ETH];
 }
@@ -537,4 +540,5 @@ module.exports = {
   putLeaves,
   readWaitingBlocknumber,
   update,
+  readFees,
 };
