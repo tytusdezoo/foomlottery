@@ -25,7 +25,6 @@ async function commit(provider,lottery) {
   const minBlocks = process.env.MIN_BLOCKS ? parseInt(process.env.MIN_BLOCKS) : 30*60; // 60 minutes on Base
   const maxUpdate = process.env.MAX_UPDATE ? parseInt(process.env.MAX_UPDATE) : 179;
   const minBetSum = process.env.MIN_BET_SUM ? parseInt(process.env.MIN_BET_SUM) : 1024; // power:10
-  console.log("minBetSum:", minBetSum);
   const blockNumber = await provider.getBlockNumber();
   // user correct structure of D:
   /*
@@ -47,14 +46,7 @@ async function commit(provider,lottery) {
   const nextIndex = D.nextIndex;
   const betsIndex = D.betsIndex;
   const commitIndex = D.commitIndex;
-  //console.log("nextIndex:", nextIndex);
-  //console.log("betsIndex:", betsIndex);
-  //console.log("commitIndex:", commitIndex);
-  //const nextIndex = await lottery.nextIndex();
-  //const betsIndex = await lottery.betsIndex();
-  //const commitIndex = await lottery.commitIndex();
   const waitingSum = betsIndex>0?getWaitingSum(nextIndex,betsIndex):0;
-  //console.log("waitingSum:", waitingSum);
   const [lastIndex,lastBlockNumber,lastRoot,lastLeaf] = readLast();
   if(betsIndex > 0 && lastIndex == nextIndex && commitIndex == 0) {
     const waitingBlocknumber = readWaitingBlocknumber();
