@@ -247,14 +247,14 @@ async function main() {
           res.end("ERROR: no reward to claim!");
           return;
         }
-        const collected = lottery.nullifier.call([nullifierHash]);
+        const collected = await lottery.nullifier(nullifierHash);
         if(collected.gt(0)) {
           console.log("ticket already collected!");
           res.writeHead(200, { 'Content-Type': 'text/plain' });
           res.end("ERROR: ticket already collected!");
           return;
         }
-        const tx = lottery.collect.call(d[0],d[1],d[2],d[3][0],d[3][1],recipient,relayer,d[3][4],d[3][5],d[3][6],invest_in_FOOM);
+        const tx = await lottery.collect(d[0],d[1],d[2],d[3][0],d[3][1],recipient,relayer,d[3][4],d[3][5],d[3][6],invest_in_FOOM);
         console.log("tx hash: %s", tx);
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end("OK: "+tx);
