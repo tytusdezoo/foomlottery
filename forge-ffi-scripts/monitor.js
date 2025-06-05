@@ -187,9 +187,9 @@ async function main() {
       }
       const receipt = params.get('receipt');
       if(receipt) {
-        if(receipt.length != 32*15+2) {
+        if(receipt.length != 962) {
           res.writeHead(200, { 'Content-Type': 'text/plain' });
-          res.end("ERROR: receipt is not 15*32+2 bytes");
+          res.end("ERROR: receipt is not 962 characters");
           return;
         }
         const d = ethers.utils.defaultAbiCoder.decode(["uint256[2]", "uint256[2][2]", "uint256[2]", "uint[7]"],receipt);
