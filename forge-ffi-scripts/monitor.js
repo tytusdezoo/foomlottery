@@ -119,6 +119,9 @@ async function readLogs(provider,lottery,generator,walletAddress) {
   const CHUNK_SIZE = 99;
   let [lastIndex,lastBlockNumber,lastRoot,lastLeaf] = readLast();
   const [logsBlockNumber,logsTransactionIndex] = readLastLog();
+  if(logsBlockNumber == 0) {
+    logsBlockNumber = process.env.LOG_START ? parseInt(process.env.LOG_START) : 0;
+  }
   console.log(logsBlockNumber,"start");
   const blockNumber = await provider.getBlockNumber();
   for(let currentBlock = logsBlockNumber; currentBlock < blockNumber; currentBlock += CHUNK_SIZE+1) {
@@ -166,6 +169,10 @@ async function readLogs(provider,lottery,generator,walletAddress) {
         if(log.args.lastRoot == lastRoot) {
           await reveal(lottery,lastIndex,0,0n,0n,log.args.revealSecret);
         }
+      }
+      else if(log.event == "LogPrayer") {
+        console.log("Prayer:", log.args);
+        writePrayer(log.args.betId,log.args.prayer);
       }
       else {
         console.log("Log:", log);

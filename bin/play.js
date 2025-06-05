@@ -91,7 +91,10 @@ async function main() {
   const ticketsFile = fs.openSync("tickets.txt", "a");
   fs.writeSync(ticketsFile, `${bigintToHex(secret_power)},${nextIndex.toString()}\n`);
   fs.closeSync(ticketsFile);
-  
+
+  const askprayer = sprintfjs.sprintf("Do you want to include a prayer? (keep empty for no prayer): ");
+  const prayer = await question(askprayer);
+
   // aprrove foom
   console.log("approving foom...");
   const approveTx = await foom.approve(lottery.address, foom_needed);
@@ -99,7 +102,12 @@ async function main() {
   console.log("approve tx hash: %s", approveReceipt.transactionHash);
   // play the ticket
   console.log("sending ticket...");
-  const tx = await lottery.play(hash,power);
+  let tx = null;
+  if(prayer.length > 0) {
+    tx = await lottery.playAndPray(hash,power,prayer);
+  } else {
+    tx = await lottery.play(hash,power);
+  }
   const receipt = await tx.wait();
   console.log("tx hash: %s", receipt.transactionHash);
   

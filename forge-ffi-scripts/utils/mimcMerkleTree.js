@@ -107,6 +107,16 @@ function readRevealLock(){
   return parseInt(lines[0],10);
 }
 
+function writePrayer(betId,prayer){
+  // escape prayer for csv content
+  const escapedPrayer = prayer
+    .replace(/"/g, '""') // escape quotes by doubling them
+    .replace(/\n/g, '\\n') // escape newlines
+    .replace(/\r/g, '\\r'); // escape carriage returns
+  // always wrap in quotes since we need to handle commas and newlines
+  writeFileSync("www/prayers.csv", sprintfjs.sprintf("%d,\"%s\"\n",betId,escapedPrayer), { flag: 'a' });
+}
+
 function writeWaiting(index,hash,blocknumber){
   writeFileSync("www/waiting.csv", sprintfjs.sprintf("%s,%s,%d\n",no0x(index.toHexString()),no0x(hash.toHexString()),blocknumber), { flag: 'a' });
 }
