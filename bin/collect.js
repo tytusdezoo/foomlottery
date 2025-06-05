@@ -6,7 +6,7 @@ const { ethers } = require("ethers");
 const readline = require('readline');
 const { hexToBigint, bigintToHex, leBigintToBuffer, reverseBits, leBufferToBigint } = require("./utils/bigint.js");
 const { pedersenHash } = require("./utils/pedersen.js");
-const { getPath, findBet } = require("./utils/mimcMerkleTree.js");
+const { getPath, findBet, readFees } = require("./utils/mimcMerkleTree.js");
 const circomlibjs = require("circomlibjs");
 const sprintfjs = require("sprintf-js");
 
@@ -147,7 +147,35 @@ async function main() {
   );
   const d = ethers.utils.defaultAbiCoder.decode(["uint256[2]", "uint256[2][2]", "uint256[2]", "uint[7]"],encoded);
 
-  const ask2 = sprintfjs.sprintf("Do You want to collect the reward at address %s now and invest %s FOOM in the lottery? (y/n): ",
+  if(fee_in_FOOM.gt(0)) {
+    const ask3 = sprintfjs.sprintf("Do You want to collect the reward through a relayer at address %s now and invest %s FOOM in the lottery? (y/n): ",
+      ethers.utils.getAddress(recipient_address.toString(16)), ethers.utils.formatUnits(invest_in_FOOM, 18));
+    const answer3 = await question(ask3);
+    if(answer3.toLowerCase() == 'y') {
+      const [min_fee_in_FOOM_tx,max_refund_in_ETH_tx] = readFees();
+      if(max_refund_in_ETH_tx == "0") {
+        console.log("ERROR: relayer not ready!");
+        process.exit(1);
+      }
+      const min_fee_in_FOOM = ethers.utils.parseUnits(min_fee_in_FOOM_tx, 18);
+      const max_refund_in_ETH = ethers.utils.parseUnits(max_refund_in_ETH_tx, 18);      
+      if(fee_in_FOOM.lt(min_fee_in_FOOM)) {
+        console.log("ERROR: fee is too low "+ethers.utils.formatUnits(fee_in_FOOM, 18)+" < "+ethers.utils.formatUnits(min_fee_in_FOOM, 18));
+        process.exit(1);
+      }
+      if(refund_in_ETH.gt(max_refund_in_ETH)) {
+        console.log("ERROR: refund is too high "+ethers.utils.formatEther(refund_in_ETH)+" > "+ethers.utils.formatEther(max_refund_in_ETH));
+        process.exit(1);
+      }
+      // run curl 'FOOM_URL/cgi?receipt=encoded&invest=invest_in_FOOM'
+      const res = await fetch(`${process.env.FOOM_URL}/cgi?receipt=${encoded}&invest=${invest_in_FOOM}`);
+      const data = await res.text();
+      console.log("RESPONSE: %s", data);
+      return;
+    }
+  }
+
+  const ask2 = sprintfjs.sprintf("Do You want to collect the reward yourself at address %s now and invest %s FOOM in the lottery? (y/n): ",
     ethers.utils.getAddress(recipient_address.toString(16)), ethers.utils.formatUnits(invest_in_FOOM, 18));
   const answer2 = await question(ask2);
   if(answer2.toLowerCase() == 'y') {
