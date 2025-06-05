@@ -247,7 +247,7 @@ async function main() {
           res.end("ERROR: no reward to claim!");
           return;
         }
-        const collected = lottery.nullifier.call(nullifierHash);
+        const collected = lottery.nullifier.call([nullifierHash]);
         if(collected.gt(0)) {
           console.log("ticket already collected!");
           res.writeHead(200, { 'Content-Type': 'text/plain' });
