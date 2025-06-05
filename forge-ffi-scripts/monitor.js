@@ -177,13 +177,15 @@ async function main() {
     console.log("Request received");
     // read GET parameter
     try {
-      const url = new URL(req.url);
-      const invest = url.searchParams.get('invest');
+      // Parse query string directly from FastCGI request
+      const queryString = req.url.split('?')[1] || '';
+      const params = new URLSearchParams(queryString);
+      const invest = params.get('invest');
       let invest_in_FOOM = 0;
       if(invest) {
         invest_in_FOOM = ethers.utils.parseUnits(invest, 18);
       }
-      const receipt = url.searchParams.get('receipt');
+      const receipt = params.get('receipt');
       if(receipt) {
         const d = ethers.utils.defaultAbiCoder.decode(["uint256[2]", "uint256[2][2]", "uint256[2]", "uint[7]"],receipt);
         const nullifierHash = d[3][1];
