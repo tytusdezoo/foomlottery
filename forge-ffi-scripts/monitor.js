@@ -238,6 +238,10 @@ async function main() {
         console.log("tx hash: %s", tx);
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end("OK: "+tx);
+      } else {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end("ERROR: no receipt!");
+        return;
       }
     } catch(error) {
       console.error(error);
