@@ -258,7 +258,7 @@ async function main() {
           { value: refund_in_ETH , gasLimit: 5000000 });
         console.log("tx hash: %s", tx);
         res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end("OK: "+tx);
+        res.end("TX: "+tx.hash);
       } else {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end("ERROR: no receipt!");
