@@ -27,15 +27,39 @@ async function commit(provider,lottery) {
   const minBetSum = process.env.MIN_BET_SUM ? parseInt(process.env.MIN_BET_SUM) : 1024; // power:10
   console.log("minBetSum:", minBetSum);
   const blockNumber = await provider.getBlockNumber();
-  const nextIndex = await lottery.nextIndex();
-  const betsIndex = await lottery.betsIndex();
-  const commitIndex = await lottery.commitIndex();
-  const waitingSum = betsIndex.gt(0)?getWaitingSum(nextIndex,betsIndex):0n;
-  console.log("waitingSum:", waitingSum);
+  // user correct structure of D:
+  /*
+    struct Data {
+        uint64 periodStartBlock; // current dividend period started there
+        uint64 commitBlock; // generator provided the random number secret in this block and will reaveal it soon
+        uint32 nextIndex; // id of the next ticket, could be uint40 in the future
+        uint16 dividendPeriod; // current dividend period
+        uint8 betsLimit; // Limit bets when closing the lottery
+        uint8 betsStart; // index of start of the queue of bets in buffer
+        uint8 betsIndex; // index of the end of the queue of bets in buffer
+        uint8 commitIndex; // number of bets in queue to insert into tree using the commited random number
+        uint8 status; // reentrancy block
+    }
+    Data public D;
+  */
+  // read lottery.D() and parse nextIndex,betsIndex,commitIndex using struct Data
+  const D = await lottery.D();
+  const nextIndex = D.nextIndex;
+  const betsIndex = D.betsIndex;
+  const commitIndex = D.commitIndex;
+  //console.log("nextIndex:", nextIndex);
+  //console.log("betsIndex:", betsIndex);
+  //console.log("commitIndex:", commitIndex);
+  //const nextIndex = await lottery.nextIndex();
+  //const betsIndex = await lottery.betsIndex();
+  //const commitIndex = await lottery.commitIndex();
+  const waitingSum = betsIndex>0?getWaitingSum(nextIndex,betsIndex):0;
+  //console.log("waitingSum:", waitingSum);
   const [lastIndex,lastBlockNumber,lastRoot,lastLeaf] = readLast();
   if(betsIndex > 0 && lastIndex == nextIndex && commitIndex == 0) {
     const waitingBlocknumber = readWaitingBlocknumber();
-    if((waitingBlocknumber > 0 && waitingBlocknumber <= blockNumber - minBlocks) || (betsIndex >= minBets) || (waitingSum >= BigInt(minBetSum))) {
+    if((waitingBlocknumber > 0 && waitingBlocknumber <= blockNumber - minBlocks) ||
+        (betsIndex >= minBets) || (waitingSum >= minBetSum)) {
       // commit if betsIndex is not 0 and enough time has passed
       const revealSecretInput = process.env.PRIVATE_KEY+'_FOOM_'+nextIndex.toString();
       console.log(revealSecretInput,"reveal secret input");
