@@ -172,7 +172,9 @@ async function readLogs(provider,lottery,generator,walletAddress) {
       }
       else if(log.event == "LogPrayer") {
         console.log("Prayer:", log.args);
-        writePrayer(log.args.betId,log.args.prayer.toString());
+        // convert prayer bytes to string
+        const prayer = ethers.utils.toUtf8String(log.args.prayer);
+        writePrayer(log.args.betId,prayer);
       }
       else {
         console.log("Log:", log);
