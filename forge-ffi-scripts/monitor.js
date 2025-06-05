@@ -24,14 +24,16 @@ async function commit(provider,lottery) {
   const minBets = process.env.MIN_BETS ? parseInt(process.env.MIN_BETS) : 8;
   const minBlocks = process.env.MIN_BLOCKS ? parseInt(process.env.MIN_BLOCKS) : 30*60; // 60 minutes on Base
   const maxUpdate = process.env.MAX_UPDATE ? parseInt(process.env.MAX_UPDATE) : 179;
+  const minBetsSum = process.env.MIN_BETS_SUM ? parseInt(process.env.MIN_BETS_SUM) : 1000000000; // power:10
   const blockNumber = await provider.getBlockNumber();
   const nextIndex = await lottery.nextIndex();
   const betsIndex = await lottery.betsIndex();
   const commitIndex = await lottery.commitIndex();
+  const betSum = await lottery.betSum();
   const [lastIndex,lastBlockNumber,lastRoot,lastLeaf] = readLast();
   if(betsIndex > 0 && lastIndex == nextIndex && commitIndex == 0) {
     const waitingBlocknumber = readWaitingBlocknumber();
-    if((waitingBlocknumber > 0 && waitingBlocknumber <= blockNumber - minBlocks) || (betsIndex >= minBets)) {
+    if((waitingBlocknumber > 0 && waitingBlocknumber <= blockNumber - minBlocks) || (betsIndex >= minBets) || (betSum >= minBetsSum)) {
       // commit if betsIndex is not 0 and enough time has passed
       const revealSecretInput = process.env.PRIVATE_KEY+'_FOOM_'+nextIndex.toString();
       console.log(revealSecretInput,"reveal secret input");
