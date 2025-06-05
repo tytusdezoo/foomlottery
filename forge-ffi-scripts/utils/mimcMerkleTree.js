@@ -176,6 +176,12 @@ function getWaitingList(nextIndex,hashesLength){
   return hashes;
 }
 
+function getWaitingSum(nextIndex,hashesLength){
+  const hashes = getWaitingList(nextIndex,hashesLength);
+  const sum = hashes.reduce((acc, hash) => acc + 2**((parseInt(hash.toString(16).slice(-2),16)&0x1f)-1), 0);
+  return sum;
+}
+
 function getLeaves(path){
   const lines = getLines(path);
   const leaves = lines.map((line) => {
@@ -541,4 +547,5 @@ module.exports = {
   readWaitingBlocknumber,
   update,
   readFees,
+  getWaitingSum,
 };
