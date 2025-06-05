@@ -2,6 +2,7 @@
 //#!/usr/bin/node --env-file=.env
 
 const dotenv = require("dotenv");
+const fastcgi = require('node-fastcgi');
 const { ethers } = require("ethers");
 const { readLast, readLastLog, writeLastLog, writeWaiting, writeRevealLock, readRevealLock, readWaitingBlocknumber, update, putLeaves } = require("./utils/mimcMerkleTree.js");
 
@@ -171,6 +172,17 @@ async function main() {
   //const balance = await provider.getBalance(wallet.address);
   //console.log("Wallet balance:", ethers.utils.formatEther(balance));
 
+  // create a fastcgi server and start on port 9000
+  const server = fastcgi.createServer((req, res) => {
+    console.log("Request received");
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end("Hello, World!");
+  });
+
+  server.listen(9000, '127.0.0.1', () => {
+    console.log("Server started on port 9000");
+  });
+  
   // run forever
   while(true) {
     await rememberHash(lottery);
