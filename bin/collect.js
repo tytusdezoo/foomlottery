@@ -95,11 +95,6 @@ async function main() {
   const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
   const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
   const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
-  const collected = await lottery.nullifier(nullifierHash);
-  if(collected.gt(0)) {
-    console.log("ticket already collected!");
-    process.exit(1);
-  }
   const pathElements = await getPath(betIndex,nextIndex);
   // 4. Format witness input to exactly match circuit expectations
   const input = {
@@ -152,9 +147,13 @@ async function main() {
       ethers.utils.getAddress(recipient_address.toString(16)), ethers.utils.formatUnits(invest_in_FOOM, 18));
     const answer3 = await question(ask3);
     if(answer3.toLowerCase() == 'y') {
-      const [min_fee_in_FOOM_tx,max_refund_in_ETH_tx] = readFees();
+      const [min_fee_in_FOOM_tx,max_refund_in_ETH_tx,relayer_address_official] = readFees();
       if(max_refund_in_ETH_tx == "0") {
         console.log("ERROR: relayer not ready!");
+        process.exit(1);
+      }
+      if(relayer_address!=0n && relayer_address_official != ethers.utils.getAddress(relayer_address.toString(16))) {
+        console.log("ERROR: relayer address does not match "+relayer_address_official+" != "+ethers.utils.getAddress(relayer_address.toString(16)));
         process.exit(1);
       }
       const min_fee_in_FOOM = ethers.utils.parseUnits(min_fee_in_FOOM_tx, 18);
@@ -178,16 +177,22 @@ async function main() {
   const ask2 = sprintfjs.sprintf("Do You want to collect the reward yourself at address %s now and invest %s FOOM in the lottery? (y/n): ",
     ethers.utils.getAddress(recipient_address.toString(16)), ethers.utils.formatUnits(invest_in_FOOM, 18));
   const answer2 = await question(ask2);
-  if(answer2.toLowerCase() == 'y') {
-    const relayer = d[3][3].eq(0)?'0x0000000000000000000000000000000000000000':d[3][3].toHexString();
-    //const tx = await lottery.collect(pA,pB,pC,pathElements[32],nullifierHash,inputs[1],inputs[2],hexToBigint(inputs[3]),hexToBigint(inputs[4]),rewardbits,hexToBigint(inputs[5]));
-    const tx = await lottery.collect(d[0],d[1],d[2],d[3][0],d[3][1],d[3][2].toHexString(),relayer,d[3][4],d[3][5],d[3][6],invest_in_FOOM);
-    const receipt = await tx.wait();
-    console.log("tx hash: %s", receipt.transactionHash);
-  } else {
+  if(answer2.toLowerCase() !== 'y') {
     console.log("Use this receipt for collecting later!\n");
     console.log(encoded);
+    return;
   }
+
+  const collected = await lottery.nullifier(nullifierHash);
+  if(collected.gt(0)) {
+    console.log("ticket already collected!");
+    process.exit(1);
+  }  
+  const relayer = d[3][3].eq(0)?'0x0000000000000000000000000000000000000000':d[3][3].toHexString();
+  //const tx = await lottery.collect(pA,pB,pC,pathElements[32],nullifierHash,inputs[1],inputs[2],hexToBigint(inputs[3]),hexToBigint(inputs[4]),rewardbits,hexToBigint(inputs[5]));
+  const tx = await lottery.collect(d[0],d[1],d[2],d[3][0],d[3][1],d[3][2].toHexString(),relayer,d[3][4],d[3][5],d[3][6],invest_in_FOOM);
+  const receipt = await tx.wait();
+  console.log("tx hash: %s", receipt.transactionHash);
 }
 
 main()
