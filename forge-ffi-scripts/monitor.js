@@ -30,7 +30,7 @@ async function commit(provider,lottery) {
   const nextIndex = await lottery.nextIndex();
   const betsIndex = await lottery.betsIndex();
   const commitIndex = await lottery.commitIndex();
-  const waitingSum = getWaitingSum(nextIndex,betsIndex);
+  const waitingSum = betsIndex.gt(0)?getWaitingSum(nextIndex,betsIndex):0n;
   console.log("waitingSum:", waitingSum);
   const [lastIndex,lastBlockNumber,lastRoot,lastLeaf] = readLast();
   if(betsIndex > 0 && lastIndex == nextIndex && commitIndex == 0) {
