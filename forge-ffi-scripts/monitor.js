@@ -4,7 +4,7 @@
 const dotenv = require("dotenv");
 const fastcgi = require('node-fastcgi');
 const { ethers } = require("ethers");
-const { readLast, readLastLog, writeLastLog, writeWaiting, writeRevealLock, readRevealLock, readWaitingBlocknumber, update, putLeaves } = require("./utils/mimcMerkleTree.js");
+const { readLast, readLastLog, writeLastLog, writeWaiting, writeRevealLock, readRevealLock, readWaitingBlocknumber, update, putLeaves, readFees } = require("./utils/mimcMerkleTree.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 
@@ -173,10 +173,70 @@ async function main() {
   //console.log("Wallet balance:", ethers.utils.formatEther(balance));
 
   // create a fastcgi server and start on port 9000
-  const server = fastcgi.createServer((req, res) => {
+  const server = fastcgi.createServer(async (req, res) => {
     console.log("Request received");
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end("Hello, World!");
+    // read GET parameter
+    try {
+      const url = new URL(req.url);
+      const invest = url.searchParams.get('invest');
+      let invest_in_FOOM = 0;
+      if(invest) {
+        invest_in_FOOM = ethers.utils.parseUnits(invest, 18);
+      }
+      const receipt = url.searchParams.get('receipt');
+      if(receipt) {
+        const d = ethers.utils.defaultAbiCoder.decode(["uint256[2]", "uint256[2][2]", "uint256[2]", "uint[7]"],receipt);
+        const nullifierHash = d[3][1];
+        const recipient = d[3][2].toHexString();
+        const relayer = d[3][3].eq(0)?'0x0000000000000000000000000000000000000000':d[3][3].toHexString();
+        const fee_in_FOOM = d[3][4];
+        const refund_in_ETH = d[3][5];
+        const rewardbits = d[3][6];
+        const [min_fee_in_FOOM_tx,max_refund_in_ETH_tx] = readFees();
+        if(max_refund_in_ETH_tx == "0") {
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end("ERROR: relayer not ready!");
+          return;
+        }
+        const min_fee_in_FOOM = ethers.utils.parseUnits(min_fee_in_FOOM_tx, 18);
+        const max_refund_in_ETH = ethers.utils.parseUnits(max_refund_in_ETH_tx, 18);
+        if(fee_in_FOOM.lt(min_fee_in_FOOM)) {
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end("ERROR: fee is too low "+ethers.utils.formatUnits(fee_in_FOOM, 18)+" < "+ethers.utils.formatUnits(min_fee_in_FOOM, 18));
+          return;
+        }
+        if(refund_in_ETH.gt(max_refund_in_ETH)) {
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end("ERROR: refund is too high "+ethers.utils.formatEther(refund_in_ETH)+" > "+ethers.utils.formatEther(max_refund_in_ETH));
+          return;
+        }
+        if(relayer !== wallet.address.toHexString() && relayer !== "0x0000000000000000000000000000000000000000") {
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end("ERROR: relayer address does not match "+relayer+" != "+wallet.address);
+          return;
+        }
+        if(rewardbits.eq(0)) {
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end("ERROR: no reward to claim!");
+          return;
+        }
+        const collected = lottery.nullifier.call(nullifierHash);
+        if(collected.gt(0)) {
+          console.log("ticket already collected!");
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end("ERROR: ticket already collected!");
+          return;
+        }
+        const tx = lottery.collect.call(d[0],d[1],d[2],d[3][0],d[3][1],recipient,relayer,d[3][4],d[3][5],d[3][6],invest_in_FOOM);
+        console.log("tx hash: %s", tx);
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end("OK: "+tx);
+      }
+    } catch(error) {
+      console.error(error);
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end("ERROR: " + error.message);
+    }
   });
 
   server.listen(9000, '127.0.0.1', () => {
@@ -191,9 +251,16 @@ async function main() {
       await commit(provider,lottery);
       generator = await readLogs(provider,lottery,generator,wallet.address);
     }
-    // wait 30 seconds
+    // wait 17 seconds
     console.log("Waiting 17 seconds");
     await new Promise(resolve => setTimeout(resolve, 17000));
+    // TODO, manage ETH balance
+    /*const balance = await provider.getBalance(wallet.address);
+    console.log("ETH balance:", ethers.utils.formatEther(balance));
+    if(balance.gt(ethers.utils.parseUnits("0.001", 18))) {
+      const tx = await wallet.sendTransaction({ to: wallet.address, value: balance });
+      console.log("ETH balance:", ethers.utils.formatEther(balance));
+    }*/
   }
 }
 

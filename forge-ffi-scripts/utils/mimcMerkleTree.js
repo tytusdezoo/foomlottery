@@ -76,6 +76,12 @@ function readLast(){
   return [parseInt(nextIndex,16), parseInt(blockNumber,16), hexToBigint(lastRoot), hexToBigint(lastLeaf)];
 }
 
+function readFees(){
+  const lines = getLines("fees.csv");
+  const [fee_in_FOOM,refund_in_ETH] = lines[0].split(',');
+  return [fee_in_FOOM,refund_in_ETH];
+}
+
 function writeLastLog(blockNumber,transactionIndex){
   writeFileSync("www/logs.csv", sprintfjs.sprintf("%d,%d\n",blockNumber,transactionIndex), { flag: 'w' });
 }
