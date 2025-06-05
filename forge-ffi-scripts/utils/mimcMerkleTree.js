@@ -178,7 +178,7 @@ function getWaitingList(nextIndex,hashesLength){
 
 function getWaitingSum(nextIndex,hashesLength){
   const hashes = getWaitingList(nextIndex,hashesLength);
-  const sum = hashes.reduce((acc, hash) => acc + 2**((parseInt(hash.toString(16).slice(-2),16)&0x1f)-1), 0);
+  const sum = hashes.reduce((acc, hash) => acc + 2n**(hash&0x1fn)-1n, 0n);
   return sum;
 }
 
