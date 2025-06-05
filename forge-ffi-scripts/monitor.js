@@ -187,6 +187,11 @@ async function main() {
       }
       const receipt = params.get('receipt');
       if(receipt) {
+        if(receipt.length != 32*15+2) {
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end("ERROR: receipt is not 15*32+2 bytes");
+          return;
+        }
         const d = ethers.utils.defaultAbiCoder.decode(["uint256[2]", "uint256[2][2]", "uint256[2]", "uint[7]"],receipt);
         const nullifierHash = d[3][1];
         const recipient = d[3][2].toHexString();
