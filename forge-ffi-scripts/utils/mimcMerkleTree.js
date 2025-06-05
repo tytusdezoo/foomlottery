@@ -126,13 +126,10 @@ function getIndexRand(hashstr,betIndex) {
   const path2 = path.slice(2,4); 
   const path3 = path.slice(4,6);
   const lines = getLines(""+path1+"/"+path2+"/"+path3+".csv");
-  //console.log(hashstr);
   for(let i=0;i<lines.length;i++) {
     const [index,skip,hash,myrand] = lines[i].split(',');
     if(hash==hashstr) {
-      //console.log(hash);
       const newIndex=(betIndex&0xffffff00) + parseInt(index,16);
-      //console.log(newIndex.toString(16),index);
       return [newIndex,hexToBigint(myrand)];
     }
   }
@@ -197,7 +194,6 @@ async function getLastPath(lastIndex){
   const path2 = path.slice(2,4); const path2i=parseInt(path2,16);
   const path3 = path.slice(4,6); const path3i=parseInt(path3,16);
   const path4 = path.slice(6,8); const path4i=parseInt(path4,16);
-//console.log(path);
 
   const [leaves1] = getLeaves("index.csv");
   const [leaves2] = getLeaves(""+path1+"/index.csv");
@@ -207,9 +203,7 @@ async function getLastPath(lastIndex){
   const tree4 = await mimicMerkleTree(hexToBigint(zeros[0]),leaves4,8);
   const mpath4 = tree4.path(path4i);
   const root4 = tree4.root;
-//console.log(bigintToHex(root4));
   if(leaves3.length==path3i){
-//console.log(path3i);
     leaves3.push(root4);}
   const tree3 = await mimicMerkleTree(hexToBigint(zeros[1]),leaves3,8);
   const root3 = tree3.root;
