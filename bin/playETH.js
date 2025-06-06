@@ -72,11 +72,11 @@ async function main() {
   console.log("DEX amountInETH: %s (105%%)", ethers.utils.formatEther(amountInETH));
   
   if(balance.lt(amountInETH)) {
-    console.log("Not enough ETH for this ticket power. You need %s ETH. You have %s ETH.",
+    console.log("Not enough ETH for this ticket power. You need %s ETH. You have %s ETH.The transaction from this account will fail.",
       (ethers.utils.formatEther(amountInETH)),
       (ethers.utils.formatEther(balance)));
-    rl.close();
-    process.exit(0);
+    //rl.close();
+    //process.exit(0);
   }
   let hash = 0n;
   let secret = 0n;
@@ -94,6 +94,8 @@ async function main() {
   secret_power = secret<<8n | BigInt(power);
   const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();
   console.log("secret: %s,%s\n",bigintToHex(secret_power),nextIndex.toString());
+  console.log("hash: %s (use on basescan.org)",hash.toString());
+  console.log("hash: %s",bigintToHex(hash));
 
   // ask for confirmation using readline
   const ask = sprintfjs.sprintf("Are you sure you want to play this ticket and send %s ETH? (y/n): ", ethers.utils.formatEther(amountInETH));
@@ -109,9 +111,16 @@ async function main() {
   fs.writeSync(ticketsFile, `${bigintToHex(secret_power)},${nextIndex.toString()}\n`);
   fs.closeSync(ticketsFile);
   
+  const askprayer = sprintfjs.sprintf("Do you want to include a prayer? (keep empty for no prayer): ");
+  const prayer = await question(askprayer);
+
   console.log("sending ticket...");
-  // play the ticket and send ETH
-  const tx = await lottery.playETH(hash, power, { value: amountInETH });
+  let tx = null;
+  if(prayer.length > 0) {
+    tx = await lottery.playETHAndPray(hash, power, prayer, { value: amountInETH });
+  } else {
+    tx = await lottery.playETH(hash, power, { value: amountInETH });
+  }
   const receipt = await tx.wait();
   console.log("tx hash: %s", receipt.transactionHash);
 

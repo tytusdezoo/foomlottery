@@ -55,11 +55,11 @@ async function main() {
   console.log("FOOM  needed: %s", ethers.utils.formatUnits(foom_needed, 18));
 
   if(foomBalance.lt(foom_needed)) {
-    console.log("Not enough FOOM for this ticket power. You need %s FOOM. You have %s FOOM.",
+    console.log("Not enough FOOM for this ticket power. You need %s FOOM. You have %s FOOM. The transaction from this account will fail.",
       (ethers.utils.formatUnits(foom_needed, 18)),
       (ethers.utils.formatEther(foomBalance)));
-    rl.close();
-    process.exit(0);
+    //rl.close();
+    //process.exit(0);
   }
   let hash = 0n;
   let secret = 0n;
@@ -77,6 +77,8 @@ async function main() {
   secret_power = secret<<8n | BigInt(power);
   const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();
   console.log("secret: %s,%s\n",bigintToHex(secret_power),nextIndex.toString());
+  console.log("hash: %s (use on basescan.org)",hash.toString());
+  console.log("hash: %s",bigintToHex(hash));
 
   // ask for confirmation using readline
   const ask = sprintfjs.sprintf("Are you sure you want to play this ticket and send %s FOOM? (y/n): ", ethers.utils.formatEther(foom_needed));
