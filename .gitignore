@@ -1,6 +1,6 @@
 # Compiler files
-cache/
-out/
+cache
+out
 
 # Ignores development broadcast logs
 !/broadcast
@@ -8,18 +8,18 @@ out/
 /broadcast/**/dry-run/
 
 # Docs
-docs/
+docs
 
 # Dotenv file
 .env
 
 # Circom
 /node_modules
-/circuit_artifacts
+/circuit_artifacts/
 /circuits/lib
 
 # 
-tmp/
+tmp
 tickets.txt
 receipts.txt
 
@@ -40,4 +40,4 @@ groth16/update179_final.zkey
 groth16/*.wnts
 groth16/*.wtns
 groth16/*.json
-www/
+www
