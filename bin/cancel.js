@@ -78,7 +78,7 @@ async function main() {
     process.exit(0);
   }
   
-  const tx = await lottery.cancelbet(pA,pB,pC,betIndex,wallet.address, { gasPrice: gasPrice });
+  const tx = await lottery.cancelbet(pA,pB,pC,betIndex,wallet.address, { gasPrice: gasPrice.mul(110).div(100) });
   const receipt = await tx.wait();
   console.log("tx hash: %s", receipt.transactionHash);
 }

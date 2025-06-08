@@ -14,7 +14,7 @@ async function rememberHash(provider,lottery) {
   const commitBlockHash = await lottery.commitBlockHash();
   if(commitIndex > 0n && commitBlockHash == _open) {
     const gasPrice = await provider.getGasPrice();
-    const tx = await lottery.rememberHash({ gasPrice: gasPrice });
+    const tx = await lottery.rememberHash({ gasPrice: gasPrice.mul(110).div(100) });
     console.log("Remember hash transaction:", tx);
     const receipt = await tx.wait();
     console.log("Remember hash transaction receipt:", receipt);
@@ -60,7 +60,7 @@ async function commit(provider,lottery) {
       const revealSecretHash = ethers.utils.keccak256(revealSecret);
       console.log(revealSecretHash,"reveal secret hash");
       const gasPrice = await provider.getGasPrice();
-      const tx = await lottery.commit(revealSecretHash,maxUpdate, { gasPrice: gasPrice });
+      const tx = await lottery.commit(revealSecretHash,maxUpdate, { gasPrice: gasPrice.mul(110).div(100) });
       console.log("Commit transaction:", tx);
       const receipt = await tx.wait();
       console.log("Commit transaction receipt:", receipt);
@@ -95,7 +95,7 @@ async function reveal(provider,lottery,index,commitIndex,commitHash,commitBlockH
       try {
         const output = await update(commitIndex,0,newRandUint128);
         const gasPrice = await provider.getGasPrice();
-        const tx = await lottery.reveal(revealSecret,output.pA,output.pB,output.pC,output.newRoot, { gasPrice: gasPrice });
+        const tx = await lottery.reveal(revealSecret,output.pA,output.pB,output.pC,output.newRoot, { gasPrice: gasPrice.mul(110).div(100) });
         const receipt = await tx.wait();
         console.log("Reveal transaction receipt:", receipt);
         if(receipt.status == 1) {
@@ -108,7 +108,7 @@ async function reveal(provider,lottery,index,commitIndex,commitHash,commitBlockH
         if(!revealed) {
           // publish secret to the network
           const gasPrice = await provider.getGasPrice();
-          const tx = await lottery.secret(revealSecret, { gasPrice: gasPrice });
+          const tx = await lottery.secret(revealSecret, { gasPrice: gasPrice.mul(110).div(100) });
           const receipt = await tx.wait();
           console.log("Publish secret transaction receipt:", receipt);
         }
@@ -276,7 +276,7 @@ async function main() {
           return;
         }
         const tx = await lottery.collect(d[0],d[1],d[2],d[3][0],d[3][1],recipient,relayer,d[3][4],d[3][5],d[3][6],invest_in_FOOM,
-          { value: refund_in_ETH, gasPrice: gasPrice /*, gasLimit: 5000000*/ });
+          { value: refund_in_ETH, gasPrice: gasPrice.mul(110).div(100) /*, gasLimit: 5000000*/ });
         console.log("tx hash: %s", tx);
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end("TX: "+tx.hash);

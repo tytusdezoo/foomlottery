@@ -34,7 +34,7 @@ async function main() {
   const betMin = ethers.utils.parseUnits("1000000", 18);
   const inputs = process.argv.slice(2, process.argv.length);
   if(inputs.length == 0) {
-    console.log("Usage: node play.js <power:0-22>");
+    console.log("Usage: node play.js <power:0-22> <prayer:optional>");
     process.exit(1);
   }
   let power = parseInt(inputs[0]);
@@ -89,12 +89,14 @@ async function main() {
   console.log("hash: %s",bigintToHex(hash));
 
   // ask for confirmation using readline
-  const ask = sprintfjs.sprintf("Are you sure you want to play this ticket and send %s FOOM? (y/n): ", ethers.utils.formatEther(foom_needed));
-  const answer = await question(ask);
-  if(answer.toLowerCase() !== 'y') {
-    console.log("Aborted.");
-    rl.close();
-    process.exit(0);
+  if(inputs.length == 1) {
+    const ask = sprintfjs.sprintf("Are you sure you want to play this ticket and send %s FOOM? (y/n): ", ethers.utils.formatEther(foom_needed));
+    const answer = await question(ask);
+    if(answer.toLowerCase() !== 'y') {
+      console.log("Aborted.");
+      rl.close();
+      process.exit(0);
+    }
   }
   // append to tickets.txt
   console.log("writing ticket to tickets.txt...");
@@ -102,13 +104,18 @@ async function main() {
   fs.writeSync(ticketsFile, `${bigintToHex(secret_power)},${nextIndex.toString()}\n`);
   fs.closeSync(ticketsFile);
 
-  const askprayer = sprintfjs.sprintf("Do you want to include a prayer? (keep empty for no prayer): ");
-  const prayer = await question(askprayer);
+  let prayer = "";
+  if(inputs.length > 1) {
+    prayer = inputs.slice(1).join(" ");
+  } else {
+    const askprayer = sprintfjs.sprintf("Do you want to include a prayer? (keep empty for no prayer): ");
+    prayer = await question(askprayer);
+  }
   // check allowance of foom if needed
   const allowance = await foom.allowance(wallet.address, lottery.address);
   if(allowance.lt(foom_needed)) {
     console.log("approving foom...");
-    const approveTx = await foom.approve(lottery.address, foom_needed, { gasPrice: gasPrice });
+    const approveTx = await foom.approve(lottery.address, foom_needed, { gasPrice: gasPrice.mul(110).div(100) });
     const approveReceipt = await approveTx.wait();
     console.log("approve tx hash: %s", approveReceipt.transactionHash);
   }
@@ -116,9 +123,10 @@ async function main() {
   console.log("sending ticket...");
   let tx = null;
   if(prayer.length > 0) {
-    tx = await lottery.playAndPray(hash,power,prayer, { gasPrice: gasPrice });
+    //tx = await lottery.playAndPray(hash,power,prayer, { gasPrice: gasPrice.mul(110).div(100), gasLimit: 70000 });
+    tx = await lottery.playAndPray(hash,power,prayer, { gasPrice: gasPrice.mul(110).div(100) });
   } else { // liimt 
-    tx = await lottery.play(hash,power, { gasPrice: gasPrice });
+    tx = await lottery.play(hash,power, { gasPrice: gasPrice.mul(110).div(100) });
   }
   const receipt = await tx.wait();
   console.log("tx hash: %s", receipt.transactionHash);

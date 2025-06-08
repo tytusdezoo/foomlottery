@@ -116,7 +116,7 @@ async function main() {
   const relayer = d[3][3].eq(0)?'0x0000000000000000000000000000000000000000':d[3][3].toHexString();
   //const tx = await lottery.collect(pA,pB,pC,pathElements[32],nullifierHash,inputs[1],inputs[2],hexToBigint(inputs[3]),hexToBigint(inputs[4]),rewardbits,hexToBigint(inputs[5]));
   const tx = await lottery.collect(d[0],d[1],d[2],d[3][0],d[3][1],d[3][2].toHexString(),relayer,d[3][4],d[3][5],d[3][6],invest_in_FOOM,
-    { gasPrice: gasPrice });
+    { gasPrice: gasPrice.mul(110).div(100) });
   const receipt = await tx.wait();
   console.log("tx hash: %s", receipt.transactionHash);
 }

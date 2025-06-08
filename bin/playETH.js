@@ -123,9 +123,9 @@ async function main() {
   console.log("sending ticket...");
   let tx = null;
   if(prayer.length > 0) {
-    tx = await lottery.playETHAndPray(hash, power, prayer, { value: amountInETH, gasPrice: gasPrice });
+    tx = await lottery.playETHAndPray(hash, power, prayer, { value: amountInETH, gasPrice: gasPrice.mul(110).div(100) });
   } else {
-    tx = await lottery.playETH(hash, power, { value: amountInETH, gasPrice: gasPrice });
+    tx = await lottery.playETH(hash, power, { value: amountInETH, gasPrice: gasPrice.mul(110).div(100) });
   }
   const receipt = await tx.wait();
   console.log("tx hash: %s", receipt.transactionHash);
