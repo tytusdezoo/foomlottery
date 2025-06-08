@@ -66,16 +66,19 @@ async function main() {
   const pB = [[pBin[0][1], pBin[0][0]], [pBin[1][1], pBin[1][0]]];
   const pC = proof.pi_c.slice(0, 2);
 
+  const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
+  const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+  const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
+  const gasPrice = await provider.getGasPrice();
+  console.log("GAS price: %s", ethers.utils.formatUnits(gasPrice, 9));
+
   const ask = sprintfjs.sprintf("Do You want to cancel the ticket now? (y/n): ");
   const answer = await question(ask);
   if(answer.toLowerCase() !== 'y') {
     process.exit(0);
   }
   
-  const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
-  const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-  const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
-  const tx = await lottery.cancelbet(pA,pB,pC,betIndex,wallet.address);
+  const tx = await lottery.cancelbet(pA,pB,pC,betIndex,wallet.address, { gasPrice: gasPrice });
   const receipt = await tx.wait();
   console.log("tx hash: %s", receipt.transactionHash);
 }

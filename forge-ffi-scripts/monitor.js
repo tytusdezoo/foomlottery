@@ -8,12 +8,13 @@ const { readLast, readLastLog, writeLastLog, writeWaiting, writeRevealLock, read
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 
-async function rememberHash(lottery) {
+async function rememberHash(provider,lottery) {
   const _open=1n;
   const commitIndex = await lottery.commitIndex();
   const commitBlockHash = await lottery.commitBlockHash();
   if(commitIndex > 0n && commitBlockHash == _open) {
-    const tx = await lottery.rememberHash();
+    const gasPrice = await provider.getGasPrice();
+    const tx = await lottery.rememberHash({ gasPrice: gasPrice });
     console.log("Remember hash transaction:", tx);
     const receipt = await tx.wait();
     console.log("Remember hash transaction receipt:", receipt);
@@ -58,7 +59,8 @@ async function commit(provider,lottery) {
       const revealSecret = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(revealSecretInput));
       const revealSecretHash = ethers.utils.keccak256(revealSecret);
       console.log(revealSecretHash,"reveal secret hash");
-      const tx = await lottery.commit(revealSecretHash,maxUpdate);
+      const gasPrice = await provider.getGasPrice();
+      const tx = await lottery.commit(revealSecretHash,maxUpdate, { gasPrice: gasPrice });
       console.log("Commit transaction:", tx);
       const receipt = await tx.wait();
       console.log("Commit transaction receipt:", receipt);
@@ -66,7 +68,7 @@ async function commit(provider,lottery) {
   }
 }
 
-async function reveal(lottery,index,commitIndex,commitHash,commitBlockHash,revealSecret) {
+async function reveal(provider,lottery,index,commitIndex,commitHash,commitBlockHash,revealSecret) {
   const revealed=revealSecret!=0n;
   const nextIndex = await lottery.nextIndex();
   if(index == nextIndex) {
@@ -92,7 +94,8 @@ async function reveal(lottery,index,commitIndex,commitHash,commitBlockHash,revea
       const newRandUint128 = ethers.BigNumber.from(newRand).toBigInt() & 0xffffffffffffffffffffffffffffffffn;
       try {
         const output = await update(commitIndex,0,newRandUint128);
-        const tx = await lottery.reveal(revealSecret,output.pA,output.pB,output.pC,output.newRoot);
+        const gasPrice = await provider.getGasPrice();
+        const tx = await lottery.reveal(revealSecret,output.pA,output.pB,output.pC,output.newRoot, { gasPrice: gasPrice });
         const receipt = await tx.wait();
         console.log("Reveal transaction receipt:", receipt);
         if(receipt.status == 1) {
@@ -104,7 +107,8 @@ async function reveal(lottery,index,commitIndex,commitHash,commitBlockHash,revea
         console.log("Reveal transaction failed:", error);
         if(!revealed) {
           // publish secret to the network
-          const tx = await lottery.secret(revealSecret);
+          const gasPrice = await provider.getGasPrice();
+          const tx = await lottery.secret(revealSecret, { gasPrice: gasPrice });
           const receipt = await tx.wait();
           console.log("Publish secret transaction receipt:", receipt);
         }
@@ -160,14 +164,14 @@ async function readLogs(provider,lottery,generator,walletAddress) {
         const index = Number(log.args.index);
         if(index == lastIndex) {
           if(generator == walletAddress) {
-            await reveal(lottery,index,Number(log.args.commitIndex),log.args.commitHash,log.blockHash,0n);
+            await reveal(provider,lottery,index,Number(log.args.commitIndex),log.args.commitHash,log.blockHash,0n);
           }
         }
       }
       else if(log.event == "LogSecret") {
         console.log("LogSecret:", log.args);
         if(log.args.lastRoot == lastRoot) {
-          await reveal(lottery,lastIndex,0,0n,0n,log.args.revealSecret);
+          await reveal(provider,lottery,lastIndex,0,0n,0n,log.args.revealSecret);
         }
       }
       else if(log.event == "LogPrayer") {
@@ -263,8 +267,16 @@ async function main() {
           res.end("ERROR: ticket already collected!");
           return;
         }
+        const gasPrice = await provider.getGasPrice();
+        console.log("GAS price: %s", ethers.utils.formatUnits(gasPrice, 9));
+        if(gasPrice.gte(ethers.utils.parseUnits(process.env.GAS_PRICE_LIMIT || "0.01", 9))) {
+          console.log("GAS price is too high. Must be less than "+process.env.GAS_PRICE_LIMIT+" gwei.");
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end("ERROR: GAS price is too high!");
+          return;
+        }
         const tx = await lottery.collect(d[0],d[1],d[2],d[3][0],d[3][1],recipient,relayer,d[3][4],d[3][5],d[3][6],invest_in_FOOM,
-          { value: refund_in_ETH /*, gasLimit: 5000000*/ });
+          { value: refund_in_ETH, gasPrice: gasPrice /*, gasLimit: 5000000*/ });
         console.log("tx hash: %s", tx);
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end("TX: "+tx.hash);
@@ -286,7 +298,7 @@ async function main() {
   
   // run forever
   while(true) {
-    await rememberHash(lottery);
+    await rememberHash(provider,lottery);
     generator = await readLogs(provider,lottery,generator,wallet.address);
     if(task == "commit" && generator == wallet.address) { // TODO, update generator if needed
       await commit(provider,lottery);

@@ -43,6 +43,12 @@ async function main() {
   const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
   const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
 
+  const gasPrice = await provider.getGasPrice();
+  console.log("GAS price: %s", ethers.utils.formatUnits(gasPrice, 9));
+  if(gasPrice.gte(ethers.utils.parseUnits(process.env.GAS_PRICE_LIMIT || "0.01", 9))) {
+    console.log("GAS price is too high. Must be less than "+process.env.GAS_PRICE_LIMIT+" gwei.");
+    process.exit(1);
+  }
   const foom = new ethers.Contract(FOOM_ADDRESS, TOKEN_ABI, wallet);
   const weth = new ethers.Contract(WETH_ADDRESS, TOKEN_ABI, wallet);
   const foomdex = new ethers.Contract(FOOM_DEX_ADDRESS, FOOM_DEX_ABI, wallet);
@@ -117,9 +123,9 @@ async function main() {
   console.log("sending ticket...");
   let tx = null;
   if(prayer.length > 0) {
-    tx = await lottery.playETHAndPray(hash, power, prayer, { value: amountInETH });
+    tx = await lottery.playETHAndPray(hash, power, prayer, { value: amountInETH, gasPrice: gasPrice });
   } else {
-    tx = await lottery.playETH(hash, power, { value: amountInETH });
+    tx = await lottery.playETH(hash, power, { value: amountInETH, gasPrice: gasPrice });
   }
   const receipt = await tx.wait();
   console.log("tx hash: %s", receipt.transactionHash);

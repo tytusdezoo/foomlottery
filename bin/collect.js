@@ -84,6 +84,12 @@ async function main() {
   const reward = betMin.mul(rew1*2n**power1+rew2*2n**power2+rew3*2n**power3);
   console.log("Reward_in_FOOM: %s %s", ethers.utils.formatEther(reward), rewardbits==0n?'no need to claim!':'');
 
+  const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
+  const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+  const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
+  const gasPrice = await provider.getGasPrice();
+  console.log("GAS price: %s", ethers.utils.formatUnits(gasPrice, 9));
+  
   const ask = sprintfjs.sprintf("Do You want to calculate the receipt for collecting the reward%s? (y/n): ",rewardbits==0n?' anyway':'');
   const answer = await question(ask);
   if(answer.toLowerCase() !== 'y') {
@@ -92,9 +98,6 @@ async function main() {
 
   const terces = reverseBits(dice,31*8);
   const nullifierHash = await pedersenHash(leBigintToBuffer(terces, 31));
-  const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
-  const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-  const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
   const pathElements = await getPath(betIndex,nextIndex);
   // 4. Format witness input to exactly match circuit expectations
   const input = {
@@ -190,7 +193,8 @@ async function main() {
   }  
   const relayer = d[3][3].eq(0)?'0x0000000000000000000000000000000000000000':d[3][3].toHexString();
   //const tx = await lottery.collect(pA,pB,pC,pathElements[32],nullifierHash,inputs[1],inputs[2],hexToBigint(inputs[3]),hexToBigint(inputs[4]),rewardbits,hexToBigint(inputs[5]));
-  const tx = await lottery.collect(d[0],d[1],d[2],d[3][0],d[3][1],d[3][2].toHexString(),relayer,d[3][4],d[3][5],d[3][6],invest_in_FOOM);
+  const tx = await lottery.collect(d[0],d[1],d[2],d[3][0],d[3][1],d[3][2].toHexString(),relayer,d[3][4],d[3][5],d[3][6],invest_in_FOOM,
+    { gasPrice: gasPrice });
   const receipt = await tx.wait();
   console.log("tx hash: %s", receipt.transactionHash);
 }

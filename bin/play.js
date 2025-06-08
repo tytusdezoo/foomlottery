@@ -29,6 +29,7 @@ async function main() {
   const FOOM_ABI = [
     "function balanceOf(address) view returns (uint256)",
     "function approve(address,uint256) external returns (bool)",
+    "function allowance(address,address) view returns (uint256)",
   ];
   const betMin = ethers.utils.parseUnits("1000000", 18);
   const inputs = process.argv.slice(2, process.argv.length);
@@ -41,6 +42,13 @@ async function main() {
   const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
   const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
 
+
+  const gasPrice = await provider.getGasPrice();
+  console.log("GAS price: %s", ethers.utils.formatUnits(gasPrice, 9));
+  if(gasPrice.gte(ethers.utils.parseUnits(process.env.GAS_PRICE_LIMIT || "0.01", 9))) {
+    console.log("GAS price is too high. Must be less than "+process.env.GAS_PRICE_LIMIT+" gwei.");
+    process.exit(1);
+  }
   const foom = new ethers.Contract(FOOM_ADDRESS, FOOM_ABI, wallet);
   console.log("Wallet address:", wallet.address);
   const balance = await provider.getBalance(wallet.address);
@@ -96,19 +104,21 @@ async function main() {
 
   const askprayer = sprintfjs.sprintf("Do you want to include a prayer? (keep empty for no prayer): ");
   const prayer = await question(askprayer);
-
-  // aprrove foom
-  console.log("approving foom...");
-  const approveTx = await foom.approve(lottery.address, foom_needed);
-  const approveReceipt = await approveTx.wait();
-  console.log("approve tx hash: %s", approveReceipt.transactionHash);
+  // check allowance of foom if needed
+  const allowance = await foom.allowance(wallet.address, lottery.address);
+  if(allowance.lt(foom_needed)) {
+    console.log("approving foom...");
+    const approveTx = await foom.approve(lottery.address, foom_needed, { gasPrice: gasPrice });
+    const approveReceipt = await approveTx.wait();
+    console.log("approve tx hash: %s", approveReceipt.transactionHash);
+  }
   // play the ticket
   console.log("sending ticket...");
   let tx = null;
   if(prayer.length > 0) {
-    tx = await lottery.playAndPray(hash,power,prayer);
-  } else {
-    tx = await lottery.play(hash,power);
+    tx = await lottery.playAndPray(hash,power,prayer, { gasPrice: gasPrice });
+  } else { // liimt 
+    tx = await lottery.play(hash,power, { gasPrice: gasPrice });
   }
   const receipt = await tx.wait();
   console.log("tx hash: %s", receipt.transactionHash);
