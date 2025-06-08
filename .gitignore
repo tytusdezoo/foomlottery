@@ -41,3 +41,6 @@ groth16/*.wnts
 groth16/*.wtns
 groth16/*.json
 www
+
+# secrets for God
+forge-ffi-scripts/utils/prayers.js

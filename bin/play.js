@@ -37,6 +37,15 @@ async function main() {
     console.log("Usage: node play.js <power:0-22> <prayer:optional>");
     process.exit(1);
   }
+  let prayer = "";
+  if(inputs.length > 1) {
+    prayer = inputs.slice(1).join(" ");
+    if(prayer === "read") {
+      const { readPrayer } = require("./utils/prayers.js");
+      prayer = await readPrayer();
+      console.log("prayer: %s", prayer);
+    }
+  }
   let power = parseInt(inputs[0]);
   const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
   const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
@@ -104,10 +113,7 @@ async function main() {
   fs.writeSync(ticketsFile, `${bigintToHex(secret_power)},${nextIndex.toString()}\n`);
   fs.closeSync(ticketsFile);
 
-  let prayer = "";
-  if(inputs.length > 1) {
-    prayer = inputs.slice(1).join(" ");
-  } else {
+  if(prayer.length == 0) {
     const askprayer = sprintfjs.sprintf("Do you want to include a prayer? (keep empty for no prayer): ");
     prayer = await question(askprayer);
   }
