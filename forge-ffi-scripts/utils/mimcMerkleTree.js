@@ -369,7 +369,7 @@ async function computeRoot(path,zero) {
   if(needfix>0){
     writeFileSync("fix.csv", sprintfjs.sprintf("%s\n",path), { flag: 'a' }); // TODO, write block number too
   } else {
-    execSync("gzip -9 "+path);
+    execSync("gzip -9 www/"+path);
   }
   const tree = await mimicMerkleTree(zeros[zero],hashes,8);
   return tree.root;
