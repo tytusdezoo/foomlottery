@@ -305,8 +305,8 @@ async function main() {
       generator = await readLogs(provider,lottery,generator,wallet.address);
     }
     // wait 17 seconds
-    console.log("Waiting 17 seconds");
-    await new Promise(resolve => setTimeout(resolve, 17000));
+    console.log("Waiting 37 seconds");
+    await new Promise(resolve => setTimeout(resolve, 37000));
     // TODO, manage ETH balance
     /*const balance = await provider.getBalance(wallet.address);
     console.log("ETH balance:", ethers.utils.formatEther(balance));
