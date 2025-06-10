@@ -84,9 +84,10 @@ async function reveal(provider,lottery,index,commitIndex,commitHash,commitBlockH
     }
     const revealSecretHash = ethers.utils.keccak256(revealSecret);
     console.log(revealSecretHash,"reveal secret hash");
-    console.log(commitHash,"commitHash");
+    console.log(commitHash.toHexString(),"commitHash");
     if(revealSecretHash == commitHash.toHexString()) {
       if(readRevealLock()==index) {
+        console.log("Reveal lock present");
         return;
       }
       writeRevealLock(index); 
