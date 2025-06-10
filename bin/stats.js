@@ -26,7 +26,10 @@ async function main() {
 
   const foom = new ethers.Contract(FOOM_ADDRESS, FOOM_ABI, wallet);
   const foomBalance = await foom.balanceOf(lottery.address);
-  console.log("FOOM Lottery balance: %s", ethers.utils.formatEther(foomBalance));
+  console.log("FOOM Lottery balance: %s M FOOM", ethers.utils.formatEther(foomBalance)/1000000);
+  // read last
+  const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();
+  console.log("FOOM Lottery total number of tickets: %d", nextIndex);
 
   for (let i = 1;; i++) {
     const period = await lottery.periods(i);
