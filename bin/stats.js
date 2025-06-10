@@ -35,8 +35,13 @@ async function main() {
     if(period.shares.eq(0)) {
       break;
     }
-    const apr = (1.0+0.04*bets/shares)**((60*60*24*365)/(16384*2))-1;
-    console.log("Period %s: %s volume, %s shares, %s APR", i, bets/1000000, shares/1000000, sprintfjs.sprintf("%.2f", apr*100));
+    if(period.bets.lt(period.shares)) {
+      const apr = (1.0+0.04*bets/shares)**((60*60*24*365)/(16384*2))-1;
+      console.log("Period %s: %s volume, %s shares, %s APR", i, bets/1000000, shares/1000000, sprintfjs.sprintf("%.2f", apr*100));
+    }
+    else {
+      console.log("Period %s: %s volume, %s shares", i, bets/1000000, shares/1000000);
+    }
   }
 }
 
