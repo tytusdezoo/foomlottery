@@ -36,7 +36,7 @@ async function main() {
       break;
     }
     const apr = (1.0+0.04*bets/shares)**((60*60*24*365)/(16384*2))-1;
-    console.log("Period %s: %s bets, %s shares, %s APR", i, bets/1000000, shares/1000000, sprintfjs.sprintf("%.2f", apr*100));
+    console.log("Period %s: %s volume, %s shares, %s APR", i, bets/1000000, shares/1000000, sprintfjs.sprintf("%.2f", apr*100));
   }
 }
 
