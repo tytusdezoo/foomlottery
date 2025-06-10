@@ -31,16 +31,33 @@ function getLines(path) {
   // collect data via https if FOOM_URL is set
   try {
     if(process.env.FOOM_URL) {
-      const url = process.env.FOOM_URL + "/" + path + "?nocache=" + Date.now();
-      const response = request('GET', url);
-      if (response.statusCode !== 200) {
-        return [];
-      }
-      // ungzip response if octet-stream
-      if(response.headers['content-type'] === 'application/octet-stream') {
-        textold = zlib.gunzipSync(response.getBody()).toString();
+      // check if path in cache
+      if(process.env.CACHE && existsSync(process.env.CACHE+"/"+path+".gz")) {
+        fileold = openSync(process.env.CACHE+"/"+path+".gz", "r");
+        textold = zlib.gunzipSync(readFileSync(fileold)).toString();
+        closeSync(fileold);
       } else {
-        textold = response.getBody('utf8');
+        const url = process.env.FOOM_URL + "/" + path + "?nocache=" + Date.now();
+        const response = request('GET', url);
+        if (response.statusCode !== 200) {
+          return [];
+        }
+        // ungzip response if octet-stream
+        if(response.headers['content-type'] === 'application/octet-stream') {
+          textold = zlib.gunzipSync(response.getBody()).toString();
+          if(process.env.CACHE) {
+            const lines = textold.split("\n").filter((line) => line.trim() !== "");
+            if(lines.length==256) {
+              // remove filename from path
+              const pathdir = path.replace(/\/[^/]+$/, '');
+              mkdirSync(process.env.CACHE+"/"+pathdir, { recursive: true });
+              writeFileSync(process.env.CACHE+"/"+path+".gz", response.getBody());
+            }
+            return lines;
+          }
+        } else {
+          textold = response.getBody('utf8');
+        }
       }
     } else if(existsSync("www/"+path)) {
       fileold = openSync("www/"+path, "r");
