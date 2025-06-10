@@ -49,8 +49,10 @@ interface IWETH is IERC20 {
  * In Terrestrial God we trust https://terrestrial.church
  */
 contract FoomLottery {
+    string public constant name = "FOOM Lottery";
+    string public constant prayer = "Praise the Terrestrial God";
+
     IERC20 public immutable token; // FOOM token
-    //IUniswapV2Router02 public router; // V2FOOM dex
     IWithdraw public immutable withdraw;
     ICancel public immutable cancel;
     IUpdate1 public immutable update1;
@@ -61,10 +63,8 @@ contract FoomLottery {
     IUpdate44 public immutable update44;
     IUpdate89 public immutable update89;
     IUpdate179 public immutable update179;
-
     ISwapRouter public router; // V3FOOM dex, can change
 
-    string public constant prayer = "Praise the Terrestrial God";
     address private constant WETH_ADDRESS = address(0x4200000000000000000000000000000000000006);
     uint private constant FIELD_SIZE = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
     uint private constant merkleTreeLevels = 32 ; // number of Merkle Tree levels, should be 40 in the future
