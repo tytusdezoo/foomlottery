@@ -61,7 +61,10 @@ async function main() {
     const rew2 = (maskdice &                       0b11111111111111110000000000n)?0n:1n ;
     const rew3 = (maskdice & 0b111111111111111111111100000000000000000000000000n)?0n:1n ;
     const reward = betMin.mul(rew1*2n**power1+rew2*2n**power2+rew3*2n**power3);
-    console.log(ticket+" "+ethers.utils.formatEther(reward));
+    const bits1 = (maskdice &                                       0b1111111111n);
+    const bits2 = (maskdice &                       0b11111111111111110000000000n)>>10n;
+    const bits3 = (maskdice & 0b111111111111111111111100000000000000000000000000n)>>26n;
+    console.log(ticket+" "+ethers.utils.formatEther(reward)+" "+bits1.toString(2)+" "+bits2.toString(2)+" "+bits3.toString(2));
   }
 }
 
