@@ -128,7 +128,8 @@ async function readLogs(provider,lottery,generator,walletAddress) {
     logsBlockNumber = process.env.LOG_START ? parseInt(process.env.LOG_START) : 0;
   }
   console.log(logsBlockNumber,"start");
-  const blockNumber = await provider.getBlockNumber();
+  // use process.env.WAIT_BLOCKS to dalay reading logs
+  const blockNumber = (await provider.getBlockNumber())-(process.env.WAIT_BLOCKS||0);
   for(let currentBlock = logsBlockNumber; currentBlock < blockNumber; currentBlock += CHUNK_SIZE+1) {
     const endBlock = Math.min(currentBlock + CHUNK_SIZE, blockNumber);
     console.log(`Querying blocks ${currentBlock} to ${endBlock} max ${blockNumber}`);    
@@ -306,8 +307,8 @@ async function main() {
       generator = await readLogs(provider,lottery,generator,wallet.address);
     }
     // wait 17 seconds
-    console.log("Waiting 37 seconds");
-    await new Promise(resolve => setTimeout(resolve, 37000));
+    console.log("Waiting 17 seconds");
+    await new Promise(resolve => setTimeout(resolve, 17000));
     // TODO, manage ETH balance
     /*const balance = await provider.getBalance(wallet.address);
     console.log("ETH balance:", ethers.utils.formatEther(balance));
