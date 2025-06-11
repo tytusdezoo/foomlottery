@@ -1,34 +1,21 @@
-# Compiler files
+# Compiler files and local data
 cache
 out
+tmp
+www
 
-# Ignores development broadcast logs
-!/broadcast
-/broadcast/*/31337/
-/broadcast/**/dry-run/
-
-# Docs
-docs
-
-# Dotenv file
+# Secrets
 .env
+tickets.txt
+forge-ffi-scripts/utils/prayers.js
 
 # Circom
-/node_modules
 /circuit_artifacts/
 /circuits/lib
 
-# 
-tmp
-tickets.txt
-receipts.txt
-
-# base chain
-base
-
-# why yarn ?
+# Node
+/node_modules
 yarn.lock
-package-lock.json
 
 # too lagre?
 groth16/update5_final.zkey
@@ -40,7 +27,3 @@ groth16/update179_final.zkey
 groth16/*.wnts
 groth16/*.wtns
 groth16/*.json
-www
-
-# secrets for God
-forge-ffi-scripts/utils/prayers.js
