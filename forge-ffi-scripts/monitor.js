@@ -74,7 +74,7 @@ async function reveal(provider,lottery,index,commitIndex,commitHash,commitBlockH
   if(index == nextIndex) {
     if(revealSecret == 0n) {
       const revealSecretInput = process.env.PRIVATE_KEY+'_FOOM_'+nextIndex.toString();
-      console.log(revealSecretInput,"reveal secret input");
+      //console.log(revealSecretInput,"reveal secret input");
       revealSecret = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(revealSecretInput));
     }
     if(commitIndex == 0) {
