@@ -10,8 +10,18 @@ const { readLast, readLastLog, writeLastLog, writeWaiting, writeRevealLock, read
 
 async function rememberHash(provider,lottery) {
   const _open=1n;
-  const commitIndex = await lottery.commitIndex();
-  const commitBlockHash = await lottery.commitBlockHash();
+  const blockNumber = await provider.getBlockNumber();
+  const D = await lottery.D();
+  const commitBlock = D.commitBlock;
+  const commitIndex = D.commitIndex;
+  const commitBlockHash = D.commitBlockHash;
+  if(commitBlock > 0 && commitBlockHash == _open && blockNumber > commitBlock+30) {
+    const gasPrice = await provider.getGasPrice();
+    const tx = await lottery.rememberHash({ gasPrice: gasPrice.mul(130).div(100) });
+    console.log("Remember hash transaction:", tx);
+    const receipt = await tx.wait();
+    console.log("Remember hash transaction receipt:", receipt);
+  }
   if(commitIndex > 0n && commitBlockHash == _open) {
     const gasPrice = await provider.getGasPrice();
     const tx = await lottery.rememberHash({ gasPrice: gasPrice.mul(130).div(100) });
@@ -307,8 +317,8 @@ async function main() {
       generator = await readLogs(provider,lottery,generator,wallet.address);
     }
     // wait 17 seconds
-    console.log("Waiting 17 seconds");
-    await new Promise(resolve => setTimeout(resolve, 17000));
+    console.log("Waiting 5 seconds");
+    await new Promise(resolve => setTimeout(resolve, 5000));
     // TODO, manage ETH balance
     /*const balance = await provider.getBalance(wallet.address);
     console.log("ETH balance:", ethers.utils.formatEther(balance));
