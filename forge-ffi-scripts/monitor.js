@@ -14,7 +14,7 @@ async function rememberHash(provider,lottery) {
   const commitBlockHash = await lottery.commitBlockHash();
   if(commitIndex > 0n && commitBlockHash == _open) {
     const gasPrice = await provider.getGasPrice();
-    const tx = await lottery.rememberHash({ gasPrice: gasPrice.mul(110).div(100) });
+    const tx = await lottery.rememberHash({ gasPrice: gasPrice.mul(130).div(100) });
     console.log("Remember hash transaction:", tx);
     const receipt = await tx.wait();
     console.log("Remember hash transaction receipt:", receipt);
@@ -85,7 +85,7 @@ async function reveal(provider,lottery,index,commitIndex,commitHash,commitBlockH
     const revealSecretHash = ethers.utils.keccak256(revealSecret);
     console.log(revealSecretHash,"reveal secret hash");
     console.log(commitHash.toHexString(),"commitHash");
-    if(revealSecretHash == commitHash.toHexString()) {
+    if(commitHash.eq(revealSecretHash)) {
       if(readRevealLock()==index) {
         console.log("Reveal lock present");
         return;
@@ -96,7 +96,7 @@ async function reveal(provider,lottery,index,commitIndex,commitHash,commitBlockH
       try {
         const output = await update(commitIndex,0,newRandUint128);
         const gasPrice = await provider.getGasPrice();
-        const tx = await lottery.reveal(revealSecret,output.pA,output.pB,output.pC,output.newRoot, { gasPrice: gasPrice.mul(110).div(100) });
+        const tx = await lottery.reveal(revealSecret,output.pA,output.pB,output.pC,output.newRoot, { gasPrice: gasPrice.mul(130).div(100) });
         const receipt = await tx.wait();
         console.log("Reveal transaction receipt:", receipt);
         if(receipt.status == 1) {
