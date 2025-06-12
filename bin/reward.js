@@ -8,10 +8,6 @@ const { findBet } = require("./utils/mimcMerkleTree.js");
 const circomlibjs = require("circomlibjs");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
-// forge-ffi-scripts/withdraw.js 0x3beeeb6bffb83c559c3c63c9d0049ec50286776b2517c6d6ec2e0f00660d7309 0x1e0 0x1 0x0 0x0 0x0
-// forge-ffi-scripts/withdraw.js 0x03f6600c7331bd61106b32556f2676d57e81cf2b0bf6df800e6fcb4c53f56b009 0x01e0 0x01 0x0 0x0 0x0
-// forge-ffi-scripts/withdraw.js 0x09340709afb154bbd3f9ccc089c0d5f2809f63fee47f88f2effe2dfeda432e16 0x0ff 0x01 0x0 0x0 0x0
-// forge-ffi-scripts/withdraw.js 0x0872cabfcaa22225e755412927cc3595379767452f8813f4fa0af1d8b9ce9540a 0x0ff 0x01 0x0 0x0 0x0
 
 async function main() {
   dotenv.config();
@@ -61,10 +57,11 @@ async function main() {
     const rew2 = (maskdice &                       0b11111111111111110000000000n)?0n:1n ;
     const rew3 = (maskdice & 0b111111111111111111111100000000000000000000000000n)?0n:1n ;
     const reward = betMin.mul(rew1*2n**power1+rew2*2n**power2+rew3*2n**power3);
-    const bits1 = (maskdice &                                       0b1111111111n);
-    const bits2 = (maskdice &                       0b11111111111111110000000000n)>>10n;
-    const bits3 = (maskdice & 0b111111111111111111111100000000000000000000000000n)>>26n;
-    console.log(ticket+" "+ethers.utils.formatEther(reward)+" "+bits1.toString(2)+" "+bits2.toString(2)+" "+bits3.toString(2));
+    // convert to binary string with fixed length 10, 16, 22
+    const bits1 = (maskdice &                                       0b1111111111n).toString(2).padStart(10, '0');
+    const bits2 = ((maskdice &                       0b11111111111111110000000000n)>>10n).toString(2).padStart(16, '0');
+    const bits3 = ((maskdice & 0b111111111111111111111100000000000000000000000000n)>>26n).toString(2).padStart(22, '0');
+    console.log(ticket+" "+ethers.utils.formatEther(reward)+" "+bits1+" "+bits2+" "+bits3);
   }
 }
 
