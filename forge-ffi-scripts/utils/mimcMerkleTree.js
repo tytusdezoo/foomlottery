@@ -177,7 +177,8 @@ function getIndexWaiting(hashstr) {
 function findBet(inHash,startindex) {
   const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();
   const hashstr = bigintToHex(inHash).replace(/^0x0*/, '');
-  for(;(startindex&0xFFFFFF00)<nextIndex;startindex+=0xff) {
+  const maxIndex = startindex + 0x200;
+  for(;(startindex&0xFFFFFF00)<nextIndex && startindex<=maxIndex;startindex+=0x100) {
     const [betIndex,betRand] = getIndexRand(hashstr,startindex);
     if(betIndex>0) {
       return [betIndex,betRand,nextIndex];
