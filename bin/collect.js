@@ -23,27 +23,27 @@ function question(query) {
   });
 }
 ////////////////////////////// MAIN ///////////////////////////////////////////
-// forge-ffi-scripts/withdraw.js 0x3beeeb6bffb83c559c3c63c9d0049ec50286776b2517c6d6ec2e0f00660d7309 0x1e0 0x1 0x0 0x0 0x0
-// forge-ffi-scripts/withdraw.js 0x03f6600c7331bd61106b32556f2676d57e81cf2b0bf6df800e6fcb4c53f56b009 0x01e0 0x01 0x0 0x0 0x0
-// forge-ffi-scripts/withdraw.js 0x09340709afb154bbd3f9ccc089c0d5f2809f63fee47f88f2effe2dfeda432e16 0x0ff 0x01 0x0 0x0 0x0
-// forge-ffi-scripts/withdraw.js 0x0872cabfcaa22225e755412927cc3595379767452f8813f4fa0af1d8b9ce9540a 0x0ff 0x01 0x0 0x0 0x0
 
 async function main() {
   dotenv.config();
   const betMin = ethers.utils.parseUnits("1000000", 18);
   const inputs = process.argv.slice(2, process.argv.length);
   if(inputs.length == 0) {
-    console.log("Usage: node collect.js <ticket> <recipient_address> <relayer_address> <fee_in_FOOM> <refund_in_ETH> <invest_in_FOOM>");
+    console.log("Usage: node collect.js <ticket> <recipient_address:optional> <invest_in_FOOM:optional>");
     process.exit(1);
   }
+  const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
+  const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+  const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
+
   const secret_power = hexToBigint(inputs[0].replace(/,.*/, ''));
   const startindex = parseInt(inputs[0].replace(/.*,/, ''));
-  const recipient_address = hexToBigint(inputs[1]);
-  const relayer_address = hexToBigint(inputs[2]);
-  // convert decimal to bigNumber
-  const fee_in_FOOM = ethers.utils.parseUnits(inputs[3], 18);
-  const refund_in_ETH = ethers.utils.parseUnits(inputs[4], 18);
-  const invest_in_FOOM = ethers.utils.parseUnits(inputs[5], 18);
+  const recipient_address = hexToBigint(inputs[1]||wallet.address);
+  const invest_in_FOOM = ethers.utils.parseUnits(inputs[2]||"0.0", 18);
+  const [min_fee_in_FOOM_tx,max_refund_in_ETH_tx,relayer_address_official] = readFees();
+  let   fee_in_FOOM = ethers.utils.parseUnits(min_fee_in_FOOM_tx||"0.0", 18);
+  let   refund_in_ETH = ethers.utils.parseUnits(max_refund_in_ETH_tx||"0.0", 18);
+  let   relayer_address = hexToBigint(relayer_address_official||"0x0000000000000000000000000000000000000000");
 
   console.log("recipient_address:", ethers.utils.getAddress(recipient_address.toString(16)));
   console.log("relayer_address  :", ethers.utils.getAddress(relayer_address==0n?'0x0000000000000000000000000000000000000000':relayer_address.toString(16)));
@@ -84,9 +84,14 @@ async function main() {
   const reward = betMin.mul(rew1*2n**power1+rew2*2n**power2+rew3*2n**power3);
   console.log("Reward_in_FOOM: %s %s", ethers.utils.formatEther(reward), rewardbits==0n?'no need to claim!':'');
 
-  const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
-  const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-  const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
+  const terces = reverseBits(dice,31*8);
+  const nullifierHash = await pedersenHash(leBigintToBuffer(terces, 31));
+  const collected = await lottery.nullifier(nullifierHash);
+  if(collected.gt(0)) {
+    console.log("ticket already collected!");
+    process.exit(1);
+  }  
+
   const gasPrice = await provider.getGasPrice();
   console.log("GAS price: %s", ethers.utils.formatUnits(gasPrice, 9));
   
@@ -96,8 +101,21 @@ async function main() {
     process.exit(0);
   }
 
-  const terces = reverseBits(dice,31*8);
-  const nullifierHash = await pedersenHash(leBigintToBuffer(terces, 31));
+  if(fee_in_FOOM.gt(0) && reward.gt(0) && relayer_address!=0n) {
+    const ask3 = sprintfjs.sprintf("Do You want to collect the reward later at address %s through a relayer at address %s and invest %s FOOM in the lottery? (y/n): ",
+      ethers.utils.getAddress(recipient_address.toString(16)), ethers.utils.getAddress(relayer_address.toString(16)), ethers.utils.formatUnits(invest_in_FOOM, 18));
+    const answer3 = await question(ask3);
+    if(answer3.toLowerCase() !== 'y') {
+      fee_in_FOOM = ethers.utils.parseUnits("0.0", 18);
+      refund_in_ETH = ethers.utils.parseUnits("0.0", 18);
+      relayer_address = 0n;
+    } 
+  } else {
+    fee_in_FOOM = ethers.utils.parseUnits("0.0", 18);
+    refund_in_ETH = ethers.utils.parseUnits("0.0", 18);
+    relayer_address = 0n;
+  }
+
   const pathElements = await getPath(betIndex,nextIndex);
   // 4. Format witness input to exactly match circuit expectations
   const input = {
@@ -146,30 +164,10 @@ async function main() {
   const d = ethers.utils.defaultAbiCoder.decode(["uint256[2]", "uint256[2][2]", "uint256[2]", "uint[7]"],encoded);
 
   if(fee_in_FOOM.gt(0)) {
-    const ask3 = sprintfjs.sprintf("Do You want to collect the reward through a relayer at address %s now and invest %s FOOM in the lottery? (y/n): ",
-      ethers.utils.getAddress(recipient_address.toString(16)), ethers.utils.formatUnits(invest_in_FOOM, 18));
+    const ask3 = sprintfjs.sprintf("Do You want to collect the reward now at address %s through a relayer at address %s and invest %s FOOM in the lottery? (y/n): ",
+      ethers.utils.getAddress(recipient_address.toString(16)), ethers.utils.getAddress(relayer_address.toString(16)), ethers.utils.formatUnits(invest_in_FOOM, 18));
     const answer3 = await question(ask3);
     if(answer3.toLowerCase() == 'y') {
-      const [min_fee_in_FOOM_tx,max_refund_in_ETH_tx,relayer_address_official] = readFees();
-      if(max_refund_in_ETH_tx == "0") {
-        console.log("ERROR: relayer not ready!");
-        process.exit(1);
-      }
-      if(relayer_address!=0n && relayer_address_official != ethers.utils.getAddress(relayer_address.toString(16))) {
-        console.log("ERROR: relayer address does not match "+relayer_address_official+" != "+ethers.utils.getAddress(relayer_address.toString(16)));
-        process.exit(1);
-      }
-      const min_fee_in_FOOM = ethers.utils.parseUnits(min_fee_in_FOOM_tx, 18);
-      const max_refund_in_ETH = ethers.utils.parseUnits(max_refund_in_ETH_tx, 18);      
-      if(fee_in_FOOM.lt(min_fee_in_FOOM)) {
-        console.log("ERROR: fee is too low "+ethers.utils.formatUnits(fee_in_FOOM, 18)+" < "+ethers.utils.formatUnits(min_fee_in_FOOM, 18));
-        process.exit(1);
-      }
-      if(refund_in_ETH.gt(max_refund_in_ETH)) {
-        console.log("ERROR: refund is too high "+ethers.utils.formatEther(refund_in_ETH)+" > "+ethers.utils.formatEther(max_refund_in_ETH));
-        process.exit(1);
-      }
-      // run curl 'FOOM_URL/cgi?receipt=encoded&invest=invest_in_FOOM'
       const res = await fetch(`${process.env.FOOM_URL}/cgi?receipt=${encoded}&invest=${invest_in_FOOM}`);
       const data = await res.text();
       console.log("RESPONSE: %s", data);
@@ -177,7 +175,7 @@ async function main() {
     }
   }
 
-  const ask2 = sprintfjs.sprintf("Do You want to collect the reward yourself at address %s now and invest %s FOOM in the lottery? (y/n): ",
+  const ask2 = sprintfjs.sprintf("Do You want to collect the reward now yourself at address %s and invest %s FOOM in the lottery? (y/n): ",
     ethers.utils.getAddress(recipient_address.toString(16)), ethers.utils.formatUnits(invest_in_FOOM, 18));
   const answer2 = await question(ask2);
   if(answer2.toLowerCase() !== 'y') {
@@ -186,11 +184,6 @@ async function main() {
     return;
   }
 
-  const collected = await lottery.nullifier(nullifierHash);
-  if(collected.gt(0)) {
-    console.log("ticket already collected!");
-    process.exit(1);
-  }  
   const relayer = d[3][3].eq(0)?'0x0000000000000000000000000000000000000000':d[3][3].toHexString();
   //const tx = await lottery.collect(pA,pB,pC,pathElements[32],nullifierHash,inputs[1],inputs[2],hexToBigint(inputs[3]),hexToBigint(inputs[4]),rewardbits,hexToBigint(inputs[5]));
   const tx = await lottery.collect(d[0],d[1],d[2],d[3][0],d[3][1],d[3][2].toHexString(),relayer,d[3][4],d[3][5],d[3][6],invest_in_FOOM,

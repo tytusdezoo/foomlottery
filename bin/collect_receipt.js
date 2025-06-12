@@ -23,10 +23,6 @@ function question(query) {
   });
 }
 ////////////////////////////// MAIN ///////////////////////////////////////////
-// forge-ffi-scripts/withdraw.js 0x3beeeb6bffb83c559c3c63c9d0049ec50286776b2517c6d6ec2e0f00660d7309 0x1e0 0x1 0x0 0x0 0x0
-// forge-ffi-scripts/withdraw.js 0x03f6600c7331bd61106b32556f2676d57e81cf2b0bf6df800e6fcb4c53f56b009 0x01e0 0x01 0x0 0x0 0x0
-// forge-ffi-scripts/withdraw.js 0x09340709afb154bbd3f9ccc089c0d5f2809f63fee47f88f2effe2dfeda432e16 0x0ff 0x01 0x0 0x0 0x0
-// forge-ffi-scripts/withdraw.js 0x0872cabfcaa22225e755412927cc3595379767452f8813f4fa0af1d8b9ce9540a 0x0ff 0x01 0x0 0x0 0x0
 
 async function main() {
   dotenv.config();
@@ -39,7 +35,7 @@ async function main() {
     console.log("Usage: node collect_receipt.js <invest_in_FOOM> <receipt>");
     process.exit(1);
   }
-  const invest_in_FOOM = ethers.utils.parseUnits(inputs[0], 18);
+  const invest_in_FOOM = ethers.utils.parseUnits(inputs[0]||"0.0", 18);
   console.log("decode ...");
   const d = ethers.utils.defaultAbiCoder.decode(["uint256[2]", "uint256[2][2]", "uint256[2]", "uint[7]"],inputs[1]);
   console.log("decoded");
@@ -55,6 +51,7 @@ async function main() {
   console.log("fee_in_FOOM:", ethers.utils.formatUnits(fee_in_FOOM, 18));
   console.log("refund_in_ETH:", ethers.utils.formatEther(refund_in_ETH));
   console.log("invest_in_FOOM:", ethers.utils.formatUnits(invest_in_FOOM, 18));
+
   const rew = rewardbits.toNumber();
   const rew1 = rew&1;
   const rew2 = rew&2;
@@ -65,6 +62,12 @@ async function main() {
   const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
   const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
   const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
+  const collected = await lottery.nullifier(nullifierHash);
+  if(collected.gt(0)) {
+    console.log("ticket already collected!");
+    process.exit(1);
+  }
+
   const gasPrice = await provider.getGasPrice();
   console.log("GAS price: %s", ethers.utils.formatUnits(gasPrice, 9));
 
@@ -105,12 +108,6 @@ async function main() {
   const answer = await question(ask);
   if(answer.toLowerCase() !== 'y') {
     process.exit(0);
-  }
-
-  const collected = await lottery.nullifier(nullifierHash);
-  if(collected.gt(0)) {
-    console.log("ticket already collected!");
-    process.exit(1);
   }
 
   const relayer = d[3][3].eq(0)?'0x0000000000000000000000000000000000000000':d[3][3].toHexString();
