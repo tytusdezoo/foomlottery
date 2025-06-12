@@ -9,6 +9,14 @@ const circomlibjs = require("circomlibjs");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 
+function maskbits(bits,mask) {
+  let bitstr = "";
+  for(let i=0;i<bits.length;i++) {
+    bitstr += mask.slice(i,i+1) == "1" ? bits.slice(i,i+1) : "_";
+  }
+  return bitstr; // reversed, but that's ok
+}
+
 async function main() {
   dotenv.config();
   const betMin = ethers.utils.parseUnits("1000000", 18);
@@ -58,10 +66,13 @@ async function main() {
     const rew3 = (maskdice & 0b111111111111111111111100000000000000000000000000n)?0n:1n ;
     const reward = betMin.mul(rew1*2n**power1+rew2*2n**power2+rew3*2n**power3);
     // convert to binary string with fixed length 10, 16, 22
-    const bits1 = (maskdice &                                       0b1111111111n).toString(2).padStart(10, '0');
-    const bits2 = ((maskdice &                       0b11111111111111110000000000n)>>10n).toString(2).padStart(16, '0');
-    const bits3 = ((maskdice & 0b111111111111111111111100000000000000000000000000n)>>26n).toString(2).padStart(22, '0');
-    console.log(ticket+" "+ethers.utils.formatEther(reward)+" "+bits1+" "+bits2+" "+bits3);
+    const mask1 = ( mask &                                       0b1111111111n      ).toString(2).padStart(10, '0');
+    const mask2 = ((mask &                       0b11111111111111110000000000n)>>10n).toString(2).padStart(16, '0');
+    const mask3 = ((mask & 0b111111111111111111111100000000000000000000000000n)>>26n).toString(2).padStart(22, '0');
+    const bits1 = ( dice &                                       0b1111111111n      ).toString(2).padStart(10, '0');
+    const bits2 = ((dice &                       0b11111111111111110000000000n)>>10n).toString(2).padStart(16, '0');
+    const bits3 = ((dice & 0b111111111111111111111100000000000000000000000000n)>>26n).toString(2).padStart(22, '0');
+    console.log(ticket+" "+maskbits(bits1,mask1)+" "+maskbits(bits2,mask2)+" "+maskbits(bits3,mask3)+" "+ethers.utils.formatEther(reward));
   }
 }
 
