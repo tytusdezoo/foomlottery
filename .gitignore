@@ -6,7 +6,7 @@ www
 
 # Secrets
 .env
-tickets.txt
+tickets.*
 forge-ffi-scripts/utils/prayers.js
 
 # Circom

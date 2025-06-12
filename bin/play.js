@@ -3,7 +3,7 @@ const dotenv = require("dotenv");
 const { ethers } = require("ethers");
 const readline = require('readline');
 const { pedersenHash } = require("./utils/pedersen.js");
-const { rbigint, bigintToHex, leBigintToBuffer } = require("./utils/bigint.js");
+const { rbigint, bigintToHex, leBigintToBuffer, hexToBigint } = require("./utils/bigint.js");
 const { readLast } = require("./utils/mimcMerkleTree.js");
 const fs = require("fs");
 const sprintfjs = require("sprintf-js");
@@ -82,7 +82,7 @@ async function main() {
   let secret = 0n;
   let i = 0n;
   let secret_power = 0n;
-  console.log("calculating secret for %s FOOM ticket...\n", (ethers.utils.formatUnits(foom_needed, 18)));
+  console.log("calculating secret for %s FOOM ticket...", (ethers.utils.formatUnits(foom_needed, 18)));
   for(; i < 10000n; i++) {
     secret = rbigint(31);
     hash = await pedersenHash(leBigintToBuffer(secret, 31));
@@ -93,7 +93,7 @@ async function main() {
   if(i >= 10000n) { throw new Error("Failed to create ticket"); }
   secret_power = secret<<8n | BigInt(power);
   const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();
-  console.log("secret: %s,%s\n",bigintToHex(secret_power),nextIndex.toString());
+  console.log("secret: %s,%s (index not final)",bigintToHex(secret_power),nextIndex.toString());
   console.log("hash: %s (use on basescan.org)",hash.toString());
   console.log("hash: %s",bigintToHex(hash));
 
@@ -107,16 +107,12 @@ async function main() {
       process.exit(0);
     }
   }
-  // append to tickets.txt
-  console.log("writing ticket to tickets.txt...");
-  const ticketsFile = fs.openSync("tickets.txt", "a");
-  fs.writeSync(ticketsFile, `${bigintToHex(secret_power)},${nextIndex.toString()}\n`);
-  fs.closeSync(ticketsFile);
 
   if(prayer.length == 0) {
     const askprayer = sprintfjs.sprintf("Do you want to include a prayer? (keep empty for no prayer): ");
     prayer = await question(askprayer);
   }
+  rl.close();
   // check allowance of foom if needed
   const allowance = await foom.allowance(wallet.address, lottery.address);
   if(allowance.lt(foom_needed)) {
@@ -136,8 +132,27 @@ async function main() {
   }
   const receipt = await tx.wait();
   console.log("tx hash: %s", receipt.transactionHash);
-  
-  rl.close();
+
+  // find logBetIn in transaction log 
+  const logBetIn = receipt.logs.find(log => log.address === lottery.address &&
+     log.topics[0] === "0x67024112d4ff1b7b177f96a8d0a53bb255e6f8eb3e7b1c9e9400d7f0de991a56");
+  if(logBetIn) {
+    const newIndex = hexToBigint(logBetIn.topics[1]);
+    const newHash = hexToBigint(logBetIn.topics[2]);
+    if(newHash != hash + BigInt(power) + 1n) {
+      console.log("ERROR: newHash is not correct! Something went wrong. Ticket not saved in tickets.txt!");
+      return;
+    }
+    // append to tickets.txt
+    console.log("writing ticket to tickets.txt...");
+    console.log("\nsecret: %s,%s\n",bigintToHex(secret_power),newIndex.toString());
+    const ticketsFile = fs.openSync("tickets.txt", "a");
+    fs.writeSync(ticketsFile, `${bigintToHex(secret_power)},${newIndex.toString()}\n`);
+    fs.closeSync(ticketsFile);
+  } else {
+    console.log("ERROR: logBetIn not found! Transaction may have failed. Ticket not saved in tickets.txt!");
+    return;
+  }
 }
 
 main()
