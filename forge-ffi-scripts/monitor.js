@@ -168,6 +168,7 @@ async function readLogs(provider,lottery,generator,walletAddress) {
           // print index and blockNumber in hex format
           console.log("Put leaves:", index.toString(16), log.args.newRand.toHexString(), log.args.newRoot.toHexString(), log.blockNumber.toString(16));
           await putLeaves(index,BigInt(log.args.newRand),BigInt(log.args.newRoot),log.blockNumber);
+          writeRand(lastIndex.toString(16),index.toString(16),log.args.newRand.toHexString());
           [lastIndex,lastBlockNumber,lastRoot,lastLeaf] = readLast();
           console.log("lastIndex:", lastIndex);
         }

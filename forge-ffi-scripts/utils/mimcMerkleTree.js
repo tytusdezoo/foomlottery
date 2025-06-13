@@ -93,6 +93,10 @@ function readLast(){
   return [parseInt(nextIndex,16), parseInt(blockNumber,16), hexToBigint(lastRoot), hexToBigint(lastLeaf)];
 }
 
+function writeRand(lastIndex,newIndex,newRand){
+  writeFileSync("www/rand.csv", sprintfjs.sprintf("%s,%s,%s\n",no0x(lastIndex),no0x(newIndex),no0x(newRand)));
+}
+
 function readFees(){
   const lines = getLines("fees.csv");
   if(lines.length==0) {
