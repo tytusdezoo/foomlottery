@@ -32,10 +32,10 @@ async function rememberHash(provider,lottery) {
 }
 
 async function commit(provider,lottery) {
-  const minBets = process.env.MIN_BETS ? parseInt(process.env.MIN_BETS) : 8;
+  const minBets = process.env.MIN_BETS ? parseInt(process.env.MIN_BETS) : 21;
   const minBlocks = process.env.MIN_BLOCKS ? parseInt(process.env.MIN_BLOCKS) : 30*60; // 60 minutes on Base
   const maxUpdate = process.env.MAX_UPDATE ? parseInt(process.env.MAX_UPDATE) : 179;
-  const minBetSum = process.env.MIN_BET_SUM ? parseInt(process.env.MIN_BET_SUM) : 1024; // power:10
+  const minBetSum = process.env.MIN_BET_SUM ? parseInt(process.env.MIN_BET_SUM) : 512; // power:9
   const blockNumber = await provider.getBlockNumber();
   // user correct structure of D:
   /*
