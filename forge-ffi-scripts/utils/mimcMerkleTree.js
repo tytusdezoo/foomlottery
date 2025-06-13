@@ -575,4 +575,5 @@ module.exports = {
   readFees,
   getWaitingSum,
   writePrayer,
+  writeRand,
 };

@@ -4,7 +4,7 @@
 const dotenv = require("dotenv");
 const fastcgi = require('node-fastcgi');
 const { ethers } = require("ethers");
-const { readLast, readLastLog, writeLastLog, writeWaiting, writeRevealLock, readRevealLock, readWaitingBlocknumber, update, putLeaves, readFees, getWaitingSum, writePrayer } = require("./utils/mimcMerkleTree.js");
+const { readLast, readLastLog, writeLastLog, writeWaiting, writeRevealLock, readRevealLock, readWaitingBlocknumber, update, putLeaves, readFees, getWaitingSum, writePrayer, writeRand } = require("./utils/mimcMerkleTree.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 
