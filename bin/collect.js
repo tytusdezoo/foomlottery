@@ -29,7 +29,7 @@ async function main() {
   const betMin = ethers.utils.parseUnits("1000000", 18);
   const inputs = process.argv.slice(2, process.argv.length);
   if(inputs.length == 0) {
-    console.log("Usage: node collect.js <ticket> <recipient_address:optional> <invest_in_FOOM:optional>");
+    console.log("Usage: collect.js <ticket> <invest_in_FOOM:optional> <recipient_address:optional>");
     process.exit(1);
   }
   const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
@@ -38,8 +38,8 @@ async function main() {
 
   const secret_power = hexToBigint(inputs[0].replace(/,.*/, ''));
   const startindex = parseInt(inputs[0].replace(/.*,/, ''));
-  const recipient_address = hexToBigint(inputs[1]||wallet.address);
-  const invest_in_FOOM = ethers.utils.parseUnits(inputs[2]||"0.0", 18);
+  const invest_in_FOOM = ethers.utils.parseUnits(inputs[1]||"0.0", 18);
+  const recipient_address = hexToBigint(inputs[2]||wallet.address);
   const [min_fee_in_FOOM_tx,max_refund_in_ETH_tx,relayer_address_official] = readFees();
   let   fee_in_FOOM = ethers.utils.parseUnits(min_fee_in_FOOM_tx||"0.0", 18);
   let   refund_in_ETH = ethers.utils.parseUnits(max_refund_in_ETH_tx||"0.0", 18);
@@ -168,6 +168,7 @@ async function main() {
       ethers.utils.getAddress(recipient_address.toString(16)), ethers.utils.getAddress(relayer_address.toString(16)), ethers.utils.formatUnits(invest_in_FOOM, 18));
     const answer3 = await question(ask3);
     if(answer3.toLowerCase() == 'y') {
+      console.log("CONNECT: %s", `${process.env.FOOM_URL}/cgi?`);
       const res = await fetch(`${process.env.FOOM_URL}/cgi?receipt=${encoded}&invest=${invest_in_FOOM}`);
       const data = await res.text();
       console.log("RESPONSE: %s", data);

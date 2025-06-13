@@ -263,7 +263,7 @@ async function main() {
           res.end("ERROR: refund is too high "+ethers.utils.formatEther(refund_in_ETH)+" > "+ethers.utils.formatEther(max_refund_in_ETH));
           return;
         }
-        if(relayer !== wallet.address && relayer !== "0x0000000000000000000000000000000000000000") {
+        if(relayer.toLowerCase() !== wallet.address.toLowerCase() && relayer !== "0x0000000000000000000000000000000000000000") {
           res.writeHead(200, { 'Content-Type': 'text/plain' });
           res.end("ERROR: relayer address does not match "+relayer+" != "+wallet.address);
           return;
