@@ -30,6 +30,7 @@ async function main() {
     "function balanceOf(address) view returns (uint256)",
     "function approve(address,uint256) external returns (bool)",
     "function allowance(address,address) view returns (uint256)",
+    "function walletBalanceOf(address) view returns (uint256)",
   ];
   const betMin = ethers.utils.parseUnits("1000000", 18);
   const inputs = process.argv.slice(2, process.argv.length);
@@ -62,8 +63,11 @@ async function main() {
   console.log("Wallet address:", wallet.address);
   const balance = await provider.getBalance(wallet.address);
   console.log("ETH  balance:", ethers.utils.formatEther(balance));
-  const foomBalance = await foom.balanceOf(wallet.address);
+    const foomBalance = await foom.balanceOf(wallet.address);
   console.log("FOOM balance: %s", ethers.utils.formatEther(foomBalance));
+  // walletBalanceOf
+  const walletBalance = await lottery.walletBalanceOf(wallet.address);
+  console.log("Lottery balance: %s", ethers.utils.formatUnits(walletBalance, 18));
 
   // Calculate FOOM needed using ethers BigNumber
   const powerBN = ethers.BigNumber.from(power);

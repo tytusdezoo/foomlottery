@@ -65,7 +65,7 @@ async function commit(provider,lottery) {
         (betsIndex >= minBets) || (waitingSum >= minBetSum)) {
       // commit if betsIndex is not 0 and enough time has passed
       const revealSecretInput = process.env.PRIVATE_KEY+'_FOOM_'+nextIndex.toString();
-      console.log(revealSecretInput,"reveal secret input");
+      //console.log(revealSecretInput,"reveal secret input");
       const revealSecret = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(revealSecretInput));
       const revealSecretHash = ethers.utils.keccak256(revealSecret);
       console.log(revealSecretHash,"reveal secret hash");
@@ -165,7 +165,8 @@ async function readLogs(provider,lottery,generator,walletAddress) {
         console.log("LogUpdate:", log.args);
         const index = Number(log.args.index);
         if(index > lastIndex) {
-          console.log("Put leaves:", index, log.args.newRand, log.args.newRoot, log.blockNumber);
+          // print index and blockNumber in hex format
+          console.log("Put leaves:", index.toString(16), log.args.newRand.toHexString(), log.args.newRoot.toHexString(), log.blockNumber.toString(16));
           await putLeaves(index,BigInt(log.args.newRand),BigInt(log.args.newRoot),log.blockNumber);
           [lastIndex,lastBlockNumber,lastRoot,lastLeaf] = readLast();
           console.log("lastIndex:", lastIndex);
