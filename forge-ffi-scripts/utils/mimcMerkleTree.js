@@ -94,7 +94,19 @@ function readLast(){
 }
 
 function writeRand(lastIndex,newIndex,newRand){
-  writeFileSync("www/rand.csv", sprintfjs.sprintf("%s,%s,%s\n",no0x(lastIndex),no0x(newIndex),no0x(newRand)));
+  const lastpath = sprintfjs.sprintf("%04x",lastIndex>>16);
+  const path1 = lastpath.slice(0,2);
+  const path2 = lastpath.slice(2,4);
+  const newpath = sprintfjs.sprintf("%04x",newIndex>>16);
+  writeFileSync("www/"+path1+"/"+path2+"/rand.csv",
+    sprintfjs.sprintf("%s,%s,%s\n",no0x(lastIndex),no0x(newIndex),no0x(newRand)), { flag: 'a' });
+  if(newpath != lastpath) {
+    execSync("gzip -9 www/"+path1+"/"+path2+"/rand.csv");
+    const npath1 = newpath.slice(0,2);
+    const npath2 = newpath.slice(2,4);
+    writeFileSync("www/"+npath1+"/"+npath2+"/rand.csv",
+    sprintfjs.sprintf("%s,%s,%s\n",no0x(lastIndex),no0x(newIndex),no0x(newRand)), { flag: 'a' });
+  }
 }
 
 function readFees(){
