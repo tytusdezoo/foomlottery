@@ -180,6 +180,24 @@ function readFees(){
   return [fee_in_FOOM,refund_in_ETH,relayer_address];
 }
 
+function writeLastBet(betIndex,blockNumber){
+  writeFileSync("www/lastbet.csv", sprintfjs.sprintf("%s,%d\n",no0x(betIndex.toHexString()),blockNumber), { flag: 'w' });
+}
+
+function readLastBet(){
+  const lines = getLines("lastbet.csv");
+  if(lines.length==0) {
+    const lines2 = getLines("waiting.csv");
+    if(lines2.length==0) {
+      return [0,0];
+    }
+    const [betIndex,newHash,blockNumber] = lines2[lines2.length-1].split(',');
+    return [parseInt(betIndex,16), parseInt(blockNumber,10)];
+  }
+  const [betIndex,blockNumber] = lines[0].split(',');
+  return [parseInt(betIndex,16), parseInt(blockNumber,10)];
+}
+
 function writeLastLog(blockNumber,transactionIndex){
   writeFileSync("www/logs.csv", sprintfjs.sprintf("%d,%d\n",blockNumber,transactionIndex), { flag: 'w' });
 }
@@ -651,4 +669,6 @@ module.exports = {
   writePrayer,
   writeRand,
   secretLuck,
+  writeLastBet,
+  readLastBet,
 };

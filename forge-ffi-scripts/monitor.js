@@ -4,7 +4,8 @@
 const dotenv = require("dotenv");
 const fastcgi = require('node-fastcgi');
 const { ethers } = require("ethers");
-const { readLast, readLastLog, writeLastLog, writeWaiting, writeRevealLock, readRevealLock, readWaitingBlocknumber, update, putLeaves, readFees, getWaitingSum, writePrayer, writeRand } = require("./utils/mimcMerkleTree.js");
+const { readLast, readLastLog, writeLastLog, writeWaiting, writeRevealLock, readRevealLock, readWaitingBlocknumber,
+  update, putLeaves, readFees, getWaitingSum, writePrayer, writeRand, writeLastBet, readLastBet } = require("./utils/mimcMerkleTree.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 
@@ -155,7 +156,23 @@ async function readLogs(provider,lottery,generator,walletAddress) {
       }
       else if(log.event == "LogBetIn") {
         console.log("Bet in:", log.args);
-        writeWaiting(log.args.index,log.args.newHash,log.blockNumber);
+        const [betIndex,betBlockNumber] = readLastBet();
+        const newBetIndex = log.args.index;
+        if(newBetIndex.gt(betIndex+1)) {
+          writeLastLog(betBlockNumber,-1);
+          console.log("Bet missing:", betIndex + 1, newBetIndex.toString());
+          return generator;
+        } else if(newBetIndex.eq(betIndex+1)) {
+          writeWaiting(newBetIndex,log.args.newHash,log.blockNumber);
+          writeLastBet(newBetIndex,log.blockNumber);
+          /*// test missing a bet , writeWaiting with 50% probability
+          if(Math.random() < 0.5) {
+            writeWaiting(newBetIndex,log.args.newHash,log.blockNumber);
+            writeLastBet(newBetIndex,log.blockNumber);
+          } else {
+            console.log("Test bet lost:", betIndex + 1, newBetIndex.toString());
+          }*/
+        }
       }
       else if(log.event == "LogCancel") {
         console.log("Cancel:", log.args);
