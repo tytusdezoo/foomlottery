@@ -6,6 +6,7 @@ const { execSync } = require('child_process');
 const sprintfjs = require('sprintf-js');
 const zlib = require('zlib');
 const request = require('sync-request');
+const { BigNumber } = require("ethers");
 const MERKLE_TREE_HEIGHT = 32;
 
 const zeros = [
@@ -108,6 +109,67 @@ function writeRand(lastIndex,newIndex,newRand){
     sprintfjs.sprintf("%s,%s,%s\n",no0x(lastIndex),no0x(newIndex),no0x(newRand)), { flag: 'a' });
   }
 }
+
+function readRand(lastIndex,numRand){
+  const lastpath = sprintfjs.sprintf("%04x",(lastIndex-numRand)>>16);
+  const path1 = lastpath.slice(0,2);
+  const path2 = lastpath.slice(2,4);
+  const lines = getLines(path1+"/"+path2+"/rand.csv");
+  let rands = [];
+  for(let i=lines.length-1;i>=0;i--) {
+    //console.log("lines[i]: %s", lines[i]);
+    const [lastIndex,newIndex,newRand] = lines[i].split(',');
+    const lastIndexNum = parseInt(lastIndex,16);
+    const newIndexNum = parseInt(newIndex,16);
+    for(let j=newIndexNum-1;j>=lastIndexNum;j--) {
+      rands.push(sprintfjs.sprintf("%x,%s",j,newRand));
+      if(rands.length>=numRand) {
+        return rands;
+      }
+    }
+  }
+  return rands;
+}
+
+async function secretLuck(secret,nextIndex,numRand){
+  const mimcsponge = await circomlibjs.buildMimcSponge();
+  const rands = readRand(nextIndex,numRand);
+  let wins = [];
+  for(let i=0;i<23;i++) {
+    wins.push(0);
+  }
+  wins.push(rands.length);
+  for(let i=0;i<rands.length;i++) {
+    const [betIndex,betRand] = rands[i].split(',');
+    const bigBetIndex = hexToBigint(betIndex);
+    const bigBetRand = hexToBigint(betRand);
+    const dice = 0b111111111111111111111111111111111111111111111111n & leBufferToBigint(mimcsponge.F.fromMontgomery(mimcsponge.multiHash([secret,bigBetRand,bigBetIndex])));
+    const rew1 = (dice &                                       0b1111111111n)?0:2**10 ;
+    const rew2 = (dice &                       0b11111111111111110000000000n)?0:2**16 ;
+    const rew3 = (dice & 0b111111111111111111111100000000000000000000000000n)?0:2**22 ;
+    //if(rew1+rew2+rew3>0) {
+    //  console.log("dice: %s, rew1: %d, rew2: %d, rew3: %d, betIndex: %s, betRand: %s", dice.toString(2).padStart(10+16+22,'0'), rew1, rew2, rew3, betIndex, betRand);
+    //}
+    wins[0] += rew1 + rew2 + rew3;
+    for(let power=1;power<=10;power++) {
+      const bigPower = BigInt(power);
+      const newrew1 = (dice & (0b1111111111n<<bigPower) & 0b1111111111n)?0:2**10;
+      wins[power] += newrew1 + rew2 + rew3;
+    }
+    for(let power=11;power<=16;power++) {
+      const bigPower = BigInt(power);
+      const newrew2 = (dice & (0b11111111111111110000000000n<<bigPower) & 0b11111111111111110000000000n)?0:2**16;
+      wins[power] += rew1 + newrew2 + rew3;
+    }
+    for(let power=17;power<=22;power++) {
+      const bigPower = BigInt(power);
+      const newrew3 = (dice & (0b111111111111111111111100000000000000000000000000n<<bigPower) & 0b111111111111111111111100000000000000000000000000n)?0:2**22;
+      wins[power] += rew1 + rew2 + newrew3;
+    }
+  }
+  return wins;
+}
+
 
 function readFees(){
   const lines = getLines("fees.csv");
@@ -588,4 +650,5 @@ module.exports = {
   getWaitingSum,
   writePrayer,
   writeRand,
+  secretLuck,
 };

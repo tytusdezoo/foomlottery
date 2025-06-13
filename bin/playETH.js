@@ -34,20 +34,24 @@ async function main() {
   ];
   const betMin = ethers.utils.parseUnits("1000000", 18);
   const inputs = process.argv.slice(2, process.argv.length);
-  if(inputs.length == 0) {
-    console.log("Usage: node playETH.js <power:0-22>");
+  if(inputs.length < 2) {
+    console.log("Usage: playETH.js <power:0-22> <0 or secret> <prayer:optional>");
     process.exit(1);
   }
+  let power = parseInt(inputs[0]);
+  let secret = hexToBigint(inputs[1].replace(/,.*/, ""))>>8n;
+  if(secret == 0n) {
+    secret = rbigint(31)-10000n;
+  }
   let prayer = "";
-  if(inputs.length > 1) {
-    prayer = inputs.slice(1).join(" ");
+  if(inputs.length > 2) {
+    prayer = inputs.slice(2).join(" ");
     if(prayer === "read") {
       const { readPrayer } = require("./utils/prayers.js");
       prayer = await readPrayer();
       console.log("prayer: %s", prayer);
     }
   }
-  let power = parseInt(inputs[0]);
   const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
   const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
   const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
@@ -94,16 +98,15 @@ async function main() {
     //process.exit(0);
   }
   let hash = 0n;
-  let secret = 0n;
   let i = 0n;
   let secret_power = 0n;
   console.log("calculating secret for %s FOOM ticket...", ethers.utils.formatUnits(foom_needed, 18));
   for(; i < 10000n; i++) {
-    secret = rbigint(31);
     hash = await pedersenHash(leBigintToBuffer(secret, 31));
     if((hash & 0x1fn)==0n) {
       break;
     }
+    secret = secret + 1n;
   }
   if(i >= 10000n) { throw new Error("Failed to create ticket"); }
   secret_power = secret<<8n | BigInt(power);
@@ -112,13 +115,31 @@ async function main() {
   console.log("hash: %s (use on basescan.org)",hash.toString());
   console.log("hash: %s",bigintToHex(hash));
 
-  // ask for confirmation using readline
-  const ask = sprintfjs.sprintf("Are you sure you want to play this ticket and send %s ETH? (y/n): ", ethers.utils.formatEther(amountInETH));
-  const answer = await question(ask);
-  if(answer.toLowerCase() !== 'y') {
-    console.log("Aborted.");
-    rl.close();
-    process.exit(0);
+  if(inputs.length < 3) {
+    // checking luck
+    const askluck = sprintfjs.sprintf("Do you want to test the luck of the secret? (y/n): ");
+    const answerluck = await question(askluck);
+    if(answerluck.toLowerCase() === 'y') {
+      const wins = await secretLuck(secret,nextIndex,1024);
+      const bets = wins[23];
+      console.log("total bets: %d (values in M FOOM)", bets);
+      console.log(sprintfjs.sprintf("%5s %11s %11s %11s %11s","power","cost","reward","profit","netprofit"));
+      for(let i=0;i<22;i++) {
+        if(i==10||i==16) {
+          console.log(sprintfjs.sprintf("%5s %11s %11s %11s %11s","power","cost","reward","profit","netprofit"));
+        } else {
+          console.log(sprintfjs.sprintf("%5d %11d %11d %11d %11d", i, bets*(2+2**i), wins[i], wins[i]-bets*(2+2**i), wins[i]*0.96-bets*(2+2**i)));
+        }
+      }
+    }
+    // ask for confirmation using readline
+    const ask = sprintfjs.sprintf("Are you sure you want to play this ticket and send %s ETH? (y/n): ", ethers.utils.formatEther(amountInETH));
+    const answer = await question(ask);
+    if(answer.toLowerCase() !== 'y') {
+      console.log("Aborted.");
+      rl.close();
+      process.exit(0);
+    }
   }
   
   if(prayer.length == 0) {
@@ -126,7 +147,7 @@ async function main() {
     prayer = await question(askprayer);
   }
   rl.close();
-
+  // play the ticket
   console.log("sending ticket...");
   let tx = null;
   if(prayer.length > 0) {
