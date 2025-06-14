@@ -31,8 +31,6 @@ async function rememberHash(provider,lottery) {
     const receipt = await tx.wait();
     console.log("Remember hash transaction receipt:", receipt);
   }
-  console.log("period:", period);
-  console.log("process.env.LAST_PERIOD:", process.env.LAST_PERIOD);
   while(period > Number(process.env.LAST_PERIOD)+1) {
     process.env.LAST_PERIOD ++;
     const Period = await lottery.periods(process.env.LAST_PERIOD);
