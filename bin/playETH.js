@@ -123,12 +123,18 @@ async function main() {
       const wins = await secretLuck(secret,nextIndex,answerluck);
       const bets = wins[23];
       console.log("total bets: %d (values in M FOOM)", bets);
-      console.log(sprintfjs.sprintf("%5s %11s %11s %11s %11s","power","cost","reward","profit","netprofit"));
+      console.log(sprintfjs.sprintf("%5s %11s %11s %11s %11s %3s %11s","power","cost","reward","profit","LUCK  %","   ","netprofit"));
       for(let i=0;i<22;i++) {
         if(i==10||i==16) {
-          console.log(sprintfjs.sprintf("%5s %11s %11s %11s %11s","power","cost","reward","profit","netprofit"));
+          console.log(sprintfjs.sprintf("%5s %11s %11s %11s %11s %3s %11s","power","cost","reward","profit","LUCK  %","   ","netprofit"));
         } else {
-          console.log(sprintfjs.sprintf("%5d %11d %11d %11d %11d", i, bets*(2+2**i), wins[i], wins[i]-bets*(2+2**i), wins[i]*0.96-bets*(2+2**i)));
+          const cost = bets*(2+2**i);
+          const reward = wins[i];
+          const profit = reward-cost;
+          const luck = reward*100/cost;
+          const netprofit = reward*0.96-cost;
+          const you = power==i ? "<- " : "   ";
+          console.log(sprintfjs.sprintf("%5d %11d %11d %11d %10.1f%% %3s %11d", i, cost, reward, profit, luck, you, netprofit));
         }
       }
     }
