@@ -100,13 +100,13 @@ function writeRand(lastIndex,newIndex,newRand){
   const path2 = lastpath.slice(2,4);
   const newpath = sprintfjs.sprintf("%04x",newIndex>>16);
   writeFileSync("www/"+path1+"/"+path2+"/rand.csv",
-    sprintfjs.sprintf("%s,%s,%s\n",no0x(lastIndex),no0x(newIndex),no0x(newRand)), { flag: 'a' });
+    sprintfjs.sprintf("%s,%s,%s\n",no0x(lastIndex.toString(16)),no0x(newIndex.toString(16)),no0x(newRand.toHexString())), { flag: 'a' });
   if(newpath != lastpath) {
     execSync("gzip -9 www/"+path1+"/"+path2+"/rand.csv");
     const npath1 = newpath.slice(0,2);
     const npath2 = newpath.slice(2,4);
     writeFileSync("www/"+npath1+"/"+npath2+"/rand.csv",
-    sprintfjs.sprintf("%s,%s,%s\n",no0x(lastIndex),no0x(newIndex),no0x(newRand)), { flag: 'a' });
+    sprintfjs.sprintf("%s,%s,%s\n",no0x(lastIndex.toString(16)),no0x(newIndex.toString(16)),no0x(newRand.toHexString())), { flag: 'a' });
   }
 }
 
@@ -196,6 +196,19 @@ function readLastBet(){
   }
   const [betIndex,blockNumber] = lines[0].split(',');
   return [parseInt(betIndex,16), parseInt(blockNumber,10)];
+}
+
+function readLastPeriod(){
+  const lines = getLines("period.csv");
+  if(lines.length==0) {
+    return 0;
+  }
+  const [period] = lines[lines.length-1].split(',');
+  return parseInt(period,10);
+}
+
+function appendLastPeriod(period,bets,shares){
+  writeFileSync("www/period.csv", sprintfjs.sprintf("%d,%s,%s\n",period,no0x(bets.toHexString()),no0x(shares.toHexString())), { flag: 'a' });
 }
 
 function writeLastLog(blockNumber,transactionIndex){
@@ -671,4 +684,6 @@ module.exports = {
   secretLuck,
   writeLastBet,
   readLastBet,
+  readLastPeriod,
+  appendLastPeriod,
 };

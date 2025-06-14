@@ -5,7 +5,7 @@ const dotenv = require("dotenv");
 const fastcgi = require('node-fastcgi');
 const { ethers } = require("ethers");
 const { readLast, readLastLog, writeLastLog, writeWaiting, writeRevealLock, readRevealLock, readWaitingBlocknumber,
-  update, putLeaves, readFees, getWaitingSum, writePrayer, writeRand, writeLastBet, readLastBet } = require("./utils/mimcMerkleTree.js");
+  update, putLeaves, readFees, getWaitingSum, writePrayer, writeRand, writeLastBet, readLastBet, readLastPeriod, appendLastPeriod } = require("./utils/mimcMerkleTree.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 
@@ -16,6 +16,7 @@ async function rememberHash(provider,lottery) {
   const commitBlock = D.commitBlock;
   const commitIndex = D.commitIndex;
   const commitBlockHash = D.commitBlockHash;
+  const period = D.dividendPeriod;
   if(commitBlock > 0 && commitBlockHash == _open && blockNumber > commitBlock+30) {
     const gasPrice = await provider.getGasPrice();
     const tx = await lottery.rememberHash({ gasPrice: gasPrice.mul(130).div(100) });
@@ -29,6 +30,14 @@ async function rememberHash(provider,lottery) {
     console.log("Remember hash transaction:", tx);
     const receipt = await tx.wait();
     console.log("Remember hash transaction receipt:", receipt);
+  }
+  console.log("period:", period);
+  console.log("process.env.LAST_PERIOD:", process.env.LAST_PERIOD);
+  while(period > Number(process.env.LAST_PERIOD)+1) {
+    process.env.LAST_PERIOD ++;
+    const Period = await lottery.periods(process.env.LAST_PERIOD);
+    appendLastPeriod(process.env.LAST_PERIOD,Period.bets,Period.shares);
+    console.log("Saved period: %d, bets: %d, shares: %d", process.env.LAST_PERIOD,ethers.utils.formatUnits(Period.bets, 18),ethers.utils.formatUnits(Period.shares, 18));
   }
 }
 
@@ -185,7 +194,7 @@ async function readLogs(provider,lottery,generator,walletAddress) {
           // print index and blockNumber in hex format
           console.log("Put leaves:", index.toString(16), log.args.newRand.toHexString(), log.args.newRoot.toHexString(), log.blockNumber.toString(16));
           await putLeaves(index,BigInt(log.args.newRand),BigInt(log.args.newRoot),log.blockNumber);
-          writeRand(lastIndex.toString(16),index.toString(16),log.args.newRand.toHexString());
+          writeRand(lastIndex,index,log.args.newRand);
           [lastIndex,lastBlockNumber,lastRoot,lastLeaf] = readLast();
           console.log("lastIndex:", lastIndex);
         }
@@ -232,6 +241,7 @@ async function main() {
   const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
   const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
   let generator = await lottery.generator();
+  process.env.LAST_PERIOD = await readLastPeriod();
   //console.log("Wallet address:", wallet.address);
   //const balance = await provider.getBalance(wallet.address);
   //console.log("Wallet balance:", ethers.utils.formatEther(balance));
@@ -338,6 +348,8 @@ async function main() {
     // wait 17 seconds
     console.log("Waiting 5 seconds");
     await new Promise(resolve => setTimeout(resolve, 5000));
+    // save stats
+    await updateStats(provider,lottery);
     // TODO, manage ETH balance
     /*const balance = await provider.getBalance(wallet.address);
     console.log("ETH balance:", ethers.utils.formatEther(balance));
