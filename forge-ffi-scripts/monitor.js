@@ -348,8 +348,6 @@ async function main() {
     // wait 17 seconds
     console.log("Waiting 5 seconds");
     await new Promise(resolve => setTimeout(resolve, 5000));
-    // save stats
-    await updateStats(provider,lottery);
     // TODO, manage ETH balance
     /*const balance = await provider.getBalance(wallet.address);
     console.log("ETH balance:", ethers.utils.formatEther(balance));
