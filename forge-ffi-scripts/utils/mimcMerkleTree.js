@@ -31,7 +31,7 @@ function getLines(path) {
   let textold;
   // collect data via https if FOOM_URL is set
   try {
-    if(process.env.FOOM_URL) {
+    if(process.env.FOOM_URL && process.env.FOOM_URL.startsWith("http")) {
       // check if path in cache
       if(process.env.CACHE && existsSync(process.env.CACHE+"/"+path+".gz")) {
         fileold = openSync(process.env.CACHE+"/"+path+".gz", "r");
@@ -88,7 +88,7 @@ function writeLast(nextIndex,blockNumber,lastRoot,lastLeaf){
 function readLast(){
   const lines = getLines("last.csv");
   if(lines.length==0) {
-    throw new Error("Failed to read tree from "+(process.env.FOOM_URL||"www/")+"last.csv");
+    throw new Error("Failed to read tree from "+(process.env.FOOM_URL||"www")+"/last.csv");
   }
   const [nextIndex,blockNumber,lastRoot,lastLeaf] = lines[0].split(',');
   return [parseInt(nextIndex,16), parseInt(blockNumber,16), hexToBigint(lastRoot), hexToBigint(lastLeaf)];
@@ -264,7 +264,7 @@ function getIndexRand(hashstr,betIndex) {
   const lines = getLines(""+path1+"/"+path2+"/"+path3+".csv");
   for(let i=0;i<lines.length;i++) {
     const [index,skip,hash,myrand] = lines[i].split(',');
-    if(hash==hashstr) {
+    if(hash===hashstr) {
       const newIndex=(betIndex&0xffffff00) + parseInt(index,16);
       return [newIndex,hexToBigint(myrand)];
     }
@@ -276,7 +276,7 @@ function getIndexWaiting(hashstr) {
   const lines = getLines("waiting.csv");
   for(let i=0;i<lines.length;i++) {
     const [index,hash] = lines[i].split(',');
-    if(hash==hashstr) {
+    if(hash===hashstr) {
       return [parseInt(index,16),0n];
     }
   }
@@ -654,7 +654,6 @@ async function update(commitIndex,hashesLength,newRand){
   }
   return output;
 }
-
 
 module.exports = {
   mimicMerkleTree,

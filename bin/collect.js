@@ -9,7 +9,7 @@ const { pedersenHash } = require("./utils/pedersen.js");
 const { getPath, findBet, readFees } = require("./utils/mimcMerkleTree.js");
 const circomlibjs = require("circomlibjs");
 const sprintfjs = require("sprintf-js");
-
+const chain = require("../forge-ffi-scripts/utils/chain.js");
 // Create readline interface
 const rl = readline.createInterface({
   input: process.stdin,
@@ -26,15 +26,18 @@ function question(query) {
 
 async function main() {
   dotenv.config();
-  const betMin = ethers.utils.parseUnits("1000000", 18);
+  const betMin = ethers.utils.parseUnits(chain.bet_min(), 18);
   const inputs = process.argv.slice(2, process.argv.length);
   if(inputs.length == 0) {
     console.log("Usage: collect.js <ticket> <invest_in_FOOM:optional> <recipient_address:optional>");
     process.exit(1);
   }
-  const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
+  if(!process.env.FOOM_URL) {
+    process.env.FOOM_URL = chain.foom_url();
+  }
+  const provider = new ethers.providers.JsonRpcProvider(chain.rpc_url());
   const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-  const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
+  const lottery = new ethers.Contract(chain.lottery_address(), chain.lottery_abi(), wallet);
 
   const secret_power = hexToBigint(inputs[0].replace(/,.*/, ''));
   const startindex = parseInt(inputs[0].replace(/.*,/, ''));

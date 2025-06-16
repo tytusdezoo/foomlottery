@@ -2,11 +2,8 @@
 const dotenv = require("dotenv");
 const { ethers } = require("ethers");
 const readline = require('readline');
-const { pedersenHash } = require("./utils/pedersen.js");
-const { rbigint, bigintToHex, leBigintToBuffer, hexToBigint } = require("./utils/bigint.js");
-const { readLast } = require("./utils/mimcMerkleTree.js");
-const fs = require("fs");
 const sprintfjs = require("sprintf-js");
+const chain = require("../forge-ffi-scripts/utils/chain.js");
 
 // Create readline interface
 const rl = readline.createInterface({
@@ -25,28 +22,23 @@ function question(query) {
 
 async function main() {
   dotenv.config();
-  const FOOM_ADDRESS = "0x02300aC24838570012027E0A90D3FEcCEF3c51d2";
-  const FOOM_ABI = [
-    "function balanceOf(address) view returns (uint256)",
-    "function approve(address,uint256) external returns (bool)",
-    "function allowance(address,address) view returns (uint256)",
-    "function walletBalanceOf(address) view returns (uint256)",
-  ];
-  const betMin = ethers.utils.parseUnits("1000000", 18);
   const inputs = process.argv.slice(2, process.argv.length);
   if(inputs.length == 0) {
     console.log("Usage: payout.js <FOOM_amount>");
     process.exit(1);
   }
+  if(!process.env.FOOM_URL) {
+    process.env.FOOM_URL = chain.foom_url();
+  }
 
   const foom_amount = ethers.utils.parseUnits(inputs[0], 18);
-  const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
+  const provider = new ethers.providers.JsonRpcProvider(chain.rpc_url());
   const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-  const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
+  const lottery = new ethers.Contract(chain.lottery_address(), chain.lottery_abi(), wallet);
 
   const gasPrice = await provider.getGasPrice();
   console.log("GAS price: %s", ethers.utils.formatUnits(gasPrice, 9));
-  const foom = new ethers.Contract(FOOM_ADDRESS, FOOM_ABI, wallet);
+  const foom = new ethers.Contract(chain.foom_address(), chain.foom_abi(), wallet);
   console.log("Wallet address:", wallet.address);
   const balance = await provider.getBalance(wallet.address);
   console.log("ETH  balance:", ethers.utils.formatEther(balance));

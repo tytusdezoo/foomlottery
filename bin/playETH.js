@@ -4,9 +4,10 @@ const { ethers } = require("ethers");
 const readline = require('readline');
 const { pedersenHash } = require("./utils/pedersen.js");
 const { rbigint, bigintToHex, leBigintToBuffer, hexToBigint } = require("./utils/bigint.js");
-const { readLast } = require("./utils/mimcMerkleTree.js");
+const { readLast, secretLuck } = require("./utils/mimcMerkleTree.js");
 const fs = require("fs");
 const sprintfjs = require("sprintf-js");
+const chain = require("../forge-ffi-scripts/utils/chain.js");
 
 // Create readline interface
 const rl = readline.createInterface({
@@ -25,14 +26,7 @@ function question(query) {
 
 async function main() {
   dotenv.config();
-  const WETH_ADDRESS = "0x4200000000000000000000000000000000000006";
-  const FOOM_ADDRESS = "0x02300aC24838570012027E0A90D3FEcCEF3c51d2";
-  const TOKEN_ABI = ["function balanceOf(address) view returns (uint256)"];
-  const FOOM_DEX_ADDRESS = "0xc5adb6F67c54D187a9FD8bA4994855e35963B69D";
-  const FOOM_DEX_ABI = [
-    "function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)",
-  ];
-  const betMin = ethers.utils.parseUnits("1000000", 18);
+  const betMin = ethers.utils.parseUnits(chain.bet_min(), 18);
   const inputs = process.argv.slice(2, process.argv.length);
   if(inputs.length < 2) {
     console.log("Usage: playETH.js <power:0-22> <0 or secret> <prayer:optional>");
@@ -52,19 +46,22 @@ async function main() {
       console.log("prayer: %s", prayer);
     }
   }
-  const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
+  if(!process.env.FOOM_URL) {
+    process.env.FOOM_URL = chain.foom_url();
+  }
+  const provider = new ethers.providers.JsonRpcProvider(chain.rpc_url());
   const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-  const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
+  const lottery = new ethers.Contract(chain.lottery_address(), chain.lottery_abi(), wallet);
 
   const gasPrice = await provider.getGasPrice();
   console.log("GAS price: %s", ethers.utils.formatUnits(gasPrice, 9));
-  if(gasPrice.gte(ethers.utils.parseUnits(process.env.GAS_PRICE_LIMIT || "0.01", 9))) {
-    console.log("GAS price is too high. Must be less than "+process.env.GAS_PRICE_LIMIT+" gwei.");
+  if(gasPrice.gte(ethers.utils.parseUnits(chain.gas_price_limit() || "0.01", 9))) {
+    console.log("GAS price is too high. Must be less than "+chain.gas_price_limit()+" gwei.");
     process.exit(1);
   }
-  const foom = new ethers.Contract(FOOM_ADDRESS, TOKEN_ABI, wallet);
-  const weth = new ethers.Contract(WETH_ADDRESS, TOKEN_ABI, wallet);
-  const foomdex = new ethers.Contract(FOOM_DEX_ADDRESS, FOOM_DEX_ABI, wallet);
+  const foom = new ethers.Contract(chain.foom_address(), chain.foom_abi(), wallet);
+  const weth = new ethers.Contract(chain.weth_address(), chain.weth_abi(), wallet);
+  const foomdex = new ethers.Contract(chain.dex_address(), chain.dex_abi(), wallet);
   console.log("Wallet address:", wallet.address);
   const balance = await provider.getBalance(wallet.address);
   console.log("ETH  balance:", ethers.utils.formatEther(balance));
@@ -78,9 +75,9 @@ async function main() {
   console.log("FOOM  needed: %s", ethers.utils.formatUnits(foom_needed, 18));
   //console.log("FOOM needed: %s hex", foom_needed.toHexString());
   //console.log("FOOM needed: %s dec", foom_needed.toString());
-  const dexfoomBalance = await foom.balanceOf(FOOM_DEX_ADDRESS);
+  const dexfoomBalance = await foom.balanceOf(chain.dex_address());
   console.log("DEX FOOM balance: %s", ethers.utils.formatUnits(dexfoomBalance, 18));
-  const wethBalance = await weth.balanceOf(FOOM_DEX_ADDRESS);
+  const wethBalance = await weth.balanceOf(chain.dex_address());
   console.log("DEX WETH balance: %s", ethers.utils.formatEther(wethBalance));
   const slot0 = await foomdex.slot0();
   const price = ethers.BigNumber.from(slot0.sqrtPriceX96).mul(ethers.BigNumber.from(slot0.sqrtPriceX96)).mul(10n**18n).div(2n**192n);
@@ -100,52 +97,60 @@ async function main() {
   let hash = 0n;
   let i = 0n;
   let secret_power = 0n;
-  console.log("calculating secret for %s FOOM ticket...", ethers.utils.formatUnits(foom_needed, 18));
-  for(; i < 10000n; i++) {
-    hash = await pedersenHash(leBigintToBuffer(secret, 31));
-    if((hash & 0x1fn)==0n) {
-      break;
+  for(;;){
+    console.log("calculating secret...");
+    for(; i < 10000n; i++) {
+      hash = await pedersenHash(leBigintToBuffer(secret, 31));
+      if((hash & 0x1fn)==0n) {
+        break;
+      }
+      secret = secret + 1n;
     }
-    secret = secret + 1n;
-  }
-  if(i >= 10000n) { throw new Error("Failed to create ticket"); }
-  secret_power = secret<<8n | BigInt(power);
-  const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();
-  console.log("secret: %s,%s (index not final)",bigintToHex(secret_power),nextIndex.toString());
-  console.log("hash: %s (use on basescan.org)",hash.toString());
-  console.log("hash: %s",bigintToHex(hash));
+    if(i >= 10000n) { throw new Error("Failed to create ticket"); }
+    secret_power = secret<<8n | BigInt(power);
+    const [nextIndex,blockNumber,lastRoot,lastLeaf] = readLast();
+    console.log("secret: %s,%s (index not final)",bigintToHex(secret_power),nextIndex.toString());
+    console.log("hash: %s (use on basescan.org)",hash.toString());
+    console.log("hash: %s",bigintToHex(hash));
 
-  if(inputs.length < 3) {
-    // checking luck
-    const askluck = sprintfjs.sprintf("Do you want to test the luck of the secret on last bets? (0-1024): ");
-    const answerluck = parseInt(await question(askluck));
-    if(answerluck > 0 && answerluck <= 1024) {
-      const wins = await secretLuck(secret,nextIndex,answerluck);
-      const bets = wins[23];
-      console.log("total bets: %d (values in M FOOM)", bets);
-      console.log(sprintfjs.sprintf("%5s %11s %11s %11s %11s %3s %11s","power","cost","reward","profit","LUCK  %","   ","netprofit"));
-      for(let i=0;i<22;i++) {
-        if(i==10||i==16) {
-          console.log(sprintfjs.sprintf("%5s %11s %11s %11s %11s %3s %11s","power","cost","reward","profit","LUCK  %","   ","netprofit"));
-        } else {
-          const cost = bets*(2+2**i);
-          const reward = wins[i];
-          const profit = reward-cost;
-          const luck = reward*100/cost;
-          const netprofit = reward*0.96-cost;
-          const you = power==i ? "<- " : "   ";
-          console.log(sprintfjs.sprintf("%5d %11d %11d %11d %10.1f%% %3s %11d", i, cost, reward, profit, luck, you, netprofit));
+    if(inputs.length < 3) {
+      // checking luck
+      const askluck = sprintfjs.sprintf("Do you want to test the luck of the secret on last bets? (0-1024): ");
+      const answerluck = parseInt(await question(askluck));
+      if(answerluck > 0 && answerluck <= 1024) {
+        const wins = await secretLuck(secret,nextIndex,answerluck);
+        const bets = wins[23];
+        console.log("total bets: %d (values in M FOOM)", bets);
+        console.log(sprintfjs.sprintf("%5s %11s %11s %11s %11s %3s %11s","power","cost","reward","profit","LUCK  %","   ","netprofit"));
+        for(let i=0;i<22;i++) {
+          if(i==10||i==16) {
+            console.log(sprintfjs.sprintf("%5s %11s %11s %11s %11s %3s %11s","power","cost","reward","profit","LUCK  %","   ","netprofit"));
+          } else {
+            const cost = bets*(2+2**i);
+            const reward = wins[i];
+            const profit = reward-cost;
+            const luck = reward*100/cost;
+            const netprofit = reward*0.96-cost;
+            const you = power==i ? "<- " : "   ";
+            console.log(sprintfjs.sprintf("%5d %11d %11d %11d %10.1f%% %3s %11d", i, cost, reward, profit, luck, you, netprofit));
+          }
         }
       }
+      // ask for confirmation using readline
+      const ask = sprintfjs.sprintf("Are you sure you want to play this ticket and send %s ETH? (y/n): ", ethers.utils.formatEther(amountInETH));
+      const answer = await question(ask);
+      if(answer.toLowerCase() === 'n') {
+        secret = secret + 1n;
+        i = 0n;
+        continue;
+      }
+      if(answer.toLowerCase() !== 'y') {
+        console.log("Aborted.");
+        rl.close();
+        process.exit(0);
+      }
     }
-    // ask for confirmation using readline
-    const ask = sprintfjs.sprintf("Are you sure you want to play this ticket and send %s ETH? (y/n): ", ethers.utils.formatEther(amountInETH));
-    const answer = await question(ask);
-    if(answer.toLowerCase() !== 'y') {
-      console.log("Aborted.");
-      rl.close();
-      process.exit(0);
-    }
+    break;
   }
   
   if(prayer.length == 0) {

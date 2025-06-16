@@ -4,9 +4,11 @@
 const dotenv = require("dotenv");
 const fastcgi = require('node-fastcgi');
 const { ethers } = require("ethers");
-const { readLast, readLastLog, writeLastLog, writeWaiting, writeRevealLock, readRevealLock, readWaitingBlocknumber,
-  update, putLeaves, readFees, getWaitingSum, writePrayer, writeRand, writeLastBet, readLastBet, readLastPeriod, appendLastPeriod } = require("./utils/mimcMerkleTree.js");
-
+//const { readLast, readLastLog, writeLastLog, writeWaiting, writeRevealLock, readRevealLock, readWaitingBlocknumber,
+//  update, putLeaves, readFees, getWaitingSum, writePrayer, writeRand, writeLastBet, readLastBet, readLastPeriod, appendLastPeriod } = require("./utils/mimcMerkleTree.js");
+const tree = require("./utils/mimcMerkleTree.js");
+const chain = require("./utils/chain.js");
+  
 ////////////////////////////// MAIN ///////////////////////////////////////////
 
 async function rememberHash(provider,lottery) {
@@ -34,7 +36,7 @@ async function rememberHash(provider,lottery) {
   while(period > Number(process.env.LAST_PERIOD)+1) {
     process.env.LAST_PERIOD ++;
     const Period = await lottery.periods(process.env.LAST_PERIOD);
-    appendLastPeriod(process.env.LAST_PERIOD,Period.bets,Period.shares);
+    tree.appendLastPeriod(process.env.LAST_PERIOD,Period.bets,Period.shares);
     console.log("Saved period: %d, bets: %d, shares: %d", process.env.LAST_PERIOD,ethers.utils.formatUnits(Period.bets, 18),ethers.utils.formatUnits(Period.shares, 18));
   }
 }
@@ -65,10 +67,10 @@ async function commit(provider,lottery) {
   const nextIndex = D.nextIndex;
   const betsIndex = D.betsIndex;
   const commitIndex = D.commitIndex;
-  const waitingSum = betsIndex>0?getWaitingSum(nextIndex,betsIndex):0;
-  const [lastIndex,lastBlockNumber,lastRoot,lastLeaf] = readLast();
+  const waitingSum = betsIndex>0?tree.getWaitingSum(nextIndex,betsIndex):0;
+  const [lastIndex,lastBlockNumber,lastRoot,lastLeaf] = tree.readLast();
   if(betsIndex > 0 && lastIndex == nextIndex && commitIndex == 0) {
-    const waitingBlocknumber = readWaitingBlocknumber();
+    const waitingBlocknumber = tree.readWaitingBlocknumber();
     if((waitingBlocknumber > 0 && waitingBlocknumber <= blockNumber - minBlocks) ||
         (betsIndex >= minBets) || (waitingSum >= minBetSum)) {
       // commit if betsIndex is not 0 and enough time has passed
@@ -104,21 +106,21 @@ async function reveal(provider,lottery,index,commitIndex,commitHash,commitBlockH
     console.log(revealSecretHash,"reveal secret hash");
     console.log(commitHash.toHexString(),"commitHash");
     if(commitHash.eq(revealSecretHash)) {
-      if(readRevealLock()==index) {
+      if(tree.readRevealLock()==index) {
         console.log("Reveal lock present");
         return;
       }
-      writeRevealLock(index); 
+      tree.writeRevealLock(index); 
       const newRand = ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["bytes32","bytes32"],[revealSecret,commitBlockHash]));
       const newRandUint128 = ethers.BigNumber.from(newRand).toBigInt() & 0xffffffffffffffffffffffffffffffffn;
       try {
-        const output = await update(commitIndex,0,newRandUint128);
+        const output = await tree.update(commitIndex,0,newRandUint128);
         const gasPrice = await provider.getGasPrice();
         const tx = await lottery.reveal(revealSecret,output.pA,output.pB,output.pC,output.newRoot, { gasPrice: gasPrice.mul(130).div(100) });
         const receipt = await tx.wait();
         console.log("Reveal transaction receipt:", receipt);
         if(receipt.status == 1) {
-            writeRevealLock(0);
+            tree.writeRevealLock(0);
         } else {
           throw new Error("Reveal transaction failed");
         }
@@ -140,14 +142,14 @@ async function reveal(provider,lottery,index,commitIndex,commitHash,commitBlockH
 
 async function readLogs(provider,lottery,generator,walletAddress) {
   const CHUNK_SIZE = 99;
-  let [lastIndex,lastBlockNumber,lastRoot,lastLeaf] = readLast();
-  const [logsBlockNumber,logsTransactionIndex] = readLastLog();
+  let [lastIndex,lastBlockNumber,lastRoot,lastLeaf] = tree.readLast();
+  const [logsBlockNumber,logsTransactionIndex] = tree.readLastLog();
   if(logsBlockNumber == 0) {
-    logsBlockNumber = process.env.LOG_START ? parseInt(process.env.LOG_START) : 0;
+    logsBlockNumber = chain.log_start();
   }
   console.log(logsBlockNumber,"start");
   // use process.env.WAIT_BLOCKS to dalay reading logs
-  const blockNumber = (await provider.getBlockNumber())-(process.env.WAIT_BLOCKS||0);
+  const blockNumber = (await provider.getBlockNumber())-(process.env.WAIT_BLOCKS||chain.wait_blocks());
   for(let currentBlock = logsBlockNumber; currentBlock < blockNumber; currentBlock += CHUNK_SIZE+1) {
     const endBlock = Math.min(currentBlock + CHUNK_SIZE, blockNumber);
     console.log(`Querying blocks ${currentBlock} to ${endBlock} max ${blockNumber}`);    
@@ -163,19 +165,19 @@ async function readLogs(provider,lottery,generator,walletAddress) {
       }
       else if(log.event == "LogBetIn") {
         console.log("Bet in:", log.args);
-        const [betIndex,betBlockNumber] = readLastBet();
+        const [betIndex,betBlockNumber] = tree.readLastBet();
         const newBetIndex = log.args.index;
         if(newBetIndex.gt(betIndex+1)) {
-          writeLastLog(betBlockNumber,-1);
+          tree.writeLastLog(betBlockNumber,-1);
           console.log("Bet missing:", betIndex + 1, newBetIndex.toString());
           return generator;
         } else if(newBetIndex.eq(betIndex+1)) {
-          writeWaiting(newBetIndex,log.args.newHash,log.blockNumber);
-          writeLastBet(newBetIndex,log.blockNumber);
-          /*// test missing a bet , writeWaiting with 50% probability
+          tree.writeWaiting(newBetIndex,log.args.newHash,log.blockNumber);
+          tree.writeLastBet(newBetIndex,log.blockNumber);
+          /*// test missing a bet , tree.writeWaiting with 50% probability
           if(Math.random() < 0.5) {
-            writeWaiting(newBetIndex,log.args.newHash,log.blockNumber);
-            writeLastBet(newBetIndex,log.blockNumber);
+            tree.writeWaiting(newBetIndex,log.args.newHash,log.blockNumber);
+            tree.writeLastBet(newBetIndex,log.blockNumber);
           } else {
             console.log("Test bet lost:", betIndex + 1, newBetIndex.toString());
           }*/
@@ -183,7 +185,7 @@ async function readLogs(provider,lottery,generator,walletAddress) {
       }
       else if(log.event == "LogCancel") {
         console.log("Cancel:", log.args);
-        writeWaiting(log.args.index,ethers.BigNumber.from(0x20n),log.blockNumber);
+        tree.writeWaiting(log.args.index,ethers.BigNumber.from(0x20n),log.blockNumber);
       }
       else if(log.event == "LogUpdate") {
         console.log("LogUpdate:", log.args);
@@ -191,9 +193,9 @@ async function readLogs(provider,lottery,generator,walletAddress) {
         if(index > lastIndex) {
           // print index and blockNumber in hex format
           console.log("Put leaves:", index.toString(16), log.args.newRand.toHexString(), log.args.newRoot.toHexString(), log.blockNumber.toString(16));
-          await putLeaves(index,BigInt(log.args.newRand),BigInt(log.args.newRoot),log.blockNumber);
-          writeRand(lastIndex,index,log.args.newRand);
-          [lastIndex,lastBlockNumber,lastRoot,lastLeaf] = readLast();
+          await tree.putLeaves(index,BigInt(log.args.newRand),BigInt(log.args.newRoot),log.blockNumber);
+          tree.writeRand(lastIndex,index,log.args.newRand);
+          [lastIndex,lastBlockNumber,lastRoot,lastLeaf] = tree.readLast();
           console.log("lastIndex:", lastIndex);
         }
       }
@@ -216,14 +218,14 @@ async function readLogs(provider,lottery,generator,walletAddress) {
         console.log("Prayer:", log.args);
         // convert prayer = array of bytes32 values to string and trim 00 suffix
         const prayer = log.args.prayer.map(p => ethers.utils.toUtf8String(p).replace(/\0*$/, '')).join("\n");
-        writePrayer(log.args.betId,prayer);
+        tree.writePrayer(log.args.betId,prayer);
       }
       else {
         console.log("Log:", log);
       }
-      writeLastLog(log.blockNumber,log.transactionIndex);
+      tree.writeLastLog(log.blockNumber,log.transactionIndex);
     }
-    writeLastLog(endBlock+1,-1);
+    tree.writeLastLog(endBlock+1,-1);
   }
   // write blockNumber to logs.csv
   return generator;
@@ -235,11 +237,11 @@ async function main() {
   delete process.env.FOOM_URL;
   const inputs = process.argv.slice(2, process.argv.length);
   const task = inputs.length > 0 ? inputs[0] : "";
-  const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
+  const provider = new ethers.providers.JsonRpcProvider(chain.rpc_url());
   const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-  const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
+  const lottery = new ethers.Contract(chain.lottery_address(), chain.lottery_abi(), wallet);
   let generator = await lottery.generator();
-  process.env.LAST_PERIOD = await readLastPeriod();
+  process.env.LAST_PERIOD = await tree.readLastPeriod();
   //console.log("Wallet address:", wallet.address);
   //const balance = await provider.getBalance(wallet.address);
   //console.log("Wallet balance:", ethers.utils.formatEther(balance));
@@ -271,7 +273,7 @@ async function main() {
         const fee_in_FOOM = d[3][4];
         const refund_in_ETH = d[3][5];
         const rewardbits = d[3][6];
-        const [min_fee_in_FOOM_tx,max_refund_in_ETH_tx] = readFees();
+        const [min_fee_in_FOOM_tx,max_refund_in_ETH_tx] = tree.readFees();
         if(max_refund_in_ETH_tx == "0") {
           res.writeHead(200, { 'Content-Type': 'text/plain' });
           res.end("ERROR: relayer not ready!");
@@ -308,8 +310,8 @@ async function main() {
         }
         const gasPrice = await provider.getGasPrice();
         console.log("GAS price: %s", ethers.utils.formatUnits(gasPrice, 9));
-        if(gasPrice.gte(ethers.utils.parseUnits(process.env.GAS_PRICE_LIMIT || "0.01", 9))) {
-          console.log("GAS price is too high. Must be less than "+process.env.GAS_PRICE_LIMIT+" gwei.");
+        if(gasPrice.gte(ethers.utils.parseUnits(chain.gas_price_limit() || "0.01", 9))) {
+          console.log("GAS price is too high. Must be less than "+chain.gas_price_limit()+" gwei.");
           res.writeHead(200, { 'Content-Type': 'text/plain' });
           res.end("ERROR: GAS price is too high!");
           return;

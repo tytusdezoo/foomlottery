@@ -9,6 +9,7 @@ const { pedersenHash } = require("./utils/pedersen.js");
 const { getPath, findBet, readFees } = require("./utils/mimcMerkleTree.js");
 const circomlibjs = require("circomlibjs");
 const sprintfjs = require("sprintf-js");
+const chain = require("../forge-ffi-scripts/utils/chain.js");
 
 // Create readline interface
 const rl = readline.createInterface({
@@ -26,7 +27,7 @@ function question(query) {
 
 async function main() {
   dotenv.config();
-  const betMin = ethers.utils.parseUnits("1000000", 18);
+  const betMin = ethers.utils.parseUnits(chain.bet_min(), 18);
   const power1=10;
   const power2=16;
   const power3=22;
@@ -34,6 +35,9 @@ async function main() {
   if(inputs.length == 0) {
     console.log("Usage: node collect_receipt.js <invest_in_FOOM> <receipt>");
     process.exit(1);
+  }
+  if(!process.env.FOOM_URL) {
+    process.env.FOOM_URL = chain.foom_url();
   }
   const invest_in_FOOM = ethers.utils.parseUnits(inputs[0]||"0.0", 18);
   console.log("decode ...");
@@ -59,9 +63,9 @@ async function main() {
   const reward = betMin.mul(rew1*2**power1+rew2*2**power2+rew3*2**power3);
   console.log("Reward_in_FOOM: %s %s", ethers.utils.formatUnits(reward, 18), rewardbits.eq(0)?'no need to claim!':'');
 
-  const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
+  const provider = new ethers.providers.JsonRpcProvider(chain.rpc_url());
   const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-  const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
+  const lottery = new ethers.Contract(chain.lottery_address(), chain.lottery_abi(), wallet);
   const collected = await lottery.nullifier(nullifierHash);
   if(collected.gt(0)) {
     console.log("ticket already collected!");

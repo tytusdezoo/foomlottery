@@ -1,30 +1,23 @@
 #!/usr/bin/node
 const dotenv = require("dotenv");
 const { ethers } = require("ethers");
-const readline = require('readline');
-const { pedersenHash } = require("./utils/pedersen.js");
-const { rbigint, bigintToHex, leBigintToBuffer } = require("./utils/bigint.js");
 const { readLast } = require("./utils/mimcMerkleTree.js");
-const fs = require("fs");
 const sprintfjs = require("sprintf-js");
+const chain = require("../forge-ffi-scripts/utils/chain.js");
 
 ////////////////////////////// MAIN ///////////////////////////////////////////
 
 async function main() {
   dotenv.config();
-  const FOOM_ADDRESS = "0x02300aC24838570012027E0A90D3FEcCEF3c51d2";
-  const FOOM_ABI = [
-    "function balanceOf(address) view returns (uint256)",
-    "function approve(address,uint256) external returns (bool)",
-    "function allowance(address,address) view returns (uint256)",
-  ];
-  const betMin = ethers.utils.parseUnits("1000000", 18);
+  if(!process.env.FOOM_URL) {
+    process.env.FOOM_URL = chain.foom_url();
+  }
 
-  const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
+  const provider = new ethers.providers.JsonRpcProvider(chain.rpc_url());
   const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-  const lottery = new ethers.Contract(process.env.BASE_LOTTERY_ADDRESS, process.env.BASE_LOTTERY_ABI, wallet);
+  const lottery = new ethers.Contract(chain.lottery_address(), chain.lottery_abi(), wallet);
 
-  const foom = new ethers.Contract(FOOM_ADDRESS, FOOM_ABI, wallet);
+  const foom = new ethers.Contract(chain.foom_address(), chain.foom_abi(), wallet);
   const foomBalance = await foom.balanceOf(lottery.address);
   console.log("FOOM Lottery balance: %s M FOOM", ethers.utils.formatEther(foomBalance)/1000000);
   // read last
